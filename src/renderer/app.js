@@ -1,13 +1,32 @@
 if (!window.api) {
+  const SESSION_KEY = 'ff_session_token';
+
   const makeRpcCall = async (channel, ...args) => {
     const origin = window.location.origin;
+    const token = localStorage.getItem(SESSION_KEY) || '';
     const res = await fetch(`${origin}/api/rpc`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
       body: JSON.stringify({ channel, args })
     });
+
+    // Session expired or invalid — force logout
+    if (res.status === 401) {
+      localStorage.removeItem(SESSION_KEY);
+      window.location.reload();
+      return;
+    }
+
     const data = await res.json();
     if (data.error) throw new Error(data.error);
+
+    // Store session token returned after a successful login
+    if (data.sessionToken) {
+      localStorage.setItem(SESSION_KEY, data.sessionToken);
+    }
 
     // If it's a web download payload, trigger the browser download dynamically
     if (data.result && data.result.isWebDownload && data.result.content) {

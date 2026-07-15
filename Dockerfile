@@ -1,5 +1,5 @@
 # Dockerfile para implantação no Fly.io / VPS
-FROM node:20-slim AS builder
+FROM node:22-slim AS builder
 
 # Instala ferramentas necessárias para compilar dependências nativas (better-sqlite3)
 RUN apt-get update && apt-get install -y \
@@ -17,7 +17,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 # --- Estágio Final ---
-FROM node:20-slim
+FROM node:22-slim
 
 WORKDIR /app
 

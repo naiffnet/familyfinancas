@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -8,9 +9,45 @@ const XLSX = require('xlsx');
 const Database = require('./src/database/db');
 
 // Instantiate Database in standalone mode
-// By default, it will save 'financeiro.db' in the project root folder.
 const db = new Database();
 db.initialize();
+
+// ── SESSION MANAGEMENT ──────────────────────────────────────────────────────
+// Simple in-memory session store (token → { userId, username, expiresAt })
+// Sessions are cleared on server restart — users just re-login (expected behavior for auto-stop).
+const sessions = new Map();
+const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+function createSession(userId, username) {
+  const token = crypto.randomBytes(32).toString('hex');
+  sessions.set(token, { userId, username, expiresAt: Date.now() + SESSION_TTL_MS });
+  // Cleanup expired sessions periodically to avoid memory leak
+  if (sessions.size > 500) {
+    for (const [t, s] of sessions) {
+      if (s.expiresAt < Date.now()) sessions.delete(t);
+    }
+  }
+  return token;
+}
+
+function getSession(token) {
+  if (!token) return null;
+  const session = sessions.get(token);
+  if (!session) return null;
+  if (session.expiresAt < Date.now()) {
+    sessions.delete(token);
+    return null;
+  }
+  return session;
+}
+
+// Channels that don't require a valid session token
+const PUBLIC_CHANNELS = new Set([
+  'auth:login',
+  'auth:register',
+  'auth:getRecoveryQuestion',
+  'auth:resetPasswordWithAnswer',
+]);
 
 const handlers = {
   'auth:login':    (d) => db.login(d.username, d.password),
@@ -275,27 +312,64 @@ const handlers = {
 };
 
 const expressApp = express();
-expressApp.use(cors());
+
+// ── CORS ─────────────────────────────────────────────────────────────────────
+// Allow same-origin + fly.dev domains + localhost for development.
+// Blocks third-party websites from making requests to the server.
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Same-origin requests and curl/mobile have no origin header — allow them.
+    if (!origin) return callback(null, true);
+    // Allow fly.dev deployments and localhost dev server.
+    if (origin.endsWith('.fly.dev') || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
+      return callback(null, true);
+    }
+    callback(new Error('Bloqueado por política de CORS'));
+  },
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+expressApp.use(cors(corsOptions));
 expressApp.use(express.json({ limit: '50mb' }));
 
-// Redirect root to app.html for direct login access
-expressApp.get('/', (req, res) => {
-  res.redirect('/app.html');
+// ── HEALTH CHECK ─────────────────────────────────────────────────────────────
+// Used by Fly.io to confirm the app is alive after waking from auto-stop.
+expressApp.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+
 
 // Serve static files from the renderer directory
 expressApp.use(express.static(path.join(__dirname, 'src', 'renderer')));
 
-// Expose JSON-RPC endpoint
+// ── JSON-RPC ENDPOINT ────────────────────────────────────────────────────────
 expressApp.post('/api/rpc', async (req, res) => {
   const { channel, args } = req.body;
   const handler = handlers[channel];
   if (!handler) {
     return res.status(404).json({ error: `RPC Handler for ${channel} not found` });
   }
+
+  // Enforce session authentication for all non-public channels
+  if (!PUBLIC_CHANNELS.has(channel)) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!getSession(token)) {
+      return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
+    }
+  }
+
   try {
     const result = await handler(...(args || []));
-    res.json({ result });
+
+    // After a successful login, create a session token and attach it to the response.
+    let sessionToken = null;
+    if (channel === 'auth:login' && result && result.success) {
+      sessionToken = createSession(result.user.id, result.user.username);
+    }
+
+    res.json({ result, ...(sessionToken ? { sessionToken } : {}) });
   } catch (err) {
     console.error(`Error in RPC Express route ${channel}:`, err);
     res.status(500).json({ error: err.message });
@@ -306,6 +380,6 @@ const PORT = process.env.PORT || 3000;
 expressApp.listen(PORT, '0.0.0.0', () => {
   console.log(`\n======================================================`);
   console.log(`[Standalone Server] Running on http://localhost:${PORT}`);
-  console.log(`[Standalone Server] Ready for deployment on VPS / Render / Railway!`);
+  console.log(`[Standalone Server] Ready for deployment on Fly.io!`);
   console.log(`======================================================\n`);
 });
