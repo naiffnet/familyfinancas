@@ -16,7 +16,9 @@ if (!window.api) {
     // Session expired or invalid — force logout
     if (res.status === 401) {
       localStorage.removeItem(SESSION_KEY);
-      window.location.reload();
+      if (token) {
+        window.location.reload();
+      }
       return;
     }
 
@@ -3629,8 +3631,14 @@ async function initLoginScreen() {
   const list = document.getElementById('user-list');
   
   if (familyId) {
-    const users = await window.api.auth.getUsers({ familyId });
-    if (users.length > 0) {
+    let users = null;
+    try {
+      users = await window.api.auth.getUsers({ familyId });
+    } catch (e) {
+      console.warn("Could not load users list:", e);
+    }
+
+    if (users && !users.error && Array.isArray(users) && users.length > 0) {
       list.innerHTML = users.map(u => `
         <div class="user-chip" data-username="${u.username}">
           ${renderAvatarHtml(u, 28)}
@@ -3660,9 +3668,22 @@ async function initLoginScreen() {
         };
       });
     } else {
-      localStorage.removeItem('financeiro_family_id');
-      localStorage.removeItem('financeiro_family_name');
-      return initLoginScreen();
+      list.innerHTML = '';
+      if (divider) divider.style.display = 'none';
+      
+      const changeWrap = document.createElement('div');
+      changeWrap.style.cssText = 'text-align: center; font-size: 11px; color: var(--text-muted); margin-top: 12px; display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%;';
+      changeWrap.innerHTML = `
+        <span>Dispositivo vinculado à <strong>${familyName || 'Família'}</strong></span>
+        <button id="btn-change-family" style="background:none; border:none; color: var(--accent-light); cursor: pointer; text-decoration: underline; font-weight: 600; font-family: inherit; font-size: 11px; padding:0;">Alterar</button>
+      `;
+      list.appendChild(changeWrap);
+      
+      document.getElementById('btn-change-family').onclick = () => {
+        localStorage.removeItem('financeiro_family_id');
+        localStorage.removeItem('financeiro_family_name');
+        initLoginScreen();
+      };
     }
   } else {
     list.innerHTML = `
