@@ -3236,6 +3236,14 @@ async function renderSettings() {
       const err = document.getElementById('prof-error-text');
       if (err) err.textContent = '';
       
+      const firstName = document.getElementById('prof-first-name').value.trim();
+      const lastName = document.getElementById('prof-last-name').value.trim();
+      const cpf = document.getElementById('prof-cpf').value.trim();
+      const birthDate = document.getElementById('prof-birth-date').value;
+      const email = document.getElementById('prof-email').value.trim();
+      const phone = document.getElementById('prof-phone').value.trim();
+      const username = document.getElementById('prof-username') ? document.getElementById('prof-username').value.trim() : State.user.username;
+      const password = document.getElementById('prof-password').value;
       const recovery_question = document.getElementById('prof-recovery-question').value;
       const recovery_answer = document.getElementById('prof-recovery-answer').value.trim();
 
