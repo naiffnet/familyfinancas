@@ -111,6 +111,14 @@ class AppDatabase {
       this.db.exec("ALTER TABLE users ADD COLUMN recovery_answer TEXT");
     } catch (e) {}
 
+    // 4.6. Add accepted_terms_timestamp and accepted_terms_version to users if not exists
+    try {
+      this.db.exec("ALTER TABLE users ADD COLUMN accepted_terms_timestamp TEXT");
+    } catch (e) {}
+    try {
+      this.db.exec("ALTER TABLE users ADD COLUMN accepted_terms_version INTEGER DEFAULT 0");
+    } catch (e) {}
+
     // 5. Migrate accounts CHECK constraint to include 'voucher'
     try {
       const accountSchema = this.db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='accounts'").get();
@@ -454,6 +462,8 @@ class AppDatabase {
         profile_type INTEGER DEFAULT 2,
         recovery_question TEXT,
         recovery_answer TEXT,
+        accepted_terms_timestamp TEXT,
+        accepted_terms_version INTEGER DEFAULT 0,
         created_at TEXT DEFAULT (datetime('now'))
       );
 
@@ -748,7 +758,9 @@ class AppDatabase {
       cpf = null,
       birth_date = null,
       recovery_question = null,
-      recovery_answer = null
+      recovery_answer = null,
+      accepted_terms_timestamp = null,
+      accepted_terms_version = 0
     } = data;
 
     // Validate username regex: only lowercase letters, numbers, dot, dash, underscore
@@ -812,9 +824,9 @@ class AppDatabase {
     const finalRecoveryAnswer = recovery_answer ? bcrypt.hashSync(recovery_answer.trim().toLowerCase(), 10) : null;
 
     const result = this.db.prepare(`
-      INSERT INTO users (name, first_name, last_name, email, phone, cpf, birth_date, username, password_hash, avatar_color, family_id, profile_type, recovery_question, recovery_answer) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(nameToSave, firstNameToSave, lastNameToSave, email, phone, cpf, birth_date, finalUsername, hash, color, finalFamilyId, profileType, recovery_question, finalRecoveryAnswer);
+      INSERT INTO users (name, first_name, last_name, email, phone, cpf, birth_date, username, password_hash, avatar_color, family_id, profile_type, recovery_question, recovery_answer, accepted_terms_timestamp, accepted_terms_version) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(nameToSave, firstNameToSave, lastNameToSave, email, phone, cpf, birth_date, finalUsername, hash, color, finalFamilyId, profileType, recovery_question, finalRecoveryAnswer, accepted_terms_timestamp, accepted_terms_version);
     
     const userId = result.lastInsertRowid;
     
@@ -912,6 +924,34 @@ class AppDatabase {
       return { success: true };
     } catch (err) {
       console.error('Error updating user:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  deleteUserAccount(userId) {
+    try {
+      const transaction = this.db.transaction(() => {
+        // 1. Delete transactions
+        this.db.prepare('DELETE FROM transactions WHERE user_id = ?').run(userId);
+        // 2. Delete budgets
+        this.db.prepare('DELETE FROM budgets WHERE user_id = ?').run(userId);
+        // 3. Delete goals
+        this.db.prepare('DELETE FROM goals WHERE user_id = ?').run(userId);
+        // 4. Delete categories
+        this.db.prepare('DELETE FROM categories WHERE user_id = ?').run(userId);
+        // 5. Delete accounts
+        this.db.prepare('DELETE FROM accounts WHERE user_id = ?').run(userId);
+        // 6. Delete user permissions
+        this.db.prepare('DELETE FROM user_permissions WHERE user_id = ?').run(userId);
+        // 7. Delete settings
+        this.db.prepare('DELETE FROM app_settings WHERE user_id = ?').run(userId);
+        // 8. Delete user
+        this.db.prepare('DELETE FROM users WHERE id = ?').run(userId);
+      });
+      transaction();
+      return { success: true };
+    } catch (err) {
+      console.error('Error deleting user account:', err);
       return { success: false, error: err.message };
     }
   }

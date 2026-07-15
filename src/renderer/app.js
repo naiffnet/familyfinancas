@@ -65,6 +65,7 @@ if (!window.api) {
       getUsers: () => makeRpcCall('auth:getUsers'),
       updateUser: (d) => makeRpcCall('auth:updateUser', d),
       deleteUser: (id) => makeRpcCall('auth:deleteUser', id),
+      deleteSelf: (id) => makeRpcCall('auth:deleteSelf', id),
       updatePositions: (positions) => makeRpcCall('auth:updatePositions', { positions }),
       getRecoveryQuestion: (username) => makeRpcCall('auth:getRecoveryQuestion', username),
       resetPasswordWithAnswer: (d) => makeRpcCall('auth:resetPasswordWithAnswer', d),
@@ -3186,6 +3187,33 @@ async function renderSettings() {
           </button>
         </div>
       </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">⚖️ Privacidade & LGPD (Conformidade)</div>
+        <div class="card" style="padding: 20px;">
+          <div style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 16px;">
+            De acordo com a Lei Geral de Proteção de Dados (LGPD), você possui o controle total sobre seus dados pessoais cadastrais e registros de transações financeiras.
+            <br><br>
+            <strong>Termos aceitos em:</strong> ${State.user.accepted_terms_timestamp ? new Date(State.user.accepted_terms_timestamp).toLocaleString('pt-BR') : 'Não registrado (versão legada)'}
+            <br>
+            <strong>Versão dos termos:</strong> ${State.user.accepted_terms_version || 'N/A'}
+          </div>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <button class="btn btn-secondary btn-sm" id="btn-show-terms-settings" style="padding: 8px 16px;">Visualizar Termos de Uso</button>
+            <button class="btn btn-secondary btn-sm" id="btn-show-privacy-settings" style="padding: 8px 16px;">Visualizar Política de Privacidade</button>
+          </div>
+          <div style="border-top: 1px dashed var(--border); margin: 16px 0;"></div>
+          <div>
+            <div style="font-size: 13px; font-weight: 600; color: #ef4444; margin-bottom: 8px;">⚠️ Excluir Minha Conta (Direito ao Esquecimento)</div>
+            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">
+              Ao clicar no botão abaixo, todos os seus dados pessoais (nome, CPF, e-mail, telefone), contas bancárias registradas, transações financeiras, orçamentos e metas serão <strong>excluídos permanentemente</strong> de nossos bancos de dados, sem possibilidade de recuperação.
+            </p>
+            <button class="btn btn-danger btn-sm" id="btn-delete-my-account" style="background-color: #ef4444; border-color: #ef4444; padding: 8px 16px;">
+              Excluir Definitivamente Minha Conta
+            </button>
+          </div>
+        </div>
+      </div>
     </div>`;
 
   // --- MEU PERFIL EVENT BINDINGS & MASKS ---
@@ -3418,6 +3446,103 @@ async function renderSettings() {
     });
     
     setupUserDragAndDrop(page.querySelector('.settings-list'));
+  }
+
+  // Bind Privacy Term buttons in Settings
+  const btnShowTerms = document.getElementById('btn-show-terms-settings');
+  const btnShowPrivacy = document.getElementById('btn-show-privacy-settings');
+  if (btnShowTerms) {
+    btnShowTerms.onclick = () => {
+      const overlay = document.getElementById('lgpd-modal-overlay');
+      const title = document.getElementById('lgpd-modal-title');
+      const content = document.getElementById('lgpd-modal-content');
+      title.textContent = 'Termos de Uso';
+      content.textContent = TERMS_OF_USE_TEXT;
+      overlay.style.display = 'flex';
+    };
+  }
+  if (btnShowPrivacy) {
+    btnShowPrivacy.onclick = () => {
+      const overlay = document.getElementById('lgpd-modal-overlay');
+      const title = document.getElementById('lgpd-modal-title');
+      const content = document.getElementById('lgpd-modal-content');
+      title.textContent = 'Política de Privacidade (LGPD)';
+      content.textContent = PRIVACY_POLICY_TEXT;
+      overlay.style.display = 'flex';
+    };
+  }
+
+  // Account erasure button
+  const btnDeleteMyAccount = document.getElementById('btn-delete-my-account');
+  if (btnDeleteMyAccount) {
+    btnDeleteMyAccount.onclick = () => {
+      if (State.user.username === 'adm') {
+        toast('O administrador do sistema (adm) não pode ser excluído!', 'error');
+        return;
+      }
+      
+      // Open confirm modal asking for password
+      Modal.open('⚠️ Confirmar Exclusão de Conta', `
+        <div style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 15px;">
+          Esta ação é irreversível. Para confirmar a exclusão completa de todos os seus dados cadastrais e financeiros do sistema, digite a sua senha de acesso abaixo:
+        </div>
+        <div class="form-group">
+          <label for="delete-account-password">Sua Senha de Acesso</label>
+          <input type="password" id="delete-account-password" placeholder="Digite sua senha atual" style="width:100%;">
+        </div>
+        <p class="auth-error" id="delete-account-error" style="margin: 0; font-size: 12px;"></p>
+        <div class="modal-footer" style="padding:0;border:none;margin-top:16px">
+          <button class="btn btn-secondary" id="btn-cancel-delete">Cancelar</button>
+          <button class="btn btn-danger" id="btn-confirm-delete" style="background-color: #ef4444; border-color: #ef4444;">Excluir Conta Permanentemente</button>
+        </div>
+      `);
+      
+      document.getElementById('btn-cancel-delete').onclick = Modal.close;
+      document.getElementById('btn-confirm-delete').onclick = async () => {
+        const passwordInput = document.getElementById('delete-account-password').value;
+        const errEl = document.getElementById('delete-account-error');
+        errEl.textContent = '';
+        
+        if (!passwordInput) {
+          errEl.textContent = 'Por favor, insira sua senha.';
+          return;
+        }
+        
+        const confirmBtn = document.getElementById('btn-confirm-delete');
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Processando...';
+        
+        // Authenticate password
+        const authCheck = await window.api.auth.login({ username: State.user.username, password: passwordInput });
+        if (!authCheck.success) {
+          errEl.textContent = 'Senha incorreta. Acesso negado.';
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = 'Excluir Conta Permanentemente';
+          return;
+        }
+        
+        // Execute cascaded deletion
+        const delRes = await window.api.auth.deleteSelf(State.user.id);
+        if (delRes.success) {
+          Modal.close();
+          toast('Sua conta e todos os seus dados foram purgados do sistema.', 'success');
+          
+          // Clear session and redirect to login
+          localStorage.removeItem('sessionToken');
+          sessionStorage.removeItem('sessionToken');
+          State.user = null;
+          State.token = null;
+          
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+        } else {
+          errEl.textContent = delRes.error || 'Erro ao processar exclusão de dados.';
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = 'Excluir Conta Permanentemente';
+        }
+      };
+    };
   }
 }
 
@@ -3972,6 +4097,11 @@ setTimeout(() => {
           if (err) err.textContent = 'Por favor, preencha todos os campos do Passo 3';
           return;
         }
+        const acceptedTerms = document.getElementById('wiz-accepted-terms').checked;
+        if (!acceptedTerms) {
+          if (err) err.textContent = 'Você deve aceitar os Termos de Uso e Política de Privacidade para cadastrar-se';
+          return;
+        }
         if (password.length < 6) {
           if (err) err.textContent = 'A senha deve possuir no mínimo 6 caracteres';
           return;
@@ -3994,7 +4124,9 @@ setTimeout(() => {
           username,
           password,
           recovery_question,
-          recovery_answer
+          recovery_answer,
+          accepted_terms_timestamp: new Date().toISOString(),
+          accepted_terms_version: 1
         });
 
         nextBtn.disabled = false;
@@ -5211,3 +5343,98 @@ if ('serviceWorker' in navigator && !window.api.isElectron) {
       .catch(err => console.error('Falha ao registrar o Service Worker:', err));
   });
 }
+
+// --- LGPD / PRIVACY MODAL STRINGS & INITIALIZATION ---
+const TERMS_OF_USE_TEXT = `TERMOS DE USO — FINANÇAS FAMÍLIA
+
+1. Objeto e Aceite dos Termos
+O aplicativo FinançasFamília é uma plataforma digital para gestão financeira pessoal e controle orçamentário. Ao utilizar o sistema, você declara ter lido, compreendido e aceitado integralmente estes Termos de Uso.
+
+2. Cadastro e Responsabilidades
+O cadastro exige o fornecimento de dados pessoais verídicos (nome completo, CPF, e-mail, telefone, data de nascimento). Você é o único responsável pela guarda de sua senha de acesso e por todas as atividades realizadas em sua conta.
+
+3. Restrições de Uso
+Você se compromete a não utilizar a plataforma para atividades ilícitas, tentar burlar as medidas de segurança do sistema, ou de qualquer forma prejudicar o funcionamento normal do servidor.
+
+4. Isenção de Responsabilidade
+O FinançasFamília não realiza consultoria financeira personalizada nem se responsabiliza por decisões econômicas tomadas com base nos relatórios gerados pelo app. O serviço é disponibilizado "como está", sem garantias implícitas.
+
+5. Vigência e Alterações
+Estes Termos podem ser atualizados periodicamente. A versão vigente estará sempre disponível no app. O uso contínuo do sistema após alterações constitui concordância automática.`;
+
+const PRIVACY_POLICY_TEXT = `POLÍTICA DE PRIVACIDADE — LGPD
+
+1. Tratamento de Dados Pessoais
+Coletamos os seus dados cadastrais (Nome, CPF, Data de Nascimento, E-mail, Telefone) com a finalidade exclusiva de realizar a sua identificação, garantir a segurança do acesso e viabilizar a recuperação de senha. Coletamos também os lançamentos financeiros inseridos voluntariamente por você para compor os relatórios de gastos da sua família.
+
+2. Base Legal para o Tratamento
+Em conformidade com a Lei Geral de Proteção de Dados (LGPD - Lei nº 13.709/2018), tratamos seus dados pessoais com base em duas hipóteses:
+- Consentimento (Art. 7º, I): manifestado ao aceitar a caixinha de seleção no momento do cadastro.
+- Execução de Contrato (Art. 7º, V): necessário para a prestação das funcionalidades de controle financeiro contratadas por você.
+
+3. Segurança e Armazenamento
+Os dados são armazenados de forma estruturada e segura em nossa base de dados, com aplicação de técnicas modernas de proteção e criptografia de senhas (bcrypt).
+
+4. Não Compartilhamento
+Seus dados financeiros e cadastrais pertencem exclusivamente a você e ao seu grupo familiar. O FinançasFamília não vende, aluga nem compartilha qualquer dado pessoal ou financeiro com terceiros para fins comerciais.
+
+5. Direitos dos Titulares de Dados (Art. 18)
+Você possui pleno controle sobre seus dados e pode exercer os seguintes direitos diretamente no painel do app:
+- Direito de Acesso e Retificação: visualizar e atualizar seus dados no menu de configurações do perfil.
+- Direito de Exclusão ("Direito ao Esquecimento"): apagar definitivamente todos os seus dados cadastrais e registros de transações por meio do botão "Excluir Minha Conta" em Configurações.`;
+
+function initLgpdModals() {
+  const overlay = document.getElementById('lgpd-modal-overlay');
+  const title = document.getElementById('lgpd-modal-title');
+  const content = document.getElementById('lgpd-modal-content');
+  const closeBtn = document.getElementById('lgpd-modal-close');
+  const okBtn = document.getElementById('lgpd-modal-btn-ok');
+
+  const showModal = (modalTitle, modalText) => {
+    title.textContent = modalTitle;
+    content.textContent = modalText;
+    overlay.style.display = 'flex';
+  };
+
+  const hideModal = () => {
+    overlay.style.display = 'none';
+  };
+
+  if (closeBtn) closeBtn.onclick = hideModal;
+  if (okBtn) okBtn.onclick = hideModal;
+
+  // Bind login screen links
+  const loginTerms = document.getElementById('link-login-terms');
+  const loginPrivacy = document.getElementById('link-login-privacy');
+  if (loginTerms) {
+    loginTerms.onclick = (e) => {
+      e.preventDefault();
+      showModal('Termos de Uso', TERMS_OF_USE_TEXT);
+    };
+  }
+  if (loginPrivacy) {
+    loginPrivacy.onclick = (e) => {
+      e.preventDefault();
+      showModal('Política de Privacidade (LGPD)', PRIVACY_POLICY_TEXT);
+    };
+  }
+
+  // Bind signup wizard links
+  const signupTerms = document.getElementById('link-terms-use');
+  const signupPrivacy = document.getElementById('link-privacy-policy');
+  if (signupTerms) {
+    signupTerms.onclick = (e) => {
+      e.preventDefault();
+      showModal('Termos de Uso', TERMS_OF_USE_TEXT);
+    };
+  }
+  if (signupPrivacy) {
+    signupPrivacy.onclick = (e) => {
+      e.preventDefault();
+      showModal('Política de Privacidade (LGPD)', PRIVACY_POLICY_TEXT);
+    };
+  }
+}
+
+// Call on startup
+initLgpdModals();

@@ -61,6 +61,7 @@ const handlers = {
   'auth:getUsers': (d)  => db.getUsers(d),
   'auth:updateUser': (d) => db.updateUser(d),
   'auth:deleteUser': (id) => db.deleteUser(id),
+  'auth:deleteSelf': (id) => db.deleteUserAccount(id),
   'auth:updatePositions': (d) => db.updateUserPositions(d.positions),
   'auth:getRecoveryQuestion': (username) => db.getRecoveryQuestion(username),
   'auth:resetPasswordWithAnswer': ({ username, answer, newPassword }) => db.resetPasswordWithAnswer(username, answer, newPassword),
