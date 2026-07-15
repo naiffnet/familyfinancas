@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('api', {
     updatePositions: (positions) => ipcRenderer.invoke('auth:updatePositions', { positions }),
     getRecoveryQuestion: (username) => ipcRenderer.invoke('auth:getRecoveryQuestion', username),
     resetPasswordWithAnswer: (d) => ipcRenderer.invoke('auth:resetPasswordWithAnswer', d),
+    exportMyData: (userId) => ipcRenderer.invoke('auth:exportMyData', userId),
   },
   settings: {
     get: (userId)      => ipcRenderer.invoke('settings:get', userId),

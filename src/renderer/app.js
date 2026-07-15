@@ -69,6 +69,7 @@ if (!window.api) {
       updatePositions: (positions) => makeRpcCall('auth:updatePositions', { positions }),
       getRecoveryQuestion: (username) => makeRpcCall('auth:getRecoveryQuestion', username),
       resetPasswordWithAnswer: (d) => makeRpcCall('auth:resetPasswordWithAnswer', d),
+      exportMyData: (userId) => makeRpcCall('auth:exportMyData', userId),
     },
     settings: {
       get: (userId)      => makeRpcCall('settings:get', userId),
@@ -3201,6 +3202,7 @@ async function renderSettings() {
           <div style="display: flex; gap: 12px; flex-wrap: wrap;">
             <button class="btn btn-secondary btn-sm" id="btn-show-terms-settings" style="padding: 8px 16px;">Visualizar Termos de Uso</button>
             <button class="btn btn-secondary btn-sm" id="btn-show-privacy-settings" style="padding: 8px 16px;">Visualizar Política de Privacidade</button>
+            <button class="btn btn-secondary btn-sm" id="btn-export-my-data" style="padding: 8px 16px; display: flex; align-items: center; gap: 6px;">📦 Exportar Meus Dados (JSON)</button>
           </div>
           <div style="border-top: 1px dashed var(--border); margin: 16px 0;"></div>
           <div>
@@ -3469,6 +3471,29 @@ async function renderSettings() {
       title.textContent = 'Política de Privacidade (LGPD)';
       content.textContent = PRIVACY_POLICY_TEXT;
       overlay.style.display = 'flex';
+    };
+  }
+
+  // LGPD data portability — export JSON button
+  const btnExportMyData = document.getElementById('btn-export-my-data');
+  if (btnExportMyData) {
+    btnExportMyData.onclick = async () => {
+      try {
+        const data = await window.api.auth.exportMyData(State.user.id);
+        if (!data) { toast('Erro ao exportar seus dados', 'error'); return; }
+        const json = JSON.stringify(data, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `meus-dados-financeiro-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+        toast('Seus dados foram exportados com sucesso!', 'success');
+      } catch (err) {
+        toast('Erro ao exportar dados: ' + err.message, 'error');
+      }
     };
   }
 

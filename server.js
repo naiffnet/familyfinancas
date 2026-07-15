@@ -7,6 +7,8 @@ const os = require('os');
 const qrcode = require('qrcode');
 const XLSX = require('xlsx');
 const Database = require('./src/database/db');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
 // Instantiate Database in standalone mode
 const db = new Database();
@@ -18,9 +20,16 @@ db.initialize();
 const sessions = new Map();
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-function createSession(userId, username) {
+function createSession(user) {
   const token = crypto.randomBytes(32).toString('hex');
-  sessions.set(token, { userId, username, expiresAt: Date.now() + SESSION_TTL_MS });
+  sessions.set(token, {
+    userId: user.id,
+    username: user.username,
+    familyId: user.family_id,
+    profileType: user.profile_type,
+    isSystemAdmin: user.is_system_admin || 0,
+    expiresAt: Date.now() + SESSION_TTL_MS
+  });
   // Cleanup expired sessions periodically to avoid memory leak
   if (sessions.size > 500) {
     for (const [t, s] of sessions) {
@@ -41,13 +50,95 @@ function getSession(token) {
   return session;
 }
 
+function isSameFamilyUser(userId, sessionFamilyId) {
+  const target = db.getUserById(userId);
+  return !!target && target.family_id === sessionFamilyId;
+}
+
+// Centralized ownership mapping for IDOR prevention
+const OWNERSHIP_CHECKS = {
+  'auth:updateUser': (session, d) => {
+    if (d.id === session.userId) return true;
+    if (session.profileType === 1 || session.profileType === 2) {
+      return isSameFamilyUser(d.id, session.familyId);
+    }
+    return false;
+  },
+  'auth:deleteUser': (session, id) => {
+    if (session.profileType === 1 || session.profileType === 2) {
+      return isSameFamilyUser(id, session.familyId);
+    }
+    return false;
+  },
+  'auth:deleteSelf': (session, id) => id === session.userId,
+  'auth:updatePositions': (session, d) => {
+    if (session.profileType !== 1 && session.profileType !== 2) return false;
+    if (!d || !Array.isArray(d.positions)) return false;
+    for (const p of d.positions) {
+      if (!isSameFamilyUser(p.id, session.familyId)) return false;
+    }
+    return true;
+  },
+  'settings:get': (session, userId) => userId === session.userId,
+  'settings:set': (session, d) => d.userId === session.userId,
+  'accounts:getAll': (session, userId) => userId === session.userId || isSameFamilyUser(userId, session.familyId),
+  'accounts:create': (session, d) => d.user_id === session.userId || isSameFamilyUser(d.user_id, session.familyId),
+  'accounts:update': (session, d) => db.checkAccountFamily(d.id, session.familyId),
+  'accounts:delete': (session, id) => db.checkAccountFamily(id, session.familyId),
+  'accounts:transfer': (session, d) => db.checkAccountFamily(d.fromAccountId, session.familyId) && db.checkAccountFamily(d.toAccountId, session.familyId),
+  'categories:getAll': (session, userId) => userId === session.userId || isSameFamilyUser(userId, session.familyId),
+  'categories:create': (session, d) => d.user_id === session.userId || isSameFamilyUser(d.user_id, session.familyId),
+  'categories:update': (session, d) => db.checkCategoryFamily(d.id, session.familyId),
+  'categories:delete': (session, id) => db.checkCategoryFamily(id, session.familyId),
+  'recurring:getAll': (session, d) => isSameFamilyUser(d.userId, session.familyId),
+  'recurring:create': (session, d) => isSameFamilyUser(d.user_id, session.familyId),
+  'recurring:update': (session, d) => db.checkRecurringFamily(d.id, session.familyId),
+  'recurring:delete': (session, d) => db.checkRecurringFamily(d.id, session.familyId),
+  'recurring:togglePriority': (session, id) => db.checkRecurringFamily(id, session.familyId),
+  'recurring:getMonthly': (session, d) => isSameFamilyUser(d.userId, session.familyId),
+  'recurring:postponeInstallment': (session, d) => db.checkTransactionFamily(d.txId, session.familyId) && db.checkRecurringFamily(d.itemId, session.familyId),
+  'recurring:updatePositions': (session, d) => isSameFamilyUser(d.userId, session.familyId),
+  'transactions:getAll': (session, f) => isSameFamilyUser(f.userId, session.familyId),
+  'transactions:create': (session, d) => isSameFamilyUser(d.user_id, session.familyId),
+  'transactions:update': (session, d) => db.checkTransactionFamily(d.id, session.familyId),
+  'transactions:delete': (session, id) => db.checkTransactionFamily(id, session.familyId),
+  'transactions:togglePaid': (session, id) => db.checkTransactionFamily(id, session.familyId),
+  'transactions:togglePaidWithDate': (session, id, date) => db.checkTransactionFamily(id, session.familyId),
+  'transactions:updatePositions': (session, d) => isSameFamilyUser(d.userId, session.familyId),
+  'budgets:getAll': (session, d) => isSameFamilyUser(d.userId, session.familyId),
+  'budgets:set': (session, d) => isSameFamilyUser(d.user_id, session.familyId),
+  'goals:getAll': (session, userId) => userId === session.userId || isSameFamilyUser(userId, session.familyId),
+  'goals:create': (session, d) => isSameFamilyUser(d.user_id, session.familyId),
+  'goals:update': (session, d) => db.checkGoalFamily(d.id, session.familyId),
+  'goals:delete': (session, id) => db.checkGoalFamily(id, session.familyId),
+  'goals:addDeposit': (session, d) => db.checkGoalFamily(d.goal_id, session.familyId),
+  'dashboard:getSummary': (session, d) => isSameFamilyUser(d.userId, session.familyId),
+  'dashboard:getGeneralSummary': (session, d) => isSameFamilyUser(d.userId, session.familyId),
+  'dashboard:getMonthlyChart': (session, d) => isSameFamilyUser(d.userId, session.familyId),
+  'dashboard:getCategoryChart': (session, d) => isSameFamilyUser(d.userId, session.familyId),
+  'reports:getCashflow': (session, d) => isSameFamilyUser(d.userId, session.familyId),
+  'reports:getPatrimony': (session, d) => isSameFamilyUser(d.userId, session.familyId),
+  'permissions:get': (session, userId) => isSameFamilyUser(userId, session.familyId),
+  'permissions:update': (session, d) => {
+    if (session.profileType !== 1 && session.profileType !== 2) return false;
+    return isSameFamilyUser(d.targetUserId, session.familyId);
+  },
+  'families:getAll': (session) => session.isSystemAdmin === 1,
+  'families:create': (session) => session.isSystemAdmin === 1,
+  'families:update': (session) => session.isSystemAdmin === 1,
+  'families:delete': (session) => session.isSystemAdmin === 1,
+  'server:getLogs': (session) => session.profileType === 1 || session.profileType === 2,
+  'logs:getByFamily': (session, id) => id === session.familyId,
+  'backup:exportExcel': (session, d) => isSameFamilyUser(d.userId, session.familyId),
+  'auth:exportMyData': (session, userId) => userId === session.userId
+};
+
 // Channels that don't require a valid session token
 const PUBLIC_CHANNELS = new Set([
   'auth:login',
   'auth:register',
   'auth:getRecoveryQuestion',
   'auth:resetPasswordWithAnswer',
-  'auth:getUsers',
   'families:checkName',
   'server:getInfo',
 ]);
@@ -111,25 +202,7 @@ const handlers = {
   'server:getLogs': () => db.getServerLogs(),
   'logs:getByFamily': (id) => db.getFamilyLogs(id),
   
-  // Backup web download handlers
-  'backup:export': async () => {
-    try {
-      if (!fs.existsSync(db.dbPath)) {
-        return { success: false, error: 'Arquivo do banco de dados não encontrado.' };
-      }
-      const fileBuffer = fs.readFileSync(db.dbPath);
-      const filename = `backup-financeiro-${new Date().toISOString().split('T')[0]}.db`;
-      return {
-        success: true,
-        filename,
-        content: fileBuffer.toString('base64'),
-        isWebDownload: true
-      };
-    } catch (err) {
-      console.error('Erro ao exportar backup do banco:', err);
-      return { success: false, error: err.message };
-    }
-  },
+  'auth:exportMyData': (userId) => db.exportMyData(userId),
 
   'backup:exportExcel': async ({ userId, month, year, type }) => {
     try {
@@ -317,6 +390,19 @@ const handlers = {
 
 const expressApp = express();
 
+expressApp.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:"],
+      connectSrc: ["'self'", "*"],
+    },
+  },
+}));
+
 // ── CORS ─────────────────────────────────────────────────────────────────────
 // Allow same-origin + fly.dev domains + localhost for development.
 // Blocks third-party websites from making requests to the server.
@@ -348,29 +434,140 @@ expressApp.get('/health', (req, res) => {
 expressApp.use(express.static(path.join(__dirname, 'src', 'renderer')));
 
 // ── JSON-RPC ENDPOINT ────────────────────────────────────────────────────────
-expressApp.post('/api/rpc', async (req, res) => {
+// Rate limiting configuration
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 attempts per IP in this window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas tentativas de autenticação. Tente novamente em 15 minutos.' }
+});
+
+const SENSITIVE_CHANNELS = new Set([
+  'auth:login',
+  'auth:register',
+  'auth:getRecoveryQuestion',
+  'auth:resetPasswordWithAnswer',
+]);
+
+const sensitiveChannelLimiter = (req, res, next) => {
+  const { channel } = req.body;
+  if (channel && SENSITIVE_CHANNELS.has(channel)) {
+    return authLimiter(req, res, next);
+  }
+  next();
+};
+
+// Brute force username lock database
+const loginAttempts = new Map();
+
+function recordLoginAttempt(username, success) {
+  const now = Date.now();
+  const attempt = loginAttempts.get(username) || { count: 0, lockUntil: 0 };
+  if (success) {
+    loginAttempts.delete(username);
+    return;
+  }
+  if (attempt.lockUntil > now) return;
+  attempt.count++;
+  if (attempt.count >= 5) {
+    attempt.lockUntil = now + 5 * 60 * 1000; // 5 minute lock
+  }
+  loginAttempts.set(username, attempt);
+}
+
+function checkLoginLock(username) {
+  const now = Date.now();
+  const attempt = loginAttempts.get(username);
+  if (attempt && attempt.lockUntil > now) {
+    return { allowed: false, lockTimeLeft: Math.ceil((attempt.lockUntil - now) / 1000) };
+  }
+  return { allowed: true };
+}
+
+// Admin backup route outside /api/rpc
+expressApp.get('/api/admin/backup', (req, res) => {
+  const adminKey = req.headers['x-admin-key'];
+  const expectedKey = process.env.ADMIN_OPERATION_KEY;
+  if (!expectedKey || expectedKey.length < 16) {
+    console.error("[Segurança] ADMIN_OPERATION_KEY não está configurada ou é muito curta.");
+    return res.status(500).json({ error: 'Erro interno de configuração do servidor.' });
+  }
+  if (!adminKey || adminKey !== expectedKey) {
+    return res.status(403).json({ error: 'Acesso negado.' });
+  }
+  if (!fs.existsSync(db.dbPath)) {
+    return res.status(404).json({ error: 'Banco de dados não encontrado.' });
+  }
+  const filename = `backup-financeiro-admin-${new Date().toISOString().split('T')[0]}.db`;
+  res.download(db.dbPath, filename);
+});
+
+// ── JSON-RPC ENDPOINT ────────────────────────────────────────────────────────
+expressApp.post('/api/rpc', sensitiveChannelLimiter, async (req, res) => {
   const { channel, args } = req.body;
   const handler = handlers[channel];
   if (!handler) {
     return res.status(404).json({ error: `RPC Handler for ${channel} not found` });
   }
 
+  let session = null;
   // Enforce session authentication for all non-public channels
   if (!PUBLIC_CHANNELS.has(channel)) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-    if (!getSession(token)) {
+    session = getSession(token);
+    if (!session) {
       return res.status(401).json({ error: 'Sessão expirada. Faça login novamente.' });
+    }
+
+    // IDOR / Centralized Ownership check
+    const checkFn = OWNERSHIP_CHECKS[channel];
+    if (checkFn) {
+      try {
+        const hasAccess = checkFn(session, ...(args || []));
+        if (!hasAccess) {
+          return res.status(403).json({ error: 'Acesso negado a este recurso' });
+        }
+      } catch (err) {
+        console.error(`Erro na checagem de posse para ${channel}:`, err);
+        return res.status(403).json({ error: 'Erro de autorização' });
+      }
+    } else {
+      // Fail secure
+      return res.status(403).json({ error: 'Acesso negado a este recurso' });
+    }
+  }
+
+  // Brute force username lock check
+  if (channel === 'auth:login') {
+    const { username } = args[0] || {};
+    if (username) {
+      const lockCheck = checkLoginLock(username);
+      if (!lockCheck.allowed) {
+        return res.status(429).json({ error: `Múltiplas tentativas incorretas. Usuário bloqueado. Tente novamente em ${lockCheck.lockTimeLeft} segundos.` });
+      }
     }
   }
 
   try {
-    const result = await handler(...(args || []));
+    let result;
+    if (channel === 'auth:getUsers') {
+      result = await db.getUsers({ familyId: session.familyId });
+    } else {
+      result = await handler(...(args || []));
+    }
 
-    // After a successful login, create a session token and attach it to the response.
+    // Record login attempts and handle sessions
     let sessionToken = null;
-    if (channel === 'auth:login' && result && result.success) {
-      sessionToken = createSession(result.user.id, result.user.username);
+    if (channel === 'auth:login') {
+      const { username } = args[0] || {};
+      if (username) {
+        recordLoginAttempt(username, result && result.success);
+      }
+      if (result && result.success) {
+        sessionToken = createSession(result.user);
+      }
     }
 
     res.json({ result, ...(sessionToken ? { sessionToken } : {}) });

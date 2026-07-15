@@ -1,6 +1,7 @@
 const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const path = require('path');
+const { encryptField, decryptField } = require('./crypto-utils');
 
 let app;
 try {
@@ -117,6 +118,14 @@ class AppDatabase {
     } catch (e) {}
     try {
       this.db.exec("ALTER TABLE users ADD COLUMN accepted_terms_version INTEGER DEFAULT 0");
+    } catch (e) {}
+
+    // 4.7. Add is_system_admin to users if not exists
+    try {
+      this.db.exec("ALTER TABLE users ADD COLUMN is_system_admin INTEGER DEFAULT 0");
+    } catch (e) {}
+    try {
+      this.db.exec("UPDATE users SET is_system_admin = 1 WHERE username = 'adm'");
     } catch (e) {}
 
     // 5. Migrate accounts CHECK constraint to include 'voucher'
@@ -464,6 +473,7 @@ class AppDatabase {
         recovery_answer TEXT,
         accepted_terms_timestamp TEXT,
         accepted_terms_version INTEGER DEFAULT 0,
+        is_system_admin INTEGER DEFAULT 0,
         created_at TEXT DEFAULT (datetime('now'))
       );
 
@@ -731,6 +741,9 @@ class AppDatabase {
     const valid = bcrypt.compareSync(password, user.password_hash);
     if (!valid) return { success: false, error: 'Senha incorreta' };
     const { password_hash, ...safeUser } = user;
+    if (safeUser.cpf) {
+      safeUser.cpf = decryptField(safeUser.cpf);
+    }
     this.logEvent('auth:login', `Usuário ${username} fez login.`, user.family_id);
     return { success: true, user: safeUser };
   }
@@ -822,11 +835,12 @@ class AppDatabase {
     }
 
     const finalRecoveryAnswer = recovery_answer ? bcrypt.hashSync(recovery_answer.trim().toLowerCase(), 10) : null;
+    const encryptedCpf = cpf ? encryptField(cpf) : null;
 
     const result = this.db.prepare(`
       INSERT INTO users (name, first_name, last_name, email, phone, cpf, birth_date, username, password_hash, avatar_color, family_id, profile_type, recovery_question, recovery_answer, accepted_terms_timestamp, accepted_terms_version) 
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(nameToSave, firstNameToSave, lastNameToSave, email, phone, cpf, birth_date, finalUsername, hash, color, finalFamilyId, profileType, recovery_question, finalRecoveryAnswer, accepted_terms_timestamp, accepted_terms_version);
+    `).run(nameToSave, firstNameToSave, lastNameToSave, email, phone, encryptedCpf, birth_date, finalUsername, hash, color, finalFamilyId, profileType, recovery_question, finalRecoveryAnswer, accepted_terms_timestamp, accepted_terms_version);
     
     const userId = result.lastInsertRowid;
     
@@ -853,10 +867,14 @@ class AppDatabase {
 
   getUsers(filters = {}) {
     const familyId = filters && typeof filters === 'object' ? filters.familyId : filters;
-    if (familyId) {
-      return this.db.prepare('SELECT id, name, first_name, last_name, email, phone, cpf, birth_date, username, avatar_color, avatar_image, family_id, profile_type, position FROM users WHERE family_id = ? ORDER BY position ASC, id ASC').all(familyId);
+    if (!familyId) {
+      throw new Error('familyId é obrigatório para listar usuários');
     }
-    return this.db.prepare('SELECT id, name, first_name, last_name, email, phone, cpf, birth_date, username, avatar_color, avatar_image, family_id, profile_type, position FROM users ORDER BY position ASC, id ASC').all();
+    const users = this.db.prepare('SELECT id, name, first_name, last_name, email, phone, cpf, birth_date, username, avatar_color, avatar_image, family_id, profile_type, position, is_system_admin FROM users WHERE family_id = ? ORDER BY position ASC, id ASC').all(familyId);
+    return users.map(u => {
+      if (u.cpf) u.cpf = decryptField(u.cpf);
+      return u;
+    });
   }
 
   updateUser(data) {
@@ -901,7 +919,19 @@ class AppDatabase {
       const lName = lastNameToSave !== undefined ? lastNameToSave : (cur ? cur.last_name : null);
       const mail = email !== undefined ? email : (cur ? cur.email : null);
       const ph = phone !== undefined ? phone : (cur ? cur.phone : null);
-      const cp = cpf !== undefined ? cpf : (cur ? cur.cpf : null);
+      
+      let cp = null;
+      if (cpf !== undefined) {
+        cp = cpf ? encryptField(cpf) : null;
+      } else if (cur && cur.cpf) {
+        const base64Regex = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+        if (!base64Regex.test(cur.cpf) || cur.cpf.length < 28) {
+          cp = encryptField(cur.cpf);
+        } else {
+          cp = cur.cpf;
+        }
+      }
+      
       const bDate = birth_date !== undefined ? birth_date : (cur ? cur.birth_date : null);
       const avImg = avatar_image !== undefined ? avatar_image : (cur ? cur.avatar_image : null);
       const recQ = recovery_question !== undefined ? recovery_question : (cur ? cur.recovery_question : null);
@@ -2380,6 +2410,160 @@ class AppDatabase {
       console.error(err);
       return { success: false, error: err.message };
     }
+  }
+
+  getUserById(id) {
+    const user = this.db.prepare('SELECT id, name, first_name, last_name, email, phone, cpf, birth_date, username, avatar_color, avatar_image, family_id, profile_type, is_system_admin FROM users WHERE id = ?').get(id);
+    if (user && user.cpf) {
+      user.cpf = decryptField(user.cpf);
+    }
+    return user;
+  }
+
+  checkAccountFamily(accountId, familyId) {
+    const res = this.db.prepare('SELECT u.family_id FROM accounts a JOIN users u ON a.user_id = u.id WHERE a.id = ?').get(accountId);
+    return res && res.family_id === familyId;
+  }
+
+  checkTransactionFamily(transactionId, familyId) {
+    const res = this.db.prepare('SELECT u.family_id FROM transactions t JOIN users u ON t.user_id = u.id WHERE t.id = ?').get(transactionId);
+    return res && res.family_id === familyId;
+  }
+
+  checkCategoryFamily(categoryId, familyId) {
+    const res = this.db.prepare('SELECT user_id FROM categories WHERE id = ?').get(categoryId);
+    if (!res) return false;
+    if (res.user_id === null) return true; // System/default categories are public
+    const u = this.getUserById(res.user_id);
+    return u && u.family_id === familyId;
+  }
+
+  checkGoalFamily(goalId, familyId) {
+    const res = this.db.prepare('SELECT u.family_id FROM goals g JOIN users u ON g.user_id = u.id WHERE g.id = ?').get(goalId);
+    return res && res.family_id === familyId;
+  }
+
+  checkRecurringFamily(recurringId, familyId) {
+    const res = this.db.prepare('SELECT u.family_id FROM recurring_items r JOIN users u ON r.user_id = u.id WHERE r.id = ?').get(recurringId);
+    return res && res.family_id === familyId;
+  }
+
+  exportMyData(userId) {
+    try {
+      const user = this.getUserById(userId);
+      if (!user) return { success: false, error: 'Usuário não encontrado' };
+      
+      const familyId = user.family_id;
+      
+      // Get all family members (safe fields only)
+      const members = this.db.prepare('SELECT id, name, first_name, last_name, email, phone, cpf, birth_date, username, profile_type FROM users WHERE family_id = ?').all(familyId);
+      for (const m of members) {
+        if (m.cpf) m.cpf = decryptField(m.cpf);
+      }
+      
+      // Get accounts
+      const accounts = this.db.prepare('SELECT id, name, type, bank, balance, agency, account_number FROM accounts WHERE user_id = ? OR user_id IN (SELECT id FROM users WHERE family_id = ?)').all(userId, familyId);
+      
+      // Get transactions
+      const transactions = this.db.prepare('SELECT id, account_id, category_id, type, amount, description, date, is_paid, is_avulso FROM transactions WHERE user_id = ? OR user_id IN (SELECT id FROM users WHERE family_id = ?)').all(userId, familyId);
+      
+      // Get categories
+      const categories = this.db.prepare('SELECT id, name, type, color, icon, is_default FROM categories WHERE user_id = ? OR user_id IS NULL').all(userId);
+      
+      // Get budgets
+      const budgets = this.db.prepare('SELECT id, category_id, amount, month, year FROM budgets WHERE user_id = ? OR user_id IN (SELECT id FROM users WHERE family_id = ?)').all(userId, familyId);
+      
+      // Get goals
+      const goals = this.db.prepare('SELECT id, name, target_amount, current_amount, deadline, color FROM goals WHERE user_id = ? OR user_id IN (SELECT id FROM users WHERE family_id = ?)').all(userId, familyId);
+
+      // Get recurring items
+      const recurring = this.db.prepare('SELECT id, name, amount, type, due_day, account_id, category_id FROM recurring_items WHERE user_id = ? OR user_id IN (SELECT id FROM users WHERE family_id = ?)').all(userId, familyId);
+      
+      return {
+        success: true,
+        data: {
+          export_timestamp: new Date().toISOString(),
+          personal_info: {
+            id: user.id,
+            name: user.name,
+            first_name: user.first_name,
+            last_name: user.last_name,
+            email: user.email,
+            phone: user.phone,
+            cpf: user.cpf,
+            birth_date: user.birth_date,
+            username: user.username,
+            profile_type: user.profile_type
+          },
+          family_members: members,
+          accounts,
+          transactions,
+          categories,
+          budgets,
+          goals,
+          recurring
+        }
+      };
+    } catch (err) {
+      console.error('Error exporting my data:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  // ── OWNERSHIP VALIDATION HELPERS ─────────────────────────────────────────
+  // Used by server.js and main.js IDOR middleware to validate resource access.
+
+  getUserById(id) {
+    try {
+      return this.db.prepare('SELECT id, username, name, family_id, profile_type, is_system_admin FROM users WHERE id = ?').get(id);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  checkAccountFamily(accountId, familyId) {
+    try {
+      const row = this.db.prepare(
+        'SELECT 1 FROM accounts a JOIN users u ON u.id = a.user_id WHERE a.id = ? AND u.family_id = ?'
+      ).get(accountId, familyId);
+      return !!row;
+    } catch (e) { return false; }
+  }
+
+  checkTransactionFamily(txId, familyId) {
+    try {
+      const row = this.db.prepare(
+        'SELECT 1 FROM transactions t JOIN users u ON u.id = t.user_id WHERE t.id = ? AND u.family_id = ?'
+      ).get(txId, familyId);
+      return !!row;
+    } catch (e) { return false; }
+  }
+
+  checkCategoryFamily(categoryId, familyId) {
+    try {
+      const row = this.db.prepare(
+        'SELECT 1 FROM categories c JOIN users u ON u.id = c.user_id WHERE c.id = ? AND u.family_id = ?'
+      ).get(categoryId, familyId);
+      return !!row;
+    } catch (e) { return false; }
+  }
+
+  checkGoalFamily(goalId, familyId) {
+    try {
+      const row = this.db.prepare(
+        'SELECT 1 FROM goals g JOIN users u ON u.id = g.user_id WHERE g.id = ? AND u.family_id = ?'
+      ).get(goalId, familyId);
+      return !!row;
+    } catch (e) { return false; }
+  }
+
+  checkRecurringFamily(itemId, familyId) {
+    try {
+      const row = this.db.prepare(
+        'SELECT 1 FROM recurring_items r JOIN users u ON u.id = r.user_id WHERE r.id = ? AND u.family_id = ?'
+      ).get(itemId, familyId);
+      return !!row;
+    } catch (e) { return false; }
   }
 }
 
