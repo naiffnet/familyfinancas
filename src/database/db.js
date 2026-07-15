@@ -862,10 +862,10 @@ class AppDatabase {
       return { success: false, error: 'Nome de usuário já está em uso' };
     }
 
-    // Get current user to protect adm
-    const currentUser = this.db.prepare('SELECT username FROM users WHERE id = ?').get(id);
+    // Get current user to protect adm and preserve existing role
+    const currentUser = this.db.prepare('SELECT username, profile_type FROM users WHERE id = ?').get(id);
     const isAdm = currentUser && currentUser.username === 'adm';
-    const finalProfileType = isAdm ? 1 : (profile_type !== undefined ? profile_type : 2);
+    const finalProfileType = isAdm ? 1 : (profile_type !== undefined ? profile_type : (currentUser ? currentUser.profile_type : 2));
 
     let nameToSave = name;
     let firstNameToSave = first_name;
