@@ -51,6 +51,8 @@ class AppDatabase {
   constructor(dbPath) {
     if (dbPath) {
       this.dbPath = dbPath;
+    } else if (process.env.DATABASE_PATH) {
+      this.dbPath = process.env.DATABASE_PATH;
     } else if (app) {
       const userDataPath = app.getPath('userData');
       this.dbPath = path.join(userDataPath, 'financeiro.db');
@@ -100,6 +102,14 @@ class AppDatabase {
     } catch (e) {
       // Column already exists
     }
+
+    // 4.5. Add recovery_question and recovery_answer to users if not exists
+    try {
+      this.db.exec("ALTER TABLE users ADD COLUMN recovery_question TEXT");
+    } catch (e) {}
+    try {
+      this.db.exec("ALTER TABLE users ADD COLUMN recovery_answer TEXT");
+    } catch (e) {}
 
     // 5. Migrate accounts CHECK constraint to include 'voucher'
     try {
@@ -442,6 +452,8 @@ class AppDatabase {
         avatar_image TEXT,
         family_id INTEGER REFERENCES families(id) ON DELETE SET NULL,
         profile_type INTEGER DEFAULT 2,
+        recovery_question TEXT,
+        recovery_answer TEXT,
         created_at TEXT DEFAULT (datetime('now'))
       );
 
@@ -734,7 +746,9 @@ class AppDatabase {
       email = null,
       phone = null,
       cpf = null,
-      birth_date = null
+      birth_date = null,
+      recovery_question = null,
+      recovery_answer = null
     } = data;
 
     // Validate username regex: only lowercase letters, numbers, dot, dash, underscore
@@ -795,10 +809,12 @@ class AppDatabase {
       }
     }
 
+    const finalRecoveryAnswer = recovery_answer ? bcrypt.hashSync(recovery_answer.trim().toLowerCase(), 10) : null;
+
     const result = this.db.prepare(`
-      INSERT INTO users (name, first_name, last_name, email, phone, cpf, birth_date, username, password_hash, avatar_color, family_id, profile_type) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(nameToSave, firstNameToSave, lastNameToSave, email, phone, cpf, birth_date, finalUsername, hash, color, finalFamilyId, profileType);
+      INSERT INTO users (name, first_name, last_name, email, phone, cpf, birth_date, username, password_hash, avatar_color, family_id, profile_type, recovery_question, recovery_answer) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(nameToSave, firstNameToSave, lastNameToSave, email, phone, cpf, birth_date, finalUsername, hash, color, finalFamilyId, profileType, recovery_question, finalRecoveryAnswer);
     
     const userId = result.lastInsertRowid;
     
@@ -832,7 +848,7 @@ class AppDatabase {
   }
 
   updateUser(data) {
-    const { id, name, username, password, avatar_image, profile_type, first_name, last_name, email, phone, cpf, birth_date } = data;
+    const { id, name, username, password, avatar_image, profile_type, first_name, last_name, email, phone, cpf, birth_date, recovery_question, recovery_answer } = data;
     
     // Validate username regex: only lowercase letters, numbers, dot, dash, underscore
     const usernameRegex = /^[a-z0-9_.-]+$/;
@@ -867,7 +883,7 @@ class AppDatabase {
     }
 
     try {
-      const cur = this.db.prepare('SELECT first_name, last_name, email, phone, cpf, birth_date, avatar_image FROM users WHERE id = ?').get(id);
+      const cur = this.db.prepare('SELECT first_name, last_name, email, phone, cpf, birth_date, avatar_image, recovery_question, recovery_answer FROM users WHERE id = ?').get(id);
       
       const fName = firstNameToSave !== undefined ? firstNameToSave : (cur ? cur.first_name : null);
       const lName = lastNameToSave !== undefined ? lastNameToSave : (cur ? cur.last_name : null);
@@ -876,20 +892,22 @@ class AppDatabase {
       const cp = cpf !== undefined ? cpf : (cur ? cur.cpf : null);
       const bDate = birth_date !== undefined ? birth_date : (cur ? cur.birth_date : null);
       const avImg = avatar_image !== undefined ? avatar_image : (cur ? cur.avatar_image : null);
+      const recQ = recovery_question !== undefined ? recovery_question : (cur ? cur.recovery_question : null);
+      const recA = recovery_answer !== undefined ? (recovery_answer ? bcrypt.hashSync(recovery_answer.trim().toLowerCase(), 10) : null) : (cur ? cur.recovery_answer : null);
 
       if (password && password.trim() !== '') {
         const hash = bcrypt.hashSync(password, 10);
         this.db.prepare(`
           UPDATE users 
-          SET name = ?, first_name = ?, last_name = ?, email = ?, phone = ?, cpf = ?, birth_date = ?, username = ?, password_hash = ?, avatar_image = ?, profile_type = ?
+          SET name = ?, first_name = ?, last_name = ?, email = ?, phone = ?, cpf = ?, birth_date = ?, username = ?, password_hash = ?, avatar_image = ?, profile_type = ?, recovery_question = ?, recovery_answer = ?
           WHERE id = ?
-        `).run(nameToSave, fName, lName, mail, ph, cp, bDate, username, hash, avImg, finalProfileType, id);
+        `).run(nameToSave, fName, lName, mail, ph, cp, bDate, username, hash, avImg, finalProfileType, recQ, recA, id);
       } else {
         this.db.prepare(`
           UPDATE users 
-          SET name = ?, first_name = ?, last_name = ?, email = ?, phone = ?, cpf = ?, birth_date = ?, username = ?, avatar_image = ?, profile_type = ?
+          SET name = ?, first_name = ?, last_name = ?, email = ?, phone = ?, cpf = ?, birth_date = ?, username = ?, avatar_image = ?, profile_type = ?, recovery_question = ?, recovery_answer = ?
           WHERE id = ?
-        `).run(nameToSave, fName, lName, mail, ph, cp, bDate, username, avImg, finalProfileType, id);
+        `).run(nameToSave, fName, lName, mail, ph, cp, bDate, username, avImg, finalProfileType, recQ, recA, id);
       }
       return { success: true };
     } catch (err) {
@@ -2293,6 +2311,36 @@ class AppDatabase {
   }
 
   backup(destPath) { this.db.backup(destPath); }
+
+  getRecoveryQuestion(username) {
+    try {
+      const user = this.db.prepare('SELECT recovery_question FROM users WHERE username = ?').get(username);
+      if (!user) return { success: false, error: 'Usuário não encontrado' };
+      if (!user.recovery_question) return { success: false, error: 'Usuário não possui pergunta de recuperação cadastrada' };
+      return { success: true, question: user.recovery_question };
+    } catch (err) {
+      console.error(err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  resetPasswordWithAnswer(username, answer, newPassword) {
+    try {
+      const user = this.db.prepare('SELECT id, recovery_answer FROM users WHERE username = ?').get(username);
+      if (!user) return { success: false, error: 'Usuário não encontrado' };
+      if (!user.recovery_answer) return { success: false, error: 'Usuário não possui resposta de recuperação cadastrada' };
+      
+      const isMatch = bcrypt.compareSync(answer.trim().toLowerCase(), user.recovery_answer);
+      if (!isMatch) return { success: false, error: 'Resposta de segurança incorreta' };
+      
+      const newHash = bcrypt.hashSync(newPassword, 10);
+      this.db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newHash, user.id);
+      return { success: true };
+    } catch (err) {
+      console.error(err);
+      return { success: false, error: err.message };
+    }
+  }
 }
 
 module.exports = AppDatabase;

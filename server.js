@@ -19,6 +19,8 @@ const handlers = {
   'auth:updateUser': (d) => db.updateUser(d),
   'auth:deleteUser': (id) => db.deleteUser(id),
   'auth:updatePositions': (d) => db.updateUserPositions(d.positions),
+  'auth:getRecoveryQuestion': (username) => db.getRecoveryQuestion(username),
+  'auth:resetPasswordWithAnswer': ({ username, answer, newPassword }) => db.resetPasswordWithAnswer(username, answer, newPassword),
   'settings:get': (userId) => db.getSettings(userId),
   'settings:set': ({ userId, key, value }) => db.setSetting(userId, key, value),
   'accounts:getAll': (userId) => db.getAccounts(userId),
@@ -275,6 +277,11 @@ const handlers = {
 const expressApp = express();
 expressApp.use(cors());
 expressApp.use(express.json({ limit: '50mb' }));
+
+// Redirect root to app.html for direct login access
+expressApp.get('/', (req, res) => {
+  res.redirect('/app.html');
+});
 
 // Serve static files from the renderer directory
 expressApp.use(express.static(path.join(__dirname, 'src', 'renderer')));

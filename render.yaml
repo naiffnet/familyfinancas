@@ -1,0 +1,26 @@
+# ═══════════════════════════════════════════
+# Render Blueprint — FinançasFamília
+# ═══════════════════════════════════════════
+# Basta conectar seu repositório GitHub ao Render
+# que ele detecta automaticamente este arquivo.
+#
+# Docs: https://render.com/docs/blueprint-spec
+# ═══════════════════════════════════════════
+
+services:
+  - type: web
+    name: financas-familia
+    runtime: node
+    region: ohio # Pode trocar para: frankfurt (Europa), singapore, oregon, etc.
+    plan: free   # Plano gratuito: 500h/mês, dorme após 15min de inatividade
+
+    buildCommand: npm install
+    startCommand: node server.js
+
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000

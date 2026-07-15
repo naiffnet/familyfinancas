@@ -47,6 +47,8 @@ if (!window.api) {
       updateUser: (d) => makeRpcCall('auth:updateUser', d),
       deleteUser: (id) => makeRpcCall('auth:deleteUser', id),
       updatePositions: (positions) => makeRpcCall('auth:updatePositions', { positions }),
+      getRecoveryQuestion: (username) => makeRpcCall('auth:getRecoveryQuestion', username),
+      resetPasswordWithAnswer: (d) => makeRpcCall('auth:resetPasswordWithAnswer', d),
     },
     settings: {
       get: (userId)      => makeRpcCall('settings:get', userId),
@@ -3034,6 +3036,23 @@ async function renderSettings() {
             </div>
           </div>
 
+          <div class="form-row">
+            <div class="form-group">
+              <label>Pergunta de Segurança <span style="color: #ef4444;">*</span></label>
+              <select id="prof-recovery-question" style="width: 100%; padding: 10px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px;">
+                <option value="Qual o nome de solteira da sua mãe?" ${State.user.recovery_question === 'Qual o nome de solteira da sua mãe?' ? 'selected' : ''}>Qual o nome de solteira da sua mãe?</option>
+                <option value="Qual o nome do seu primeiro animal de estimação?" ${State.user.recovery_question === 'Qual o nome do seu primeiro animal de estimação?' ? 'selected' : ''}>Qual o nome do seu primeiro animal de estimação?</option>
+                <option value="Em qual cidade você nasceu?" ${State.user.recovery_question === 'Em qual cidade você nasceu?' ? 'selected' : ''}>Em qual cidade você nasceu?</option>
+                <option value="Qual o nome da sua primeira escola?" ${State.user.recovery_question === 'Qual o nome da sua primeira escola?' ? 'selected' : ''}>Qual o nome da sua primeira escola?</option>
+                <option value="Qual o modelo do seu primeiro carro?" ${State.user.recovery_question === 'Qual o modelo do seu primeiro carro?' ? 'selected' : ''}>Qual o modelo do seu primeiro carro?</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Resposta de Segurança (Opcional)</label>
+              <input type="text" id="prof-recovery-answer" placeholder="Deixe em branco para manter a atual" style="width: 100%; padding: 10px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px;">
+            </div>
+          </div>
+
           <div style="font-size: 11px; color: var(--text-muted); margin-top: -6px;"><span style="color: #ef4444;">*</span> Indica campos obrigatórios</div>
 
           <p class="auth-error" id="prof-error-text" style="margin: 0; font-size: 12px;"></p>
@@ -3198,14 +3217,8 @@ async function renderSettings() {
       const err = document.getElementById('prof-error-text');
       if (err) err.textContent = '';
       
-      const firstName = document.getElementById('prof-first-name').value.trim();
-      const lastName = document.getElementById('prof-last-name').value.trim();
-      const cpf = document.getElementById('prof-cpf').value.trim();
-      const birthDate = document.getElementById('prof-birth-date').value;
-      const email = document.getElementById('prof-email').value.trim();
-      const phone = document.getElementById('prof-phone').value.trim();
-      const username = document.getElementById('prof-username') ? document.getElementById('prof-username').value.trim() : State.user.username;
-      const password = document.getElementById('prof-password').value;
+      const recovery_question = document.getElementById('prof-recovery-question').value;
+      const recovery_answer = document.getElementById('prof-recovery-answer').value.trim();
 
       if (!firstName || !lastName || !cpf || !birthDate || !email || !phone || !username) {
         if (err) err.textContent = 'Por favor, preencha todos os campos obrigatórios';
@@ -3236,6 +3249,7 @@ async function renderSettings() {
         email,
         phone,
         username,
+        recovery_question,
       };
       if (password && password.trim() !== '') {
         if (password.length < 6) {
@@ -3243,6 +3257,9 @@ async function renderSettings() {
           return;
         }
         payload.password = password;
+      }
+      if (recovery_answer) {
+        payload.recovery_answer = recovery_answer;
       }
 
       const r = await window.api.auth.updateUser(payload);
@@ -3483,7 +3500,92 @@ async function initLoginScreen() {
   document.getElementById('toggle-login-pass').onclick = () => { const i = document.getElementById('login-password'); i.type = i.type === 'password' ? 'text' : 'password'; };
   document.getElementById('toggle-reg-pass').onclick  = () => { const i = document.getElementById('reg-password');   i.type = i.type === 'password' ? 'text' : 'password'; };
   document.getElementById('go-register').onclick = (e) => { e.preventDefault(); openSignUpWizard(); };
-  document.getElementById('go-login').onclick    = (e) => { e.preventDefault(); };
+  document.getElementById('go-login').onclick    = (e) => {
+    e.preventDefault();
+    document.getElementById('register-form-wrap').classList.add('hidden');
+    document.getElementById('login-form-wrap').classList.remove('hidden');
+  };
+
+  // Esqueci minha senha navigation
+  document.getElementById('go-recover').onclick = (e) => {
+    e.preventDefault();
+    document.getElementById('login-form-wrap').classList.add('hidden');
+    document.getElementById('recovery-form-wrap').classList.remove('hidden');
+    document.getElementById('recovery-step-1').classList.remove('hidden');
+    document.getElementById('recovery-step-2').classList.add('hidden');
+    document.getElementById('recovery-error').textContent = '';
+    document.getElementById('rec-username').value = '';
+    document.getElementById('rec-answer').value = '';
+    document.getElementById('rec-new-password').value = '';
+  };
+
+  document.getElementById('recovery-go-back').onclick = (e) => {
+    e.preventDefault();
+    document.getElementById('recovery-form-wrap').classList.add('hidden');
+    document.getElementById('login-form-wrap').classList.remove('hidden');
+  };
+
+  // Verify username to load security question
+  document.getElementById('rec-verify-user-btn').onclick = async () => {
+    const username = document.getElementById('rec-username').value.trim();
+    const errEl = document.getElementById('recovery-error');
+    errEl.textContent = '';
+    if (!username) { errEl.textContent = 'Digite seu usuário'; return; }
+    
+    try {
+      const btn = document.getElementById('rec-verify-user-btn');
+      btn.disabled = true; btn.textContent = 'Verificando...';
+      const r = await window.api.auth.getRecoveryQuestion(username);
+      btn.disabled = false; btn.textContent = 'Verificar Usuário';
+      
+      if (!r.success) {
+        errEl.textContent = r.error;
+        return;
+      }
+      
+      document.getElementById('rec-question-text').textContent = r.question;
+      document.getElementById('recovery-step-1').classList.add('hidden');
+      document.getElementById('recovery-step-2').classList.remove('hidden');
+    } catch (err) {
+      console.error(err);
+      errEl.textContent = 'Erro de rede ou servidor';
+    }
+  };
+
+  // Submit Answer to Reset Password
+  document.getElementById('recovery-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const username = document.getElementById('rec-username').value.trim();
+    const answer = document.getElementById('rec-answer').value.trim();
+    const newPassword = document.getElementById('rec-new-password').value;
+    const errEl = document.getElementById('recovery-error');
+    errEl.textContent = '';
+    
+    if (!answer || !newPassword) { errEl.textContent = 'Preencha a resposta e a nova senha'; return; }
+    if (newPassword.length < 6) { errEl.textContent = 'A nova senha deve ter no mínimo 6 caracteres'; return; }
+    
+    try {
+      const btn = document.getElementById('rec-reset-btn');
+      btn.disabled = true; btn.textContent = 'Processando...';
+      const r = await window.api.auth.resetPasswordWithAnswer({ username, answer, newPassword });
+      btn.disabled = false; btn.textContent = 'Redefinir Senha';
+      
+      if (!r.success) {
+        errEl.textContent = r.error;
+        return;
+      }
+      
+      toast('Senha redefinida com sucesso! Faça login.');
+      document.getElementById('recovery-form-wrap').classList.add('hidden');
+      document.getElementById('login-form-wrap').classList.remove('hidden');
+      document.getElementById('login-username').value = username;
+      document.getElementById('login-password').value = '';
+      document.getElementById('login-password').focus();
+    } catch (err) {
+      console.error(err);
+      errEl.textContent = 'Erro de conexão';
+    }
+  };
 }
 
 function showWizardFamilyChoiceModal(familyName, ownerName, onJoin, onNew) {
@@ -3836,9 +3938,11 @@ setTimeout(() => {
         const familyName = document.getElementById('wiz-family-name').value.trim();
         const username = document.getElementById('wiz-username').value.trim();
         const password = document.getElementById('wiz-password').value;
+        const recovery_question = document.getElementById('wiz-recovery-question').value;
+        const recovery_answer = document.getElementById('wiz-recovery-answer').value.trim();
 
-        if (!username || !password) {
-          if (err) err.textContent = 'Por favor, preencha o Usuário e a Senha';
+        if (!username || !password || !recovery_question || !recovery_answer) {
+          if (err) err.textContent = 'Por favor, preencha todos os campos do Passo 3';
           return;
         }
         if (password.length < 6) {
@@ -3861,7 +3965,9 @@ setTimeout(() => {
           familyName: signupFamilyId ? null : familyName,
           familyId: signupFamilyId,
           username,
-          password
+          password,
+          recovery_question,
+          recovery_answer
         });
 
         nextBtn.disabled = false;
@@ -4418,12 +4524,14 @@ document.getElementById('register-form').onsubmit = async (e) => {
   const name = document.getElementById('reg-name').value.trim();
   const username = document.getElementById('reg-username').value.trim();
   const password = document.getElementById('reg-password').value;
+  const recovery_question = document.getElementById('reg-recovery-question').value;
+  const recovery_answer = document.getElementById('reg-recovery-answer').value.trim();
   const errEl = document.getElementById('register-error');
   errEl.textContent = '';
-  if (!name || !username || !password) { errEl.textContent = 'Preencha todos os campos'; return; }
+  if (!name || !username || !password || !recovery_question || !recovery_answer) { errEl.textContent = 'Preencha todos os campos, incluindo a recuperação'; return; }
   if (password.length < 4) { errEl.textContent = 'Senha muito curta'; return; }
   const familyName = document.getElementById('reg-family-name')?.value.trim() || null;
-  const r = await window.api.auth.register({ name, username, password, familyName });
+  const r = await window.api.auth.register({ name, username, password, familyName, recovery_question, recovery_answer });
   if (!r.success) { errEl.textContent = r.error; return; }
   toast('Conta criada! Faça login.');
   document.getElementById('register-form-wrap').classList.add('hidden');
@@ -5067,3 +5175,12 @@ document.getElementById('main-content').onclick = () => {
     sidebar.classList.remove('open');
   }
 };
+
+// Register PWA Service Worker for web hosting compatibility
+if ('serviceWorker' in navigator && !window.api.isElectron) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => console.log('Service Worker registrado com sucesso no escopo:', reg.scope))
+      .catch(err => console.error('Falha ao registrar o Service Worker:', err));
+  });
+}

@@ -1,0 +1,41 @@
+# flyctl launch added from .gitignore
+# Dependency directories
+**/node_modules
+
+# SQLite databases and temporary files
+**/*.db
+**/*.db-journal
+**/*.db-wal
+**/*.db-shm
+
+# Executables
+**/cloudflared.exe
+
+# Build directories (Electron)
+**/dist
+**/out
+**/build
+
+# IDE / Scratch directories
+**/.vscode
+**/.idea
+**/.gemini
+**/scratch
+
+# OS-generated files
+**/Thumbs.db
+**/ehthumbs.db
+**/Desktop.ini
+**/.DS_Store
+
+# Local spreadsheet / data files (which might contain personal info)
+**/*.xlsx
+**/*.xls
+**/*.csv
+
+# Environment variables and secrets
+**/.env
+**/.env.local
+**/.env.*.local
+**/*.log
+fly.toml
