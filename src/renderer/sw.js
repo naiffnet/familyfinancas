@@ -1,4 +1,4 @@
-const CACHE_NAME = 'financas-familia-v1';
+const CACHE_NAME = 'financas-familia-v2';
 const ASSETS = [
   '/app.html',
   '/style.css',
@@ -33,7 +33,7 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// Fetch events interception
+// Fetch events interception (Network-First Strategy)
 self.addEventListener('fetch', (e) => {
   // Let JSON-RPC API requests bypass the cache completely (always fetch live)
   if (e.request.url.includes('/api/')) {
@@ -41,22 +41,18 @@ self.addEventListener('fetch', (e) => {
   }
   
   e.respondWith(
-    caches.match(e.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
+    fetch(e.request).then((networkResponse) => {
+      // Cache successful GET static assets dynamically
+      if (e.request.method === 'GET' && networkResponse.status === 200 && !e.request.url.startsWith('chrome-extension')) {
+        const cacheCopy = networkResponse.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(e.request, cacheCopy);
+        });
       }
-      return fetch(e.request).then((networkResponse) => {
-        // Cache successful GET static assets dynamically
-        if (e.request.method === 'GET' && networkResponse.status === 200 && !e.request.url.startsWith('chrome-extension')) {
-          const cacheCopy = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(e.request, cacheCopy);
-          });
-        }
-        return networkResponse;
-      }).catch((err) => {
-        console.log("Fetch failed, offline fallback: ", err);
-      });
+      return networkResponse;
+    }).catch((err) => {
+      console.log("Fetch failed, serving from cache: ", err);
+      return caches.match(e.request);
     })
   );
 });
