@@ -47,6 +47,9 @@ const PUBLIC_CHANNELS = new Set([
   'auth:register',
   'auth:getRecoveryQuestion',
   'auth:resetPasswordWithAnswer',
+  'auth:getUsers',
+  'families:checkName',
+  'server:getInfo',
 ]);
 
 const handlers = {
