@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinançasFamília</title>
+  <meta name="description" content="Administração do orçamento familiar">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════
+     LOGIN SCREEN
+     ═════════════════════════════════════════ -->
+<div id="login-screen" class="login-screen">
+  <div class="login-bg">
+    <div class="login-orb login-orb-1"></div>
+    <div class="login-orb login-orb-2"></div>
+    <div class="login-orb login-orb-3"></div>
+  </div>
+  <div class="login-card">
+    <div class="login-logo">
+      <span class="login-logo-icon">💰</span>
+      <h1 class="login-logo-text">FinançasFamília</h1>
+      <p class="login-logo-sub">Controle financeiro inteligente</p>
+    </div>
+
+    <div id="login-form-wrap">
+      <div class="user-list" id="user-list"></div>
+      <div class="login-divider"><span>ou entre com sua conta</span></div>
+      <form id="login-form" class="auth-form">
+        <div class="form-group">
+          <label for="login-username">Usuário</label>
+          <input type="text" id="login-username" placeholder="Digite seu usuário" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label for="login-password">Senha</label>
+          <div class="input-icon-wrap">
+            <input type="password" id="login-password" placeholder="Digite sua senha" autocomplete="current-password">
+            <button type="button" class="input-icon-btn" id="toggle-login-pass">👁</button>
+          </div>
+        </div>
+        <p class="auth-error" id="login-error"></p>
+        <button type="submit" class="btn btn-primary btn-full" id="login-btn">Entrar</button>
+      </form>
+      <p class="auth-switch">Não tem conta? <a href="#" id="go-register">Cadastrar-se</a></p>
+    </div>
+
+    <div id="register-form-wrap" class="hidden">
+      <form id="register-form" class="auth-form">
+        <div class="form-group">
+          <label for="reg-name">Nome completo</label>
+          <input type="text" id="reg-name" placeholder="Seu nome">
+        </div>
+        <div class="form-group">
+          <label for="reg-family-name">Nome da Família (Opcional)</label>
+          <input type="text" id="reg-family-name" placeholder="Ex: Família Silva">
+        </div>
+        <div class="form-group">
+          <label for="reg-username">Usuário</label>
+          <input type="text" id="reg-username" placeholder="Escolha um usuário">
+        </div>
+        <div class="form-group">
+          <label for="reg-password">Senha</label>
+          <div class="input-icon-wrap">
+            <input type="password" id="reg-password" placeholder="Escolha uma senha">
+            <button type="button" class="input-icon-btn" id="toggle-reg-pass">👁</button>
+          </div>
+        </div>
+        <p class="auth-error" id="register-error"></p>
+        <button type="submit" class="btn btn-primary btn-full">Criar conta</button>
+      </form>
+      <p class="auth-switch"><a href="#" id="go-login">← Voltar ao login</a></p>
+    </div>
+    <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed var(--border); text-align: center; font-size: 11px; color: var(--text-muted);">
+      Gostou do app? <a href="https://pag.ae/81ZdpUAX7" target="_blank" style="color: var(--accent-light); text-decoration: underline; font-weight: 600;">Apoie o projeto com uma doação!</a>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     MAIN APP
+     ═════════════════════════════════════════ -->
+<div id="app" class="app hidden">
+
+  <!-- Titlebar -->
+  <div class="titlebar" id="titlebar">
+    <button class="titlebar-menu-btn" id="titlebar-menu-btn" title="Menu">☰</button>
+    <div class="titlebar-drag">
+      <span class="titlebar-icon">💰</span>
+      <span class="titlebar-title">FinançasFamília</span>
+    </div>
+    <div class="titlebar-controls">
+      <button class="titlebar-btn" id="btn-minimize">─</button>
+      <button class="titlebar-btn" id="btn-maximize">□</button>
+      <button class="titlebar-btn titlebar-btn-close" id="btn-close">✕</button>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-user" id="sidebar-user">
+      <div class="avatar" id="sidebar-avatar"></div>
+      <div class="sidebar-user-info">
+        <span class="sidebar-user-name" id="sidebar-user-name"></span>
+        <span class="sidebar-user-role">Usuário</span>
+      </div>
+      <button class="sidebar-connect" id="sidebar-connect" title="Conectar outro aparelho (Rede Local)" style="display: none;">📱</button>
+      <button class="sidebar-logout" id="sidebar-logout" title="Sair">⏻</button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <button class="nav-item active" data-page="dashboard" id="nav-dashboard">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">Dashboard</span>
+      </button>
+      <button class="nav-item" data-page="recurring" id="nav-recurring">
+        <span class="nav-icon">🔄</span>
+        <span class="nav-label">Planejamento</span>
+      </button>
+      <button class="nav-item" data-page="accounts" id="nav-accounts">
+        <span class="nav-icon">🏦</span>
+        <span class="nav-label">Contas</span>
+      </button>
+      <button class="nav-item" data-page="budget" id="nav-budget">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">Orçamento</span>
+      </button>
+      <button class="nav-item" data-page="goals" id="nav-goals">
+        <span class="nav-icon">🎯</span>
+        <span class="nav-label">Metas</span>
+      </button>
+      <button class="nav-item" data-page="reports" id="nav-reports">
+        <span class="nav-icon">📈</span>
+        <span class="nav-label">Relatórios</span>
+      </button>
+      <div class="nav-spacer"></div>
+      <button class="nav-item" data-page="settings" id="nav-settings">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">Configurações</span>
+      </button>
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content" id="main-content">
+    <div id="page-dashboard" class="page active"></div>
+    <div id="page-recurring" class="page"></div>
+    <div id="page-accounts" class="page"></div>
+    <div id="page-budget" class="page"></div>
+    <div id="page-goals" class="page"></div>
+    <div id="page-reports" class="page"></div>
+    <div id="page-settings" class="page"></div>
+    <div id="page-families" class="page"></div>
+  </main>
+</div>
+
+<!-- ════════════════════════════════════════
+     GLOBAL MODAL
+     ═════════════════════════════════════════ -->
+<div id="modal-overlay" class="modal-overlay hidden">
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <h3 class="modal-title" id="modal-title"></h3>
+      <button class="modal-close" id="modal-close">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
+     SIGNUP WIZARD OVERLAY MODAL
+     ═════════════════════════════════════════ -->
+<div id="signup-wizard-overlay" class="signup-wizard-overlay">
+  <div class="signup-wizard-card">
+    <div class="wizard-orb wizard-orb-1"></div>
+    <div class="wizard-orb wizard-orb-2"></div>
+    
+    <div class="wizard-header">
+      <h2 class="wizard-title">Criar Conta Familiar</h2>
+      <p class="wizard-sub" id="wizard-sub-text">Passo 1: Seus dados pessoais de cadastro</p>
+    </div>
+
+    <!-- Stepper Indicator -->
+    <div class="wizard-stepper">
+      <div class="wizard-step-line-bg"></div>
+      <div class="wizard-step-line-fill" id="wizard-line-fill"></div>
+      
+      <div class="wizard-step-node active" id="step-node-1" data-step="1">
+        1
+        <span class="wizard-step-node-label">Pessoal</span>
+      </div>
+      <div class="wizard-step-node" id="step-node-2" data-step="2">
+        2
+        <span class="wizard-step-node-label">Contato</span>
+      </div>
+      <div class="wizard-step-node" id="step-node-3" data-step="3">
+        3
+        <span class="wizard-step-node-label">Acesso</span>
+      </div>
+    </div>
+
+    <div class="wizard-body">
+      <!-- Passo 1: Dados Pessoais -->
+      <div class="wizard-pane" id="wizard-pane-1">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="wiz-first-name">Nome <span style="color: #ef4444;">*</span></label>
+            <input type="text" id="wiz-first-name" placeholder="Ex: João">
+          </div>
+          <div class="form-group">
+            <label for="wiz-last-name">Sobrenome <span style="color: #ef4444;">*</span></label>
+            <input type="text" id="wiz-last-name" placeholder="Ex: Silva">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="wiz-cpf">CPF <span style="color: #ef4444;">*</span></label>
+          <input type="text" id="wiz-cpf" placeholder="000.000.000-00" maxlength="14">
+        </div>
+        <div class="form-group">
+          <label for="wiz-birth-date">Data de Nascimento <span style="color: #ef4444;">*</span></label>
+          <input type="date" id="wiz-birth-date">
+        </div>
+      </div>
+
+      <!-- Passo 2: Contato & Grupo Familiar -->
+      <div class="wizard-pane hidden" id="wizard-pane-2">
+        <div class="form-group">
+          <label for="wiz-email">E-mail <span style="color: #ef4444;">*</span></label>
+          <input type="email" id="wiz-email" placeholder="nome@provedor.com">
+        </div>
+        <div class="form-group">
+          <label for="wiz-phone">Celular (WhatsApp) <span style="color: #ef4444;">*</span></label>
+          <input type="text" id="wiz-phone" placeholder="(00) 00000-0000" maxlength="15">
+        </div>
+        <div class="form-group">
+          <label for="wiz-family-name">Nome da Família (Opcional)</label>
+          <input type="text" id="wiz-family-name" placeholder="Ex: Família Silva">
+        </div>
+      </div>
+
+      <!-- Passo 3: Acesso Secure -->
+      <div class="wizard-pane hidden" id="wizard-pane-3">
+        <div class="form-group">
+          <label for="wiz-username">Usuário <span style="color: #ef4444;">*</span></label>
+          <input type="text" id="wiz-username" placeholder="Apenas minúsculas, números, pontos e traços">
+        </div>
+        <div class="form-group">
+          <label for="wiz-password">Senha <span style="color: #ef4444;">*</span></label>
+          <div class="input-icon-wrap">
+            <input type="password" id="wiz-password" placeholder="Digite uma senha forte">
+            <button type="button" class="input-icon-btn" id="toggle-wiz-pass">👁</button>
+          </div>
+          <div class="password-strength-wrap">
+            <div class="password-strength-bg">
+              <div class="password-strength-bar" id="wiz-pass-strength-bar"></div>
+            </div>
+            <span class="password-strength-text" id="wiz-pass-strength-text">Força: Muito fraca</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="auth-error" id="wiz-error-text" style="margin: 0; min-height: 18px; font-size: 12px;"></p>
+
+    <div class="wizard-footer">
+      <button type="button" class="btn btn-back hidden" id="wiz-btn-back">← Voltar</button>
+      <button type="button" class="btn btn-next" id="wiz-btn-next">Avançar →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast-container" class="toast-container"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
