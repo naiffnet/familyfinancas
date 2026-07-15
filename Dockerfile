@@ -28,6 +28,8 @@ COPY package*.json ./
 # Copia o arquivo do servidor e a pasta src (contém o banco de dados e o frontend em src/renderer)
 COPY server.js ./
 COPY src/ ./src/
+COPY scripts/ ./scripts/
+
 
 # Configura porta padrão
 EXPOSE 3000
