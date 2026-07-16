@@ -11,3 +11,7 @@ console.log(JSON.stringify(items, null, 2));
 console.log('--- RECURRING TRANSACTIONS THIS MONTH ---');
 const txs = db.prepare("SELECT * FROM transactions WHERE recurring_item_id IS NOT NULL").all();
 console.log(JSON.stringify(txs, null, 2));
+
+console.log('--- ACTIVITY LOGS ---');
+const logs = db.prepare("SELECT * FROM activity_logs ORDER BY id DESC LIMIT 50").all();
+console.log(JSON.stringify(logs, null, 2));
