@@ -130,6 +130,8 @@ const OWNERSHIP_CHECKS = {
   'server:getLogs': (session) => session.profileType === 1 || session.profileType === 2,
   'logs:getByFamily': (session, id) => id === session.familyId,
   'backup:exportExcel': (session, d) => isSameFamilyUser(d.userId, session.familyId),
+  'backup:export': (session) => session.isSystemAdmin === 1 || session.profileType === 1,
+  'backup:restore': (session) => session.isSystemAdmin === 1 || session.profileType === 1,
   'auth:exportMyData': (session, userId) => userId === session.userId,
   'auth:getUsers': (session) => true
 };
@@ -357,6 +359,67 @@ const handlers = {
       };
     } catch (err) {
       console.error('Erro na exportação Excel:', err);
+      return { success: false, error: err.message };
+    }
+  },
+
+  'backup:export': async () => {
+    try {
+      if (!fs.existsSync(db.dbPath)) {
+        return { success: false, error: 'Arquivo do banco de dados não encontrado.' };
+      }
+      const data = fs.readFileSync(db.dbPath);
+      return {
+        success: true,
+        fileData: data.toString('base64'),
+        filename: `backup-financeiro-${new Date().toISOString().split('T')[0]}.db`
+      };
+    } catch (err) {
+      console.error('Erro ao exportar backup:', err);
+      return { success: false, error: err.message };
+    }
+  },
+
+  'backup:restore': async ({ fileData }) => {
+    if (!fileData) {
+      return { success: false, error: 'Nenhum arquivo enviado.' };
+    }
+    try {
+      const buffer = Buffer.from(fileData, 'base64');
+      const magic = buffer.slice(0, 15).toString('utf8');
+      if (!magic.startsWith('SQLite format 3')) {
+        return { success: false, error: 'Arquivo inválido. O arquivo enviado não é um banco de dados SQLite válido.' };
+      }
+      
+      // Close active database connection
+      db.db.close();
+      
+      const backupPath = db.dbPath + '.bak';
+      try {
+        if (fs.existsSync(db.dbPath)) {
+          fs.copyFileSync(db.dbPath, backupPath);
+        }
+        
+        fs.writeFileSync(db.dbPath, buffer);
+        db.initialize();
+        
+        if (fs.existsSync(backupPath)) {
+          fs.unlinkSync(backupPath);
+        }
+        return { success: true, message: 'Banco de dados restaurado com sucesso!' };
+      } catch (writeErr) {
+        // Rollback from backup if writing fails
+        if (fs.existsSync(backupPath)) {
+          try {
+            fs.copyFileSync(backupPath, db.dbPath);
+            fs.unlinkSync(backupPath);
+          } catch (e) {}
+        }
+        db.initialize();
+        throw writeErr;
+      }
+    } catch (err) {
+      console.error('Erro ao restaurar banco de dados:', err);
       return { success: false, error: err.message };
     }
   },

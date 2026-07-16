@@ -432,6 +432,46 @@ ipcMain.handle('backup:export', async () => {
   return { success: false };
 });
 
+ipcMain.handle('backup:restore', async (e, { fileData }) => {
+  try {
+    if (!fileData) {
+      return { success: false, error: 'Nenhum dado de arquivo enviado.' };
+    }
+    const buffer = Buffer.from(fileData, 'base64');
+    const magic = buffer.slice(0, 15).toString('utf8');
+    if (!magic.startsWith('SQLite format 3')) {
+      return { success: false, error: 'Arquivo inválido. O arquivo enviado não é um banco de dados SQLite válido.' };
+    }
+
+    // Close SQLite database
+    db.db.close();
+
+    const backupPath = db.dbPath + '.bak';
+    try {
+      if (fs.existsSync(db.dbPath)) {
+        fs.copyFileSync(db.dbPath, backupPath);
+      }
+      fs.writeFileSync(db.dbPath, buffer);
+      db.initialize();
+      if (fs.existsSync(backupPath)) {
+        fs.unlinkSync(backupPath);
+      }
+      return { success: true };
+    } catch (writeErr) {
+      if (fs.existsSync(backupPath)) {
+        try {
+          fs.copyFileSync(backupPath, db.dbPath);
+          fs.unlinkSync(backupPath);
+        } catch (e) {}
+      }
+      db.initialize();
+      throw writeErr;
+    }
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
 // Excel Export
 ipcMain.handle('backup:exportExcel', async (e, { userId, month, year, type }) => {
   try {

@@ -81,6 +81,7 @@ contextBridge.exposeInMainWorld('api', {
   },
   backup: {
     export: () => ipcRenderer.invoke('backup:export'),
+    restore: (d) => ipcRenderer.invoke('backup:restore', d),
     exportExcel: (d) => ipcRenderer.invoke('backup:exportExcel', d),
   },
   permissions: {

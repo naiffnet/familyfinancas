@@ -132,6 +132,7 @@ if (!window.api) {
     },
     backup: {
       export: () => makeRpcCall('backup:export'),
+      restore: (d) => makeRpcCall('backup:restore', d),
       exportExcel: (d) => makeRpcCall('backup:exportExcel', d),
     },
     permissions: {
@@ -3181,6 +3182,12 @@ async function renderSettings() {
           <button class="btn btn-secondary" id="btn-backup" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
             💾 Exportar Backup do Banco (.db)
           </button>
+          ${(State.user.profile_type === 1 || State.user.is_system_admin === 1) ? `
+          <button class="btn btn-secondary" id="btn-restore-backup" style="display: flex; align-items: center; justify-content: center; gap: 8px; background: rgba(255,255,255,0.03); border: 1px dashed var(--border);">
+            📂 Restaurar Banco de Dados (.db)
+          </button>
+          <input type="file" id="input-restore-backup" accept=".db" style="display:none">
+          ` : ''}
           <div style="border-top: 1px dashed var(--border); margin: 8px 0;"></div>
           <button class="btn btn-primary" id="btn-export-month" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
             📊 Exportar Excel (Mês Atual: ${capitalizedMonth}/${State.currentYear})
@@ -3375,7 +3382,73 @@ async function renderSettings() {
   };
   document.getElementById('btn-add-user').onclick = () => openRegisterModal();
   document.getElementById('btn-add-category').onclick = () => openCategoryModal(categories);
-  document.getElementById('btn-backup').onclick = async () => { const r = await window.api.backup.export(); if (r.success) toast('Backup exportado!'); };
+  document.getElementById('btn-backup').onclick = async () => {
+    try {
+      const r = await window.api.backup.export();
+      if (r && r.fileData) {
+        // Web/RPC flow: convert base64 to binary blob and trigger download
+        const binaryStr = atob(r.fileData);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) {
+          bytes[i] = binaryStr.charCodeAt(i);
+        }
+        const blob = new Blob([bytes], { type: 'application/x-sqlite3' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = r.filename || 'financeiro.db';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast('Backup exportado com sucesso!');
+      } else if (r && r.success) {
+        // Desktop flow
+        toast('Backup exportado!');
+      } else {
+        toast('Erro ao exportar backup', 'error');
+      }
+    } catch (err) {
+      toast('Erro na exportação: ' + err.message, 'error');
+    }
+  };
+
+  if (document.getElementById('btn-restore-backup')) {
+    document.getElementById('btn-restore-backup').onclick = () => {
+      document.getElementById('input-restore-backup').click();
+    };
+    
+    document.getElementById('input-restore-backup').onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const confirmRestore = confirm('⚠️ ATENÇÃO: Restaurar o banco de dados irá SOBRESCREVER todos os dados atuais (incluindo usuários, contas, lançamentos e famílias) de forma definitiva!\n\nCertifique-se de que o arquivo .db selecionado é um backup válido.\n\nDeseja prosseguir com a restauração?');
+      if (!confirmRestore) {
+        e.target.value = '';
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64 = event.target.result.split(',')[1];
+        try {
+          const res = await window.api.backup.restore({ fileData: base64 });
+          if (res.success) {
+            alert('Banco de dados restaurado com sucesso! O aplicativo será recarregado.');
+            window.location.reload();
+          } else {
+            alert('Erro ao restaurar banco de dados: ' + (res.error || 'Erro desconhecido.'));
+          }
+        } catch (err) {
+          alert('Erro de conexão ao restaurar: ' + err.message);
+        }
+      };
+      reader.onerror = () => {
+        alert('Erro ao ler o arquivo selecionado.');
+      };
+      reader.readAsDataURL(file);
+    };
+  }
   document.getElementById('btn-export-month').onclick = async () => {
     try {
       const res = await window.api.backup.exportExcel({
