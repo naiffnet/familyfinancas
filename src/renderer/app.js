@@ -3212,7 +3212,7 @@ async function renderSettings() {
             <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">
               Ao clicar no botão abaixo, todos os seus dados pessoais (nome, CPF, e-mail, telefone), contas bancárias registradas, transações financeiras, orçamentos e metas serão <strong>excluídos permanentemente</strong> de nossos bancos de dados, sem possibilidade de recuperação.
             </p>
-            <button class="btn btn-danger btn-sm" id="btn-delete-my-account" style="background-color: #ef4444; border-color: #ef4444; padding: 8px 16px;">
+            <button class="btn btn-danger btn-sm" id="btn-delete-my-account" style="background-color: #ef4444; border-color: #ef4444; color: #ffffff; padding: 8px 16px;">
               Excluir Definitivamente Minha Conta
             </button>
           </div>
@@ -3520,7 +3520,7 @@ async function renderSettings() {
         <p class="auth-error" id="delete-account-error" style="margin: 0; font-size: 12px;"></p>
         <div class="modal-footer" style="padding:0;border:none;margin-top:16px">
           <button class="btn btn-secondary" id="btn-cancel-delete">Cancelar</button>
-          <button class="btn btn-danger" id="btn-confirm-delete" style="background-color: #ef4444; border-color: #ef4444;">Excluir Conta Permanentemente</button>
+          <button class="btn btn-danger" id="btn-confirm-delete" style="background-color: #ef4444; border-color: #ef4444; color: #ffffff;">Excluir Conta Permanentemente</button>
         </div>
       `);
       
