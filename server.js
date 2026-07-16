@@ -123,10 +123,10 @@ const OWNERSHIP_CHECKS = {
     if (session.profileType !== 1 && session.profileType !== 2) return false;
     return isSameFamilyUser(d.targetUserId, session.familyId);
   },
-  'families:getAll': (session) => session.isSystemAdmin === 1,
-  'families:create': (session) => session.isSystemAdmin === 1,
-  'families:update': (session) => session.isSystemAdmin === 1,
-  'families:delete': (session) => session.isSystemAdmin === 1,
+  'families:getAll': (session) => session.isSystemAdmin === 1 || session.profileType === 1,
+  'families:create': (session) => session.isSystemAdmin === 1 || session.profileType === 1,
+  'families:update': (session) => session.isSystemAdmin === 1 || session.profileType === 1,
+  'families:delete': (session) => session.isSystemAdmin === 1 || session.profileType === 1,
   'server:getLogs': (session) => session.profileType === 1 || session.profileType === 2,
   'logs:getByFamily': (session, id) => id === session.familyId,
   'backup:exportExcel': (session, d) => isSameFamilyUser(d.userId, session.familyId),

@@ -125,7 +125,7 @@ class AppDatabase {
       this.db.exec("ALTER TABLE users ADD COLUMN is_system_admin INTEGER DEFAULT 0");
     } catch (e) {}
     try {
-      this.db.exec("UPDATE users SET is_system_admin = 1 WHERE username = 'adm'");
+      this.db.exec("UPDATE users SET is_system_admin = 1 WHERE username = 'adm' OR profile_type = 1");
     } catch (e) {}
 
     // 5. Migrate accounts CHECK constraint to include 'voucher'
