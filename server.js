@@ -130,7 +130,8 @@ const OWNERSHIP_CHECKS = {
   'server:getLogs': (session) => session.profileType === 1 || session.profileType === 2,
   'logs:getByFamily': (session, id) => id === session.familyId,
   'backup:exportExcel': (session, d) => isSameFamilyUser(d.userId, session.familyId),
-  'auth:exportMyData': (session, userId) => userId === session.userId
+  'auth:exportMyData': (session, userId) => userId === session.userId,
+  'auth:getUsers': (session) => true
 };
 
 // Channels that don't require a valid session token
