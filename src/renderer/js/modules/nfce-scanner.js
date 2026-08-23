@@ -686,7 +686,204 @@ function openNFCeScannerModal(customCallback = null) {
 }
 
 /**
- * Processa os dados extraídos da Nota Fiscal e direciona para o Modal de Lançamento
+ * Abre Pop-up de Confirmação com todos os dados da leitura do QR Code
+ */
+function openNFCeConfirmationModal(parsedData, accounts, categories) {
+  const today = new Date().toISOString().split('T')[0];
+  const dateVal = parsedData.date || today;
+  const competenceVal = parsedData.competence || (dateVal ? dateVal.slice(0, 7) : today.slice(0, 7));
+  const amountVal = parsedData.amount != null ? parsedData.amount : '';
+  const descVal = parsedData.description || 'Compra Cupom Fiscal';
+
+  // Localiza melhor categoria sugerida
+  let matchedCatId = '';
+  if (parsedData.suggestedCategory) {
+    const matchedCat = categories.find(c =>
+      c.name.toLowerCase().includes(parsedData.suggestedCategory.toLowerCase()) ||
+      parsedData.suggestedCategory.toLowerCase().includes(c.name.toLowerCase())
+    );
+    if (matchedCat) matchedCatId = matchedCat.id;
+  }
+
+  Modal.open('📋 Conferência da Nota Fiscal', `
+    <div class="nfce-confirm-container">
+      <!-- Card com destaque do valor e dados fiscais lidos -->
+      <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(6, 182, 212, 0.08)); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius); padding: 18px; margin-bottom: 16px; text-align: center;">
+        <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 4px;">
+          <span style="font-size: 24px;">🧾</span>
+          <span style="font-size: 16px; font-weight: 700; color: var(--text-primary);">${descVal}</span>
+          ${parsedData.uf ? `<span class="badge badge-blue" style="font-size: 10px;">${parsedData.uf}</span>` : ''}
+        </div>
+        
+        <div style="font-size: 32px; font-weight: 900; color: var(--accent-light); letter-spacing: -0.02em; margin: 8px 0;">
+          ${amountVal !== '' ? fmt.currency(amountVal) : 'R$ 0,00'}
+        </div>
+        
+        <div style="font-size: 12px; color: var(--text-muted); display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;">
+          <span>📅 Data: <strong>${fmt.date(dateVal)}</strong></span>
+          ${parsedData.nNF ? `<span>🔢 Nota: <strong>#${parsedData.nNF}</strong></span>` : ''}
+          ${parsedData.cnpj ? `<span>🏢 CNPJ: <strong>${parsedData.cnpj}</strong></span>` : ''}
+        </div>
+
+        ${parsedData.accessKey ? `
+          <div style="margin-top: 10px; font-size: 10.5px; color: var(--text-muted); background: rgba(0,0,0,0.2); padding: 4px 8px; border-radius: 6px; word-break: break-all;">
+            🔑 Chave: <code>${parsedData.accessKey}</code>
+          </div>
+        ` : ''}
+      </div>
+
+      <!-- Formulário de Ajuste Rápido antes de Aceitar -->
+      <div class="form-row">
+        <div class="form-group">
+          <label style="font-size: 12px; font-weight: 600;">Descrição</label>
+          <input type="text" id="nfce-conf-desc" value="${descVal}" style="font-size: 13px;">
+        </div>
+        <div class="form-group">
+          <label style="font-size: 12px; font-weight: 600;">Valor (R$)</label>
+          <input type="number" step="0.01" min="0" id="nfce-conf-amount" value="${amountVal}" style="font-size: 13px;">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label style="font-size: 12px; font-weight: 600;">Conta / Cartão Pagador</label>
+          <select id="nfce-conf-account" style="font-size: 13px;">
+            ${accounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label style="font-size: 12px; font-weight: 600;">Categoria</label>
+          <select id="nfce-conf-category" style="font-size: 13px;">
+            <option value="">Sem categoria</option>
+            ${categories.filter(c => c.type === 'expense' || c.type === 'both').map(c => `
+              <option value="${c.id}" ${String(c.id) === String(matchedCatId) ? 'selected' : ''}>${c.icon} ${c.name}</option>
+            `).join('')}
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label style="font-size: 12px; font-weight: 600;">Data do Pagamento</label>
+          <input type="date" id="nfce-conf-date" value="${dateVal}" style="font-size: 13px;">
+        </div>
+        <div class="form-group">
+          <label style="font-size: 12px; font-weight: 600;">Mês de Referência (Competência)</label>
+          <input type="month" id="nfce-conf-competence" value="${competenceVal}" style="font-size: 13px;">
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top: 6px;">
+        <label style="font-size: 12.5px; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+          <input type="checkbox" id="nfce-conf-paid" checked> Já foi pago / debitado da conta
+        </label>
+      </div>
+
+      <!-- Rodapé de Ações: Aceitar ou Não Aceitar -->
+      <div class="modal-footer" style="padding: 16px 0 0 0; border-top: 1px solid var(--border); margin-top: 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+        <button type="button" class="btn btn-secondary" id="nfce-conf-btn-reject" style="color: #f87171; border-color: rgba(239, 68, 68, 0.4); display: flex; align-items: center; gap: 6px;">
+          <span>✕</span> Não Aceitar (Descartar)
+        </button>
+
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="btn btn-secondary" id="nfce-conf-btn-more-options" title="Abrir no formulário completo com todas as opções">
+            <span>✏️</span> Mais Opções
+          </button>
+          <button type="button" class="btn btn-primary" id="nfce-conf-btn-accept" style="font-weight: 700; display: flex; align-items: center; gap: 6px;">
+            <span>✓</span> Aceitar e Criar Lançamento
+          </button>
+        </div>
+      </div>
+    </div>
+  `);
+
+  // 1. Botão Não Aceitar / Descartar
+  document.getElementById('nfce-conf-btn-reject').onclick = () => {
+    Modal.close();
+    toast('Leitura da nota fiscal descartada.', 'info');
+  };
+
+  // 2. Botão Mais Opções (abre formulário avulso completo)
+  document.getElementById('nfce-conf-btn-more-options').onclick = () => {
+    const updatedPrefill = {
+      ...parsedData,
+      description: document.getElementById('nfce-conf-desc').value.trim(),
+      amount: parseFloat(document.getElementById('nfce-conf-amount').value) || null,
+      date: document.getElementById('nfce-conf-date').value,
+      competence: document.getElementById('nfce-conf-competence').value,
+      suggestedCategory: categories.find(c => String(c.id) === String(document.getElementById('nfce-conf-category').value))?.name || parsedData.suggestedCategory
+    };
+    Modal.close();
+    openAvulsoModal(accounts, categories, null, 'expense', updatedPrefill);
+  };
+
+  // 3. Botão Aceitar e Criar Lançamento Direto
+  document.getElementById('nfce-conf-btn-accept').onclick = async () => {
+    try {
+      const amount = parseFloat(document.getElementById('nfce-conf-amount').value);
+      const date = document.getElementById('nfce-conf-date').value;
+      const account_id = parseInt(document.getElementById('nfce-conf-account').value);
+      const description = document.getElementById('nfce-conf-desc').value.trim();
+      const category_id = parseInt(document.getElementById('nfce-conf-category').value) || null;
+      const competenceMonthVal = document.getElementById('nfce-conf-competence').value;
+      const competence_date = competenceMonthVal ? `${competenceMonthVal}-01` : null;
+      const is_paid = document.getElementById('nfce-conf-paid').checked ? 1 : 0;
+
+      if (!amount || amount <= 0) {
+        toast('Informe um valor válido para a nota fiscal.', 'error');
+        return;
+      }
+      if (!date) {
+        toast('Informe a data da compra.', 'error');
+        return;
+      }
+      if (!account_id || isNaN(account_id)) {
+        toast('Selecione a conta pagadora.', 'error');
+        return;
+      }
+
+      const txData = {
+        user_id: State.user.id,
+        account_id,
+        category_id,
+        recurring_item_id: null,
+        type: 'expense',
+        amount,
+        description: description || 'Compra Cupom Fiscal',
+        date,
+        is_paid,
+        is_avulso: 1,
+        notes: parsedData.accessKey ? `Chave NFC-e: ${parsedData.accessKey}` : null,
+        credit_product: 'normal',
+        due_date: null,
+        competence_date
+      };
+
+      const res = await window.api.transactions.create(txData);
+      if (res && res.error) {
+        toast(res.error, 'error');
+        return;
+      }
+
+      Modal.close();
+      toast(`✅ Lançamento de ${fmt.currency(amount)} criado com sucesso!`, 'success');
+
+      // Atualiza visualizações
+      if (typeof renderRecurring === 'function' && State.currentPage === 'recurring') {
+        renderRecurring();
+      }
+      if (typeof renderDashboard === 'function' && (State.currentPage === 'dashboard' || !State.currentPage)) {
+        renderDashboard();
+      }
+    } catch (err) {
+      console.error('[Scanner] Erro ao salvar lançamento aceito:', err);
+      toast('Erro ao criar lançamento: ' + err.message, 'error');
+    }
+  };
+}
+
+/**
+ * Processa os dados extraídos da Nota Fiscal e abre o Pop-up de Confirmação
  */
 async function handleNFCeScanResult(parsedData, customCallback = null) {
   if (!parsedData) {
@@ -705,14 +902,10 @@ async function handleNFCeScanResult(parsedData, customCallback = null) {
       window.api.categories.getAll(State.user.id)
     ]);
 
-    // Abre o modal de lançamento avulso pré-preenchido
-    openAvulsoModal(accounts, categories, null, 'expense', parsedData);
-
-    const feedbackDesc = parsedData.description || 'Nota Fiscal';
-    const feedbackVal = parsedData.amount ? ` no valor de R$ ${parsedData.amount.toFixed(2)}` : '';
-    toast(`✅ ${feedbackDesc}${feedbackVal} lido com sucesso!`, 'success');
+    // Abre o Pop-up de Confirmação com opções de Aceitar ou Não Aceitar
+    openNFCeConfirmationModal(parsedData, accounts, categories);
   } catch (err) {
-    console.error('[Scanner] Erro ao abrir modal com dados da nota:', err);
-    toast('Erro ao abrir formulário de lançamento.', 'error');
+    console.error('[Scanner] Erro ao abrir pop-up de confirmação da nota:', err);
+    toast('Erro ao carregar dados para confirmação do lançamento.', 'error');
   }
 }
