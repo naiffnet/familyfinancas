@@ -150,7 +150,7 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
   const competenceInput = document.getElementById('avl-competence');
 
   // Realtime Candidate Duplicate Checker
-  attachRealtimeDuplicateChecker({
+  const recheckDup = attachRealtimeDuplicateChecker({
     amountInput: document.getElementById('avl-amount'),
     dateInput: document.getElementById('avl-date'),
     descInput: document.getElementById('avl-desc'),
@@ -194,6 +194,7 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
       document.querySelectorAll('#avl-type-toggle button').forEach(b => b.className = '');
       btn.className = currentType === 'income' ? 'active-income' : 'active-expense';
       updateAvulsoCategories(currentType);
+      if (typeof recheckDup === 'function') recheckDup();
     };
   });
 

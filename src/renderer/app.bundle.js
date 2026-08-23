@@ -1,7 +1,7 @@
 /* ============================================
  * app.bundle.js — FamilyFinancas Renderer
  * Gerado por: npm run build:renderer
- * 2026-08-23T12:38:13.372Z
+ * 2026-08-23T12:43:38.398Z
  * Modulos: 21
  * ============================================ */
 
@@ -3218,13 +3218,13 @@ async function loadAvulsos(container, accounts, categories, tabType) {
 }
 
 function attachRealtimeDuplicateChecker({ amountInput, dateInput, descInput, accountSelect, typeGetter, excludeId = null, containerEl }) {
-  if (!amountInput || !dateInput || !containerEl) return;
+  if (!amountInput || !dateInput || !containerEl) return () => {};
 
   let debounceTimer = null;
 
   const runCheck = async () => {
     const amount = parseFloat(amountInput.value) || 0;
-    const date = dateInput.value;
+    const date = typeof dateInput.value === 'string' ? dateInput.value : (dateInput.value || '');
     const description = (descInput?.value || '').trim();
     const accountId = parseInt(accountSelect?.value, 10) || null;
     const type = typeof typeGetter === 'function' ? typeGetter() : typeGetter || 'expense';
@@ -3244,13 +3244,19 @@ function attachRealtimeDuplicateChecker({ amountInput, dateInput, descInput, acc
         description,
         accountId,
         type,
+        userId: State.user?.id || null,
         excludeId
       });
 
       if (res && res.hasDuplicate && res.candidate) {
         const cand = res.candidate;
         const color = res.score >= 90 ? '#ef4444' : '#f59e0b';
-        const badgeText = res.score >= 95 ? '🚨 Duplicata Quase Certa' : (res.score >= 80 ? '⚠️ Alta Similaridade' : '🔍 Lançamento Parecido');
+        const isIncome = type === 'income';
+        const badgeText = res.score >= 95 
+          ? (isIncome ? '🚨 Duplicata de Receita Quase Certa' : '🚨 Duplicata Quase Certa')
+          : (res.score >= 80 
+              ? (isIncome ? '⚠️ Receita Similar Encontrada' : '⚠️ Alta Similaridade')
+              : (isIncome ? '🔍 Receita Parecida' : '🔍 Lançamento Parecido'));
 
         containerEl.style.display = 'block';
         containerEl.style.border = `1.5px solid ${color}`;
@@ -3262,7 +3268,7 @@ function attachRealtimeDuplicateChecker({ amountInput, dateInput, descInput, acc
                 <span>${badgeText} (${res.score}%)</span>
               </div>
               <div style="line-height:1.5; color:var(--text-secondary); font-size:12px;">
-                Atenção: Já existe um lançamento similar de <strong>${cand.user_name || 'um familiar'}</strong> em <strong>${fmt.date(cand.date)}</strong> no valor de <strong style="color:var(--text-primary)">${fmt.currency(cand.amount)}</strong> (<em>${cand.description || 'Sem descrição'}</em>).
+                Atenção: Já existe ${isIncome ? 'uma receita' : 'um lançamento'} similar de <strong>${cand.user_name || 'um familiar'}</strong> em <strong>${fmt.date(cand.date)}</strong> na conta <strong>${cand.account_name || 'Não informada'}</strong> no valor de <strong style="color:var(--text-primary)">${fmt.currency(cand.amount)}</strong> (<em>${cand.description || 'Sem descrição'}</em>).
               </div>
             </div>
             <button type="button" class="btn btn-sm" id="btn-dismiss-modal-dup" style="padding:2px 8px; font-size:11px; border-radius:6px; border:1px solid ${color}66; color:var(--text-muted); background:transparent; cursor:pointer;" title="Ignorar aviso">
@@ -3288,13 +3294,15 @@ function attachRealtimeDuplicateChecker({ amountInput, dateInput, descInput, acc
 
   const scheduleCheck = () => {
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(runCheck, 350);
+    debounceTimer = setTimeout(runCheck, 300);
   };
 
   amountInput.addEventListener('input', scheduleCheck);
   dateInput.addEventListener('change', scheduleCheck);
   if (descInput) descInput.addEventListener('input', scheduleCheck);
   if (accountSelect) accountSelect.addEventListener('change', scheduleCheck);
+
+  return scheduleCheck;
 }
 
 function openRecurringModal(item, accounts, categories, type) {
@@ -3816,7 +3824,7 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
   const competenceInput = document.getElementById('avl-competence');
 
   // Realtime Candidate Duplicate Checker
-  attachRealtimeDuplicateChecker({
+  const recheckDup = attachRealtimeDuplicateChecker({
     amountInput: document.getElementById('avl-amount'),
     dateInput: document.getElementById('avl-date'),
     descInput: document.getElementById('avl-desc'),
@@ -3860,6 +3868,7 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
       document.querySelectorAll('#avl-type-toggle button').forEach(b => b.className = '');
       btn.className = currentType === 'income' ? 'active-income' : 'active-expense';
       updateAvulsoCategories(currentType);
+      if (typeof recheckDup === 'function') recheckDup();
     };
   });
 

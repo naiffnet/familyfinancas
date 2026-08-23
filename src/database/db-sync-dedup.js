@@ -44,11 +44,23 @@ module.exports = (Base) => class extends Base {
 
     const isIncome = txA.type === 'income';
 
-    // REGRA DE OURO PARA RECEITAS (INCOME):
-    // Se forem receitas e as contas bancárias forem DIFERENTES, 100% IGNORADAS (são rendas reais independentes)
+    // REGRA PARA RECEITAS (INCOME):
+    // Na receita, aplicam-se TODOS os filtros (valor, data, título/NLP).
+    // Porém, para ser considerada duplicata, as receitas DEVEM ser:
+    // a) Da MESMA conta bancária (ex: txA.account_id === txB.account_id), OU
+    // b) De contas pertencentes ao MESMO usuário titular (ex: txA.user_id === txB.user_id ou txA.account_user_id === txB.account_user_id).
+    // Se forem contas de membros diferentes na família -> 100% IGNORADAS (são rendas reais independentes de cada familiar).
     if (isIncome) {
-      if (txA.account_id && txB.account_id && txA.account_id !== txB.account_id) {
-        return 0;
+      const hasAccountA = !!txA.account_id;
+      const hasAccountB = !!txB.account_id;
+      const isSameAccount = hasAccountA && hasAccountB && txA.account_id === txB.account_id;
+      const isSameUser = (txA.user_id && txB.user_id && txA.user_id === txB.user_id) ||
+                         (txA.account_user_id && txB.account_user_id && txA.account_user_id === txB.account_user_id) ||
+                         (txA.user_id && txB.account_user_id && txA.user_id === txB.account_user_id) ||
+                         (txA.account_user_id && txB.user_id && txA.account_user_id === txB.user_id);
+
+      if (hasAccountA && hasAccountB && !isSameAccount && !isSameUser) {
+        return 0; // Receitas de familiares diferentes em contas diferentes = rendas independentes
       }
     }
 
@@ -189,14 +201,14 @@ module.exports = (Base) => class extends Base {
     return Math.max(0, Math.min(100, Math.round(score)));
   }
 
-  checkDuplicateCandidate({ familyId, amount, date, description, accountId, type = 'expense', excludeId = null }) {
+  checkDuplicateCandidate({ familyId, amount, date, description, accountId, type = 'expense', userId = null, excludeId = null }) {
     if (!familyId || !amount || !date) return { hasDuplicate: false };
     const targetAmount = Math.abs(Number(amount) || 0);
     if (targetAmount <= 0) return { hasDuplicate: false };
 
     // Busca transações recentes da família na janela de +- 4 dias
     const candidates = this.db.prepare(`
-      SELECT t.*, u.name as user_name, u.avatar_color as user_avatar_color, a.name as account_name, r.name as recurring_name
+      SELECT t.*, u.name as user_name, u.avatar_color as user_avatar_color, a.name as account_name, a.user_id as account_user_id, r.name as recurring_name
       FROM transactions t
       JOIN users u ON t.user_id = u.id
       LEFT JOIN accounts a ON t.account_id = a.id
@@ -209,12 +221,20 @@ module.exports = (Base) => class extends Base {
       LIMIT 30
     `).all(familyId, date, excludeId, excludeId);
 
+    let virtualAccountUserId = null;
+    if (accountId) {
+      const acc = this.db.prepare('SELECT user_id FROM accounts WHERE id = ?').get(accountId);
+      if (acc) virtualAccountUserId = acc.user_id;
+    }
+
     const virtualTx = {
       type,
       amount: targetAmount,
       date,
       description: description || '',
-      account_id: accountId || null
+      account_id: accountId || null,
+      user_id: userId || null,
+      account_user_id: virtualAccountUserId || userId || null
     };
 
     let bestMatch = null;
@@ -253,7 +273,7 @@ module.exports = (Base) => class extends Base {
     const minDate = new Date(Date.now() - daysWindow * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     let query = `
-      SELECT t.*, u.name as user_name, u.avatar_color as user_avatar_color, a.name as account_name, c.name as category_name, r.name as recurring_name
+      SELECT t.*, u.name as user_name, u.avatar_color as user_avatar_color, a.name as account_name, a.user_id as account_user_id, c.name as category_name, r.name as recurring_name
       FROM transactions t
       JOIN users u ON t.user_id = u.id
       LEFT JOIN accounts a ON t.account_id = a.id
