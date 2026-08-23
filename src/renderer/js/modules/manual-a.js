@@ -187,11 +187,14 @@ async function renderManual() {
             <div class="wiki-tree-item" data-cat="sync" data-topic="sync-uuid" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #38bdf8; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
               • 🔑 UUIDs & Multi-Aparelho
             </div>
+            <div class="wiki-tree-item" data-cat="sync" data-topic="sync-receitas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #34d399; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+              • 💰 Regra de Receitas & Mesma Conta (Novo)
+            </div>
             <div class="wiki-tree-item" data-cat="sync" data-topic="sync-dedup" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-              • 🧠 Motor Heurístico Anti-Duplicidade
+              • 🧠 Motor Heurístico & Dívidas
             </div>
             <div class="wiki-tree-item" data-cat="sync" data-topic="sync-conciliacao" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-              • ⚖️ Central de Conciliação (Mesclar / Manter)
+              • ⚖️ Central de Conciliação & Ações em Lote
             </div>
           </div>
         </div>
@@ -225,7 +228,20 @@ async function renderManual() {
           </div>
         </div>
 
-        <!-- GRUPO 9: FAQ INTERATIVO -->
+        <!-- GRUPO 9: ARQUITETURA MODULAR & DESENVOLVIMENTO -->
+        <div class="wiki-tree-group">
+          <div class="wiki-tree-header" data-cat="arquitetura" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #eab308; background: rgba(234,179,8,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+            <span>🏗️ Arquitetura & Manutenção</span>
+            <span class="wiki-tree-arrow">▾</span>
+          </div>
+          <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+            <div class="wiki-tree-item" data-cat="arquitetura" data-topic="arq-modular" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #eab308; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+              • ⚡ Modularização (< 1000 Linhas) & Build
+            </div>
+          </div>
+        </div>
+
+        <!-- GRUPO 10: FAQ INTERATIVO -->
         <div class="wiki-tree-group">
           <div class="wiki-tree-header" data-cat="faq" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #f87171; background: rgba(248,113,113,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
             <span>❓ FAQ (Perguntas)</span>

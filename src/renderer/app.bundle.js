@@ -1,7 +1,7 @@
 /* ============================================
  * app.bundle.js — FamilyFinancas Renderer
  * Gerado por: npm run build:renderer
- * 2026-08-23T12:43:38.398Z
+ * 2026-08-23T13:22:06.029Z
  * Modulos: 21
  * ============================================ */
 
@@ -5668,11 +5668,14 @@ async function renderManual() {
             <div class="wiki-tree-item" data-cat="sync" data-topic="sync-uuid" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #38bdf8; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
               • 🔑 UUIDs & Multi-Aparelho
             </div>
+            <div class="wiki-tree-item" data-cat="sync" data-topic="sync-receitas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #34d399; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+              • 💰 Regra de Receitas & Mesma Conta (Novo)
+            </div>
             <div class="wiki-tree-item" data-cat="sync" data-topic="sync-dedup" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-              • 🧠 Motor Heurístico Anti-Duplicidade
+              • 🧠 Motor Heurístico & Dívidas
             </div>
             <div class="wiki-tree-item" data-cat="sync" data-topic="sync-conciliacao" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-              • ⚖️ Central de Conciliação (Mesclar / Manter)
+              • ⚖️ Central de Conciliação & Ações em Lote
             </div>
           </div>
         </div>
@@ -5706,7 +5709,20 @@ async function renderManual() {
           </div>
         </div>
 
-        <!-- GRUPO 9: FAQ INTERATIVO -->
+        <!-- GRUPO 9: ARQUITETURA MODULAR & DESENVOLVIMENTO -->
+        <div class="wiki-tree-group">
+          <div class="wiki-tree-header" data-cat="arquitetura" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #eab308; background: rgba(234,179,8,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+            <span>🏗️ Arquitetura & Manutenção</span>
+            <span class="wiki-tree-arrow">▾</span>
+          </div>
+          <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+            <div class="wiki-tree-item" data-cat="arquitetura" data-topic="arq-modular" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #eab308; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+              • ⚡ Modularização (< 1000 Linhas) & Build
+            </div>
+          </div>
+        </div>
+
+        <!-- GRUPO 10: FAQ INTERATIVO -->
         <div class="wiki-tree-group">
           <div class="wiki-tree-header" data-cat="faq" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #f87171; background: rgba(248,113,113,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
             <span>❓ FAQ (Perguntas)</span>
@@ -6161,28 +6177,68 @@ async function renderManual() {
           </div>
         </div>
 
-        <!-- TÓPICO 6.2: SYNC > MOTOR HEURÍSTICO (ATUALIZADO) -->
-        <div class="manual-topic-content" id="topic-sync-dedup" style="display: none;">
+        <!-- TÓPICO 6.1: SYNC > UUIDS & MULTI-APARELHO -->
+        <div class="manual-topic-content" id="topic-sync-uuid" style="display: none;">
           <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #38bdf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-            <span>🧠 Motor Heurístico Anti-Duplicidade & Alertas em Tempo Real</span>
-            <span class="badge badge-purple">Inteligência Familiar</span>
+            <span>🔑 Identificadores Globais Universais (UUID v4) & Multi-Dispositivo</span>
+            <span class="badge badge-blue">Smart Sync</span>
           </h4>
           <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-            <div style="background: rgba(139, 92, 246, 0.08); border-left: 4px solid #8b5cf6; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-              <strong>Prevenção Imediata e Detecção Ativa de Lançamentos Duplicados:</strong>
+            <div style="background: rgba(56, 189, 248, 0.08); border-left: 4px solid #38bdf8; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+              <strong>Arquitetura Resiliente para Sincronização Desktop e Web:</strong>
             </div>
-            <p style="margin-bottom: 10px;">Quando múltiplos membros da família inserem despesas, o motor atua em duas etapas:</p>
+            <p style="margin-bottom: 10px;">Para permitir que membros da família usem o app no notebook (Desktop) e no celular (Web) simultaneamente sem conflitos:</p>
             <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-              <li>⚡ <strong>Alerta em Tempo Real no Formulário:</strong> Conforme você digita o valor, data ou descrição nos formulários de despesas ou contas fixas, o sistema pesquisa instantaneamente e avisa: <em>"Atenção: Já existe um lançamento similar registrado por Maria em 15/08..."</em>.</li>
-              <li>🔤 <strong>NLP & Stopwords Bancárias:</strong> O sistema ignora termos genéricos como <code>PIX</code>, <code>TED</code>, <code>PAGTO</code>, <code>COMPRA</code>, <code>CARTÃO</code>, comparando apenas o nome do estabelecimento (ex: <em>"PIX PAGTO SUPERMERCADO ZAFFARI"</em> vira <em>"Supermercado Zaffari"</em>).</li>
-              <li>📅 <strong>Compensação de Fim de Semana:</strong> Tolera compras feitas na sexta/sábado/domingo que são registradas ou compensadas na segunda/terça.</li>
-              <li>🔢 <strong>Detecção de Parcelamentos Duplicados:</strong> Identifica compras parceladas coincidentes (ex: <em>"Sofá 3/10"</em> vs <em>"Sofá 3 de 10"</em>).</li>
-              <li>🤖 <strong>Auto-Merge Inteligente:</strong> Duplicatas com 100% de similaridade (mesmo valor, mesma data, mesma descrição e mesma conta) são unificadas com segurança e registradas no histórico.</li>
+              <li>🌐 <strong>UUID Global (128 bits):</strong> Todo lançamento ganha um identificador único universal (<code>sync_id</code>). Isso impede colisões de ID numérico (ex: Desktop e Web criando o ID #1506).</li>
+              <li>⏱️ <strong>Last-Write-Wins:</strong> Atualizações em um mesmo lançamento são resolvidas automaticamente com base no carimbo de data/hora mais recente (<code>updated_at</code>).</li>
+              <li>🗑️ <strong>Soft-Delete:</strong> Exclusões são sincronizadas de forma limpa sem deixar registros fantasmas em outros aparelhos.</li>
             </ul>
           </div>
         </div>
 
-        <!-- TÓPICO 6.3: SYNC > CONCILIAÇÃO VISUAL (ATUALIZADO) -->
+        <!-- TÓPICO 6.2: SYNC > REGRA DE RECEITAS (NOVO) -->
+        <div class="manual-topic-content" id="topic-sync-receitas" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #34d399; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span>💰 Regra de Ouro para Receitas & Mesma Titularidade</span>
+            <span class="badge badge-green">Recurso Novo</span>
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+              <strong>Como o sistema analisa o recebimento de receitas e salários:</strong>
+            </div>
+            <p style="margin-bottom: 10px;">Nas <strong>Receitas</strong> (salários, pró-labore, aluguéis recebidos, PIX recebidos), aplicam-se filtros completos de valor, data e título, respeitando as contas:</p>
+            <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+              <li>🟢 <strong>Contas Diferentes de Membros Distintos = 100% Ignoradas:</strong> Se William recebe R$ 4.000 no Itaú e Jennifer recebe R$ 4.000 no Nubank, o motor <strong>ignora totalmente</strong> e não gera alerta, pois são rendas legítimas e independentes de cada familiar.</li>
+              <li>🚨 <strong>Mesma Conta Bancária:</strong> Se uma receita de mesmo valor e data for cadastrada duas vezes na <strong>mesma conta</strong>, o motor acusa duplicidade com **Altíssima Certeza (95-100%)**.</li>
+              <li>⚠️ <strong>Contas Diferentes do MESMO Titular:</strong> Se o próprio usuário lançar a mesma receita no Itaú e depois no Nubank por engano, o sistema identifica que ambas as contas pertencem ao mesmo usuário e acusa **duplicidade com banco trocado (85-90%)**.</li>
+              <li>⚡ <strong>Aviso em Tempo Real no Formulário:</strong> Ao preencher uma receita no modal, surge um alerta instantâneo: <em>"Atenção: Já existe uma receita similar de William em 20/08 na conta Itaú no valor de R$ 4.000,00..."</em>.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- TÓPICO 6.3: SYNC > MOTOR HEURÍSTICO & HIERARQUIA DE DÍVIDAS -->
+        <div class="manual-topic-content" id="topic-sync-dedup" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #38bdf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span>🧠 Motor Heurístico Anti-Duplicidade & Hierarquia de Dívidas</span>
+            <span class="badge badge-purple">Inteligência Familiar</span>
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <div style="background: rgba(139, 92, 246, 0.08); border-left: 4px solid #8b5cf6; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+              <strong>Hierarquia de Análise para Dívidas e Despesas:</strong>
+            </div>
+            <p style="margin-bottom: 10px;">Para despesas e pagamentos da casa, o motor segue uma rigorosa escala de critérios:</p>
+            <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+              <li><strong>Nível 1 (Valor Exato + Datas Próximas):</strong> Compara valores idênticos com tolerância de até ±2 dias e compensações bancárias de fim de semana (sexta/sábado/domingo compensados na segunda/terça).</li>
+              <li><strong>Nível 2 (Data Exata + Valores Aproximados):</strong> Detecta despesas no mesmo dia com pequenas variações de centavos, taxas ou gorjetas (até 2% a 5%).</li>
+              <li><strong>Nível 3 (Títulos e NLP Bancário):</strong> Limpa ruídos e stopwords bancárias (<code>PIX</code>, <code>TED</code>, <code>PAGTO</code>, <code>COMPRA</code>, <code>DÉBITO</code>, <code>CRÉDITO</code>) e compara os estabelecimentos com busca inteligente por prefixos (ex: <em>"Zaffari Ipiranga"</em> vs <em>"Cia Zaffari"</em>).</li>
+              <li><strong>Contas Diferentes com Lojas Diferentes = 0% Duplicata:</strong> Se o valor for R$ 50 no Itaú (Farmácia) e R$ 50 no Nubank (Padaria), é <strong>100% ignorado</strong>.</li>
+              <li>🔢 <strong>Parcelamento Inteligente:</strong> Se o Lançamento A diz <em>"Sofá (2/10)"</em> e o B diz <em>"Sofá (3/10)"</em>, o motor sabe que <strong>NÃO é duplicata</strong>. Se ambos disserem <em>"2/10"</em> e <em>"2 de 10"</em>, acusa duplicata de 100%!</li>
+              <li>🏷️ <strong>Mesma Conta Fixa Recorrente:</strong> Lançamentos que apontam para o mesmo item fixo do mês (ex: <em>Aluguel, Luz, Internet</em>) são detectados automaticamente com 100% de confiança.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- TÓPICO 6.4: SYNC > CONCILIAÇÃO VISUAL E AÇÕES EM LOTE -->
         <div class="manual-topic-content" id="topic-sync-conciliacao" style="display: none;">
           <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #38bdf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
             <span>⚖️ Central Avançada de Conciliação, Filtros e Ações em Lote</span>
@@ -6245,7 +6301,27 @@ async function renderManual() {
           </div>
         </div>
 
-        <!-- TÓPICO 9.1: FAQ INTERATIVO -->
+        <!-- TÓPICO 9.1: ARQUITETURA MODULAR & BUILD -->
+        <div class="manual-topic-content" id="topic-arq-modular" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #eab308; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span>🏗️ Nova Arquitetura Modular & Manutenção Ágil</span>
+            <span class="badge badge-yellow">Engenharia v2</span>
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <div style="background: rgba(234, 179, 8, 0.08); border-left: 4px solid #eab308; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+              <strong>Código 100% Desacoplado (Arquivos com no máximo 900 linhas):</strong>
+            </div>
+            <p style="margin-bottom: 10px;">Para garantir alta velocidade de carregamento, facilidade de manutenção e eliminar arquivos monolíticos:</p>
+            <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+              <li>🧩 <strong>Frontend Modularizado (21 Módulos em <code>src/renderer/js/modules/</code>):</strong> Dashboard, Planejamento, Contas, Configurações, Modais, Autenticação e Deduplicação separados em submódulos concisos.</li>
+              <li>💾 <strong>Banco SQLite Modular (8 Módulos em <code>src/database/</code>):</strong> Camadas de Transações, Contas, Usuários/LGPD, Faturas, Relatórios e Anti-Duplicidade desacopladas em mixins limpos.</li>
+              <li>🎨 <strong>Folhas de Estilo (4 Folhas em <code>src/renderer/css/</code>):</strong> <code>base.css</code>, <code>components.css</code>, <code>views.css</code> e <code>responsive-features.css</code> agregadas via <code>@import</code>.</li>
+              <li>⚡ <strong>Scripts de Build:</strong> Execute <code>npm run build:renderer</code> para compilar alterações ou <code>npm run watch:renderer</code> para compilação instantânea em segundo plano.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- TÓPICO 10.1: FAQ INTERATIVO -->
         <div class="manual-topic-content" id="topic-faq-interativo" style="display: none;">
           <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f87171; font-weight: 700;">
             ❓ Perguntas Frequentes (FAQ Interativo — Clique para abrir a resposta)
@@ -6254,31 +6330,41 @@ async function renderManual() {
             
             <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
               <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
+                <span>💰 Como o app diferencia receitas de familiares em contas bancárias distintas?</span>
+                <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
+              </div>
+              <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
+                Pela <strong>Regra de Ouro de Receitas</strong>, salários e recebíveis lançados em contas de familiares diferentes (ex: marido no Itaú e esposa no Nubank) são <strong>100% ignorados pelo motor de duplicidades</strong>, pois são rendas reais independentes. O sistema só alerta se a receita for na mesma conta bancária ou se o mesmo titular cadastrar em bancos diferentes por engano.
+              </div>
+            </div>
+
+            <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
+              <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
+                <span>🛡️ O que acontece se dois membros da família lançarem a mesma despesa (Web e Desktop)?</span>
+                <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
+              </div>
+              <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
+                O <strong>Motor Anti-Duplicidade</strong> cruza valor, data (com compensação de fins de semana) e o nome do estabelecimento (NLP). Se o mesmo local for detectado, o sistema alerta e você pode abrir a <strong>Central de Conciliação</strong> para mesclar em 1 único lançamento com 1 clique.
+              </div>
+            </div>
+
+            <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
+              <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
+                <span>🔢 O motor de duplicidade confunde compras parceladas (ex: 2/10 com 3/10)?</span>
+                <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
+              </div>
+              <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
+                Não! O motor extrai o número da parcela automaticamente. Se os números forem diferentes (ex: <em>2/10</em> vs <em>3/10</em>), a duplicidade é <strong>zerada (0%)</strong> porque são parcelas de meses distintos. Já parcelas idênticas (ex: <em>2/10</em> vs <em>2 de 10</em>) recebem pontuação máxima de duplicidade (100%).
+              </div>
+            </div>
+
+            <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
+              <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
                 <span>💳 Como funciona o destaque de parcelas ao clicar na fatura?</span>
                 <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
               </div>
               <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
-                Ao clicar no card de qualquer fatura na tela de Planejamento (ex: <code>FATURA CARTÃO CARREFOUR</code>), todas as compras e parcelas correspondentes na lista de Despesas são imediatamente destacadas com a cor oficial do cartão/banco (borda, fundo luminoso e badge explicativa). Os itens que não fazem parte dessa fatura são atenuados, e a tela rola suavemente até o primeiro item para facilitar a conferência. Clicar novamente no card da fatura desativa o destaque.
-              </div>
-            </div>
-
-            <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
-              <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
-                <span>🚨 Como usar os avisos de vencimento do Dashboard como links diretos?</span>
-                <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
-              </div>
-              <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
-                Basta clicar em qualquer chip de alerta na faixa vermelha <code>🚨 Vencimentos próximos</code> ou nos cartões das colunas <code>⭐ Prioritários</code> e <code>Contas a Pagar</code>. O aplicativo abre a tela de Planejamento no mês exato e aplica um destaque luminoso pulsante (*glow flash*) sobre o lançamento selecionado.
-              </div>
-            </div>
-
-            <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
-              <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
-                <span>💳 Qual a diferença entre Competência e Vencimento do Cartão?</span>
-                <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
-              </div>
-              <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
-                A <strong>competência</strong> refere-se ao mês em que o consumo ou o ciclo da fatura ocorreu (ex: compras feitas até o fechamento de 25 de Fevereiro pertencem à competência 02/2026). O <strong>vencimento</strong> é o dia em que o pagamento do boleto é realizado (ex: 05 de Março).
+                Ao clicar no card de qualquer fatura na tela de Planejamento (ex: <code>FATURA CARTÃO CARREFOUR</code>), todas as compras e parcelas correspondentes na lista de Despesas são imediatamente destacadas com a cor oficial do cartão/banco. Os itens de outros cartões são atenuados, facilitando a conferência.
               </div>
             </div>
 
@@ -6288,47 +6374,7 @@ async function renderManual() {
                 <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
               </div>
               <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
-                A fatura é marcada como <span class="badge badge-purple">Renegociada</span>, a entrada (se informada) é debitada da conta bancária e o sistema gera automaticamente as parcelas do acordo como despesas recorrentes nos meses subsequentes. Caso tenha feito por engano, você pode clicar em "Desfazer Acordo / Reabrir" para restaurar a fatura original.
-              </div>
-            </div>
-
-            <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
-              <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
-                <span>🛡️ O que acontece se dois membros da família lançarem o mesmo gasto (Web e Desktop)?</span>
-                <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
-              </div>
-              <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
-                O <strong>Motor Anti-Duplicidade</strong> entra em ação imediatamente! Ele cruza a data (com margem de ±2 dias), o valor (com tolerância de centavos/gorjetas) e o nome do estabelecimento. Se for muito parecido, o Dashboard exibe um alerta temático e o botão <code>🛡️</code> abre o modal comparativo permitindo que você escolha com 1 clique entre <strong>[Mesclar em 1 Lançamento]</strong> (unificando saldos e removendo a duplicata) ou <strong>[Manter Ambos]</strong> caso sejam dois gastos legítimos.
-              </div>
-            </div>
-
-            <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
-              <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
-                <span>🎟️ Como cadastrar um Cartão Benefício (Flash, Caju, Alelo, Sodexo, VR)?</span>
-                <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
-              </div>
-              <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
-                Vá até a aba <strong>Contas</strong>, clique em <code>+ Nova Conta</code>, selecione o tipo <strong>Voucher / Benefício</strong> e escolha a operadora (Flash, Caju, Alelo, Banricard, Swile, Sodexo, VR, etc.). Você pode informar a modalidade (ex: Alimentação, Refeição, Mobilidade ou Flexível), o saldo atual disponível e configurar o valor e o dia da recarga mensal automática!
-              </div>
-            </div>
-
-            <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
-              <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
-                <span>⚠️ Como quitar pendências de meses anteriores diretamente pelo Dashboard?</span>
-                <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
-              </div>
-              <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
-                No topo do Dashboard, o container <strong>"⚠️ Pendências de Meses Anteriores Não Pagas"</strong> lista todas as contas passadas em aberto. Ao clicar sobre qualquer uma delas, o sistema abre automaticamente a tela de Planejamento no mês exato em que a dívida foi gerada e destaca a linha com um efeito luminoso, permitindo dar baixa ou editar imediatamente.
-              </div>
-            </div>
-
-            <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
-              <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
-                <span>🔒 Meus dados financeiros ficam salvos na nuvem ou são compartilhados?</span>
-                <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
-              </div>
-              <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
-                Não! Todos os dados são gravados exclusivamente no banco de dados local SQLite no seu computador com criptografia AES-256 e conformidade integral com a LGPD. Nenhuma informação financeira sai da sua rede local.
+                A fatura é marcada como <span class="badge badge-purple">Renegociada</span>, a entrada é debitada da conta bancária e o sistema gera automaticamente as parcelas do acordo como despesas nos meses subsequentes. Caso tenha feito por engano, você pode clicar em "Desfazer Acordo / Reabrir" para restaurar a fatura original.
               </div>
             </div>
 
