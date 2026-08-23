@@ -115,13 +115,14 @@ module.exports = (Base) => class extends Base {
       competence_date: null,
       credit_product: 'normal',
       due_date: null,
+      pix_code: null,
       ...data,
       payment_date: data.is_paid ? (data.payment_date || data.date) : null
     };
     const t = this.db.transaction(() => {
       const r = this.db.prepare(`
-        INSERT INTO transactions (user_id, account_id, category_id, recurring_item_id, type, amount, description, date, payment_date, competence_date, is_paid, is_avulso, notes, credit_product, due_date)
-        VALUES (@user_id, @account_id, @category_id, @recurring_item_id, @type, @amount, @description, @date, @payment_date, @competence_date, @is_paid, @is_avulso, @notes, @credit_product, @due_date)
+        INSERT INTO transactions (user_id, account_id, category_id, recurring_item_id, type, amount, description, date, payment_date, competence_date, is_paid, is_avulso, notes, credit_product, due_date, pix_code)
+        VALUES (@user_id, @account_id, @category_id, @recurring_item_id, @type, @amount, @description, @date, @payment_date, @competence_date, @is_paid, @is_avulso, @notes, @credit_product, @due_date, @pix_code)
       `).run(txData);
       if (txData.is_paid) {
         const delta = txData.type === 'income' ? txData.amount : -txData.amount;
@@ -150,7 +151,7 @@ module.exports = (Base) => class extends Base {
       }
       this.db.prepare(`
         UPDATE transactions SET account_id=@account_id, category_id=@category_id, type=@type,
-        amount=@amount, description=@description, date=@date, payment_date=@payment_date, competence_date=@competence_date, is_paid=@is_paid, notes=@notes, credit_product=@credit_product, due_date=@due_date WHERE id=@id
+        amount=@amount, description=@description, date=@date, payment_date=@payment_date, competence_date=@competence_date, is_paid=@is_paid, notes=@notes, credit_product=@credit_product, due_date=@due_date, pix_code=@pix_code WHERE id=@id
       `).run(txData);
       if (txData.is_paid) {
         const d = txData.type === 'income' ? txData.amount : -txData.amount;

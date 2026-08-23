@@ -1,5 +1,5 @@
 /* ===
- * nfce-scanner.js — Scanner de Notas Fiscais (NFC-e / SAT / Pix) via Câmera e QR Code
+ * nfce-scanner.js — Scanner de Notas Fiscais (NFC-e / SAT / Pix) via Câmera, PDF e QR Code
  * Módulo para FamilyFinancas
  * === */
 
@@ -28,15 +28,46 @@ function vibrateDevice(ms = 70) {
   try { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(ms); } catch (e) {}
 }
 
-async function ensureJsQRLoaded() {
-  if (typeof window.jsQR === 'function') return true;
-  return new Promise((resolve) => {
-    const script = document.createElement('script');
-    script.src = 'js/vendor/jsQR.js';
-    script.onload = () => resolve(typeof window.jsQR === 'function');
-    script.onerror = () => resolve(false);
-    document.head.appendChild(script);
-  });
+async function ensureEnginesLoaded() {
+  const promises = [];
+  if (typeof window.jsQR !== 'function') {
+    promises.push(new Promise(res => {
+      const s = document.createElement('script');
+      s.src = 'js/vendor/jsQR.js';
+      s.onload = () => res(true);
+      s.onerror = () => res(false);
+      document.head.appendChild(s);
+    }));
+  }
+  if (typeof window.QRCode === 'undefined') {
+    promises.push(new Promise(res => {
+      const s = document.createElement('script');
+      s.src = 'js/vendor/qrcode.min.js';
+      s.onload = () => res(true);
+      s.onerror = () => res(false);
+      document.head.appendChild(s);
+    }));
+  }
+  if (typeof window.pdfjsLib === 'undefined') {
+    promises.push(new Promise(res => {
+      const s = document.createElement('script');
+      s.src = 'js/vendor/pdf.min.js';
+      s.onload = () => {
+        try {
+          if (window.pdfjsLib) window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/vendor/pdf.worker.min.js';
+        } catch(e) {}
+        res(true);
+      };
+      s.onerror = () => res(false);
+      document.head.appendChild(s);
+    }));
+  }
+  await Promise.all(promises);
+  try {
+    if (window.pdfjsLib && !window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/vendor/pdf.worker.min.js';
+    }
+  } catch(e) {}
 }
 
 function decodeHexAscii(str) {
@@ -85,44 +116,74 @@ const KNOWN_CNPJS = [
   { root: '13574594', name: 'Burger King', cat: 'Alimentação' }
 ];
 
-function parseNFCeUrl(raw) {
+function parsePixPayload(text) {
+  if (!text || typeof text !== 'string') return null;
+  const clean = text.trim();
+  if (!clean.startsWith('000201') || !clean.includes('BR.GOV.BCB.PIX')) return null;
+  const res = { isPix: true, pixCode: clean, amount: null, receiver: '', txid: '', city: '' };
+  const valMatch = clean.match(/54(\d{2})([0-9.]+)/);
+  if (valMatch) {
+    const len = parseInt(valMatch[1], 10);
+    const num = parseFloat(valMatch[2].substring(0, len));
+    if (!isNaN(num) && num > 0) res.amount = num;
+  }
+  const nameMatch = clean.match(/59(\d{2})([^0-9]+)/);
+  if (nameMatch) {
+    const len = parseInt(nameMatch[1], 10);
+    res.receiver = nameMatch[2].substring(0, len).trim();
+  }
+  const cityMatch = clean.match(/60(\d{2})([^0-9]+)/);
+  if (cityMatch) {
+    const len = parseInt(cityMatch[1], 10);
+    res.city = cityMatch[2].substring(0, len).trim();
+  }
+  const txMatch = clean.match(/62\d{2}.*?05(\d{2})([a-zA-Z0-9]+)/);
+  if (txMatch) {
+    const len = parseInt(txMatch[1], 10);
+    res.txid = txMatch[2].substring(0, len);
+  }
+  return res;
+}
+
+function parseSingleCode(raw) {
   if (!raw || typeof raw !== 'string') return null;
   const text = raw.trim();
-  let result = {
-    type: 'expense', amount: null, date: null, competence: null, description: '',
-    suggestedCategory: '', accessKey: '', cnpj: '', nNF: '', uf: '', rawUrl: text, isPix: false, isBoleto: false
-  };
 
   // 1. Pix
-  if (text.startsWith('000201') && text.includes('BR.GOV.BCB.PIX')) {
-    result.isPix = true; result.description = 'Pagamento PIX'; result.suggestedCategory = 'Alimentação';
-    const pixVal = text.match(/54\d{2}([0-9.]+)/);
-    if (pixVal) result.amount = parseFloat(pixVal[1]);
-    const pixName = text.match(/59(\d{2})([^0-9]+)/);
-    if (pixName) {
-      const len = parseInt(pixName[1], 10);
-      const name = pixName[2].substring(0, len).trim();
-      if (name) result.description = `PIX para ${name}`;
-    }
+  const pix = parsePixPayload(text);
+  if (pix) {
     const today = new Date().toISOString().split('T')[0];
-    result.date = today; result.competence = today.slice(0, 7);
-    return result;
+    return {
+      type: 'expense', amount: pix.amount, date: today, competence: today.slice(0, 7),
+      description: pix.receiver ? `PIX para ${pix.receiver}` : 'Pagamento PIX', suggestedCategory: 'Alimentação',
+      accessKey: '', cnpj: '', nNF: '', uf: '', rawUrl: text, isPix: true, isBoleto: false,
+      pixCode: pix.pixCode, pixReceiver: pix.receiver, pixTxid: pix.txid,
+      notes: `PIX Copia e Cola: ${pix.pixCode}`
+    };
   }
 
   // 2. Boleto
   const cleanDigits = text.replace(/[^0-9]/g, '');
   if ((cleanDigits.length === 47 || cleanDigits.length === 48) && !text.includes('http')) {
-    result.isBoleto = true; result.description = 'Pagamento de Boleto'; result.suggestedCategory = 'Moradia';
+    const today = new Date().toISOString().split('T')[0];
+    let amt = null;
     if (cleanDigits.length === 47) {
       const cents = parseInt(cleanDigits.slice(-10), 10);
-      if (cents > 0) result.amount = cents / 100;
+      if (cents > 0) amt = cents / 100;
     }
-    const today = new Date().toISOString().split('T')[0];
-    result.date = today; result.competence = today.slice(0, 7);
-    return result;
+    return {
+      type: 'expense', amount: amt, date: today, competence: today.slice(0, 7),
+      description: 'Pagamento de Boleto', suggestedCategory: 'Moradia', accessKey: '', cnpj: '',
+      nNF: '', uf: '', rawUrl: text, isPix: false, isBoleto: true, notes: `Código de Barras: ${text}`
+    };
   }
 
-  // 3. Chave de 44 dígitos
+  // 3. NFC-e / NF-e SEFAZ
+  let result = {
+    type: 'expense', amount: null, date: null, competence: null, description: '',
+    suggestedCategory: '', accessKey: '', cnpj: '', nNF: '', uf: '', rawUrl: text, isPix: false, isBoleto: false
+  };
+
   const keyMatch = text.match(/\b([0-9]{44})\b/) || text.match(/[?&]p=([0-9]{44})/i) || text.match(/[?&]chNFe=([0-9]{44})/i);
   if (keyMatch) {
     result.accessKey = keyMatch[1];
@@ -137,8 +198,7 @@ function parseNFCeUrl(raw) {
     result.nNF = parseInt(result.accessKey.substring(25, 34), 10).toString();
   }
 
-  // 4. Extração de Valor e Data por Tokens Pipe (|), Hexadecimal e Query Params
-  // 4A. Query parameters explícitos de data (dhEmi, dEmi, data, date)
+  // Query parameters de data
   const qDateMatch = text.match(/[?&](?:dhEmi|dEmi|data|date)=([^&|]+)/i);
   if (qDateMatch) {
     const rawD = decodeURIComponent(qDateMatch[1]).trim();
@@ -146,38 +206,24 @@ function parseNFCeUrl(raw) {
     if (isoM) { result.date = `${isoM[1]}-${isoM[2]}-${isoM[3]}`; result.competence = `${isoM[1]}-${isoM[2]}`; }
     const brM = rawD.match(/(\d{2})\/(\d{2})\/(\d{4})/);
     if (brM) { result.date = `${brM[3]}-${brM[2]}-${brM[1]}`; result.competence = `${brM[3]}-${brM[2]}`; }
-    const compM = rawD.match(/^(\d{4})(\d{2})(\d{2})/);
-    if (compM) { result.date = `${compM[1]}-${compM[2]}-${compM[3]}`; result.competence = `${compM[1]}-${compM[2]}`; }
   }
 
-  // 4B. Tokens do Pipe (|)
   if (text.includes('|')) {
     const pipeParts = text.split('|');
     for (let i = 1; i < pipeParts.length; i++) {
       const token = pipeParts[i].trim();
       if (!token) continue;
-
-      // Se for decimal direto (ex: 84.50 ou 148,90)
       if (/^\d+[.,]\d{2}$/.test(token) || (/^\d+[.,]\d+$/.test(token) && parseFloat(token.replace(',', '.')) > 0)) {
         const val = parseFloat(token.replace(',', '.'));
         if (!isNaN(val) && val > 0 && !(i <= 3 && (val === 1 || val === 2))) {
           if (!result.amount) result.amount = val;
         }
       }
-
-      // Se for data direta em formato ISO ou BR no pipe
       const pIsoM = token.match(/(\d{4})-(\d{2})-(\d{2})/);
-      if (pIsoM && !result.date) {
-        result.date = `${pIsoM[1]}-${pIsoM[2]}-${pIsoM[3]}`;
-        result.competence = `${pIsoM[1]}-${pIsoM[2]}`;
-      }
+      if (pIsoM && !result.date) { result.date = `${pIsoM[1]}-${pIsoM[2]}-${pIsoM[3]}`; result.competence = `${pIsoM[1]}-${pIsoM[2]}`; }
       const pBrM = token.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-      if (pBrM && !result.date) {
-        result.date = `${pBrM[3]}-${pBrM[2]}-${pBrM[1]}`;
-        result.competence = `${pBrM[3]}-${pBrM[2]}`;
-      }
+      if (pBrM && !result.date) { result.date = `${pBrM[3]}-${pBrM[2]}-${pBrM[1]}`; result.competence = `${pBrM[3]}-${pBrM[2]}`; }
 
-      // Se for Hexadecimal ASCII (SEFAZ v2.0)
       const decodedHex = decodeHexAscii(token);
       if (decodedHex) {
         if (/^\d+[.,]\d{2}$/.test(decodedHex) || /^\d+[.,]\d+$/.test(decodedHex)) {
@@ -189,34 +235,6 @@ function parseNFCeUrl(raw) {
           result.date = dateMatch[1].length === 4 ? `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}` : `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
           result.competence = result.date.slice(0, 7);
         }
-        const compDateM = decodedHex.match(/^(\d{4})(\d{2})(\d{2})/);
-        if (compDateM && !result.date) {
-          result.date = `${compDateM[1]}-${compDateM[2]}-${compDateM[3]}`;
-          result.competence = `${compDateM[1]}-${compDateM[2]}`;
-        }
-        const aaMmDd = decodedHex.match(/^(\d{2})(\d{2})(\d{2})$/);
-        if (aaMmDd && !result.date && result.competence) {
-          const yr = parseInt(aaMmDd[1], 10) + 2000;
-          const mo = aaMmDd[2];
-          const dy = aaMmDd[3];
-          if (parseInt(mo, 10) >= 1 && parseInt(mo, 10) <= 12 && parseInt(dy, 10) >= 1 && parseInt(dy, 10) <= 31) {
-            result.date = `${yr}-${mo}-${dy}`;
-            result.competence = `${yr}-${mo}`;
-          }
-        }
-      }
-
-      // Unix Timestamp em Hex (8 dígitos hex)
-      if (token.length === 8 && /^[0-9a-fA-F]{8}$/.test(token) && !result.date) {
-        const ts = parseInt(token, 16);
-        if (ts > 1577836800 && ts < 1893456000) {
-          const d = new Date(ts * 1000);
-          const y = d.getFullYear();
-          const m = String(d.getMonth() + 1).padStart(2, '0');
-          const day = String(d.getDate()).padStart(2, '0');
-          result.date = `${y}-${m}-${day}`;
-          result.competence = `${y}-${m}`;
-        }
       }
     }
   }
@@ -226,21 +244,15 @@ function parseNFCeUrl(raw) {
     if (valMatch) result.amount = parseFloat(valMatch[1].replace(',', '.'));
   }
 
-  // Se a data exata do dia não foi codificada na URL, usa a competência da chave
   const today = new Date().toISOString().split('T')[0];
   if (!result.date) {
     result.isEstimatedDate = true;
-    if (result.competence) {
-      result.date = result.competence === today.slice(0, 7) ? today : `${result.competence}-01`;
-    } else {
-      result.date = today;
-      result.competence = today.slice(0, 7);
-    }
+    result.date = result.competence && result.competence !== today.slice(0, 7) ? `${result.competence}-01` : today;
+    result.competence = result.competence || today.slice(0, 7);
   } else {
     result.isEstimatedDate = false;
   }
 
-  // 5. CNPJ Raiz
   if (result.cnpj) {
     const root = result.cnpj.replace(/[^0-9]/g, '').substring(0, 8);
     const k = KNOWN_CNPJS.find(x => x.root === root);
@@ -250,7 +262,6 @@ function parseNFCeUrl(raw) {
     }
   }
 
-  // 6. Palavras-chave
   if (!result.description) {
     const merchants = [
       { pattern: /zaffari|bourbon/i, name: 'Supermercado Zaffari', cat: 'Alimentação' },
@@ -282,7 +293,52 @@ function parseNFCeUrl(raw) {
     result.description = result.nNF ? `Compra Cupom Fiscal NFC-e #${result.nNF}` : `Compra Cupom Fiscal (${result.uf || 'NFC-e'})`;
     result.suggestedCategory = 'Alimentação';
   }
+
+  if (result.accessKey) {
+    result.notes = `Chave NFC-e: ${result.accessKey}`;
+  }
   return result;
+}
+
+function mergeScanResults(codes) {
+  if (!codes || !codes.length) return null;
+  const uniqueCodes = [...new Set(codes.map(c => c.trim()).filter(Boolean))];
+  if (uniqueCodes.length === 1) return parseSingleCode(uniqueCodes[0]);
+
+  let nfceObj = null;
+  let pixObj = null;
+
+  for (const c of uniqueCodes) {
+    const p = parseSingleCode(c);
+    if (!p) continue;
+    if (p.isPix) pixObj = p;
+    else if (p.accessKey || p.rawUrl.includes('sefaz') || p.rawUrl.includes('nfce') || p.rawUrl.includes('nfe')) nfceObj = p;
+  }
+
+  if (nfceObj && pixObj) {
+    const merged = {
+      ...nfceObj,
+      isPix: true,
+      pixCode: pixObj.pixCode,
+      pixReceiver: pixObj.pixReceiver,
+      pixTxid: pixObj.pixTxid
+    };
+    if (!merged.amount && pixObj.amount) merged.amount = pixObj.amount;
+    if (pixObj.pixReceiver && (!merged.description || merged.description.startsWith('Compra Cupom Fiscal'))) {
+      merged.description = `${pixObj.pixReceiver}${merged.nNF ? ` (NFC-e #${merged.nNF})` : ''}`;
+    }
+    const notesParts = [];
+    if (merged.accessKey) notesParts.push(`Chave NFC-e: ${merged.accessKey}`);
+    if (pixObj.pixCode) notesParts.push(`PIX Copia e Cola: ${pixObj.pixCode}`);
+    merged.notes = notesParts.join('\n');
+    return merged;
+  }
+
+  return nfceObj || pixObj || parseSingleCode(uniqueCodes[0]);
+}
+
+function parseNFCeUrl(raw) {
+  return parseSingleCode(raw);
 }
 
 const NFCeCameraManager = {
@@ -290,7 +346,7 @@ const NFCeCameraManager = {
   currentFacingMode: 'environment', isTorchOn: false, barcodeDetector: null,
 
   async initEngines() {
-    await ensureJsQRLoaded();
+    await ensureEnginesLoaded();
     if ('BarcodeDetector' in window) {
       try {
         const formats = await window.BarcodeDetector.getSupportedFormats();
@@ -328,15 +384,14 @@ const NFCeCameraManager = {
         return;
       }
       const video = this.videoElement;
-      const vw = video.videoWidth || 640;
-      const vh = video.videoHeight || 480;
+      const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
 
       if (this.barcodeDetector) {
         try {
           const barcodes = await this.barcodeDetector.detect(video);
-          if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
-            this.handleDetectedCode(barcodes[0].rawValue, onResultCallback);
-            return;
+          if (barcodes && barcodes.length > 0) {
+            const rawTexts = barcodes.map(b => b.rawValue).filter(Boolean);
+            if (rawTexts.length) { this.handleDetectedCodes(rawTexts, onResultCallback); return; }
           }
         } catch (e) {}
       }
@@ -357,7 +412,7 @@ const NFCeCameraManager = {
             code = window.jsQR(cropData.data, cropW, cropH, { inversionAttempts: 'attemptBoth' });
           }
           if (code && code.data) {
-            this.handleDetectedCode(code.data, onResultCallback);
+            this.handleDetectedCodes([code.data], onResultCallback);
             return;
           }
         } catch (err) {}
@@ -367,14 +422,111 @@ const NFCeCameraManager = {
     requestAnimationFrame(scanFrame);
   },
 
-  handleDetectedCode(rawText, onResultCallback) {
+  handleDetectedCodes(rawList, onResultCallback) {
     if (!this.isScanning) return;
     this.isScanning = false;
     playScanBeep();
     vibrateDevice(80);
-    const parsed = parseNFCeUrl(rawText);
+    const parsed = mergeScanResults(rawList);
     this.stop();
     if (onResultCallback) onResultCallback(parsed);
+  },
+
+  async scanCanvasMultiQR(canvas) {
+    const detected = new Set();
+    if (this.barcodeDetector) {
+      try {
+        const barcodes = await this.barcodeDetector.detect(canvas);
+        if (barcodes) barcodes.forEach(b => { if (b.rawValue) detected.add(b.rawValue); });
+      } catch(e) {}
+    }
+
+    if (typeof window.jsQR === 'function') {
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      const w = canvas.width, h = canvas.height;
+      const slices = [
+        { x: 0, y: 0, w: w, h: h },
+        { x: 0, y: 0, w: Math.round(w / 2), h: Math.round(h / 2) },
+        { x: Math.round(w / 2), y: 0, w: w - Math.round(w / 2), h: Math.round(h / 2) },
+        { x: 0, y: Math.round(h / 2), w: Math.round(w / 2), h: h - Math.round(h / 2) },
+        { x: Math.round(w / 2), y: Math.round(h / 2), w: w - Math.round(w / 2), h: h - Math.round(h / 2) },
+        { x: 0, y: Math.round(h * 0.4), w: w, h: Math.round(h * 0.6) }
+      ];
+
+      for (const s of slices) {
+        try {
+          const imgData = ctx.getImageData(s.x, s.y, s.w, s.h);
+          const qr = window.jsQR(imgData.data, s.w, s.h, { inversionAttempts: 'attemptBoth' });
+          if (qr && qr.data) detected.add(qr.data);
+        } catch(e) {}
+      }
+    }
+    return Array.from(detected);
+  },
+
+  async scanFile(file, onResultCallback) {
+    await this.initEngines();
+    try {
+      // 1. PDF
+      if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+        if (!window.pdfjsLib) throw new Error('Leitor de PDF não inicializado.');
+        toast('Lendo páginas do PDF da nota fiscal...', 'info');
+        const arrayBuffer = await file.arrayBuffer();
+        const pdfDoc = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const allCodes = [];
+
+        for (let pageNum = 1; pageNum <= Math.min(pdfDoc.numPages, 3); pageNum++) {
+          const page = await pdfDoc.getPage(pageNum);
+          const viewport = page.getViewport({ scale: 2.0 });
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          await page.render({ canvasContext: ctx, viewport }).promise;
+
+          const pageCodes = await this.scanCanvasMultiQR(canvas);
+          pageCodes.forEach(c => allCodes.push(c));
+        }
+
+        if (allCodes.length > 0) {
+          this.handleDetectedCodes(allCodes, onResultCallback);
+        } else {
+          toast('Nenhum QR Code foi encontrado no PDF. Verifique se o documento contém cupom fiscal ou QR do Pix.', 'warning');
+        }
+        return;
+      }
+
+      // 2. Imagem
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = objectUrl; });
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      const testResolutions = [1800, 1200, 800];
+      let allFoundCodes = [];
+
+      for (const maxDim of testResolutions) {
+        let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w >= h) { h = Math.round((h * maxDim) / w); w = maxDim; } else { w = Math.round((w * maxDim) / h); h = maxDim; }
+        }
+        canvas.width = w; canvas.height = h;
+        ctx.drawImage(img, 0, 0, w, h);
+        const codes = await this.scanCanvasMultiQR(canvas);
+        if (codes.length) { allFoundCodes = codes; break; }
+      }
+      URL.revokeObjectURL(objectUrl);
+
+      if (allFoundCodes.length) {
+        this.handleDetectedCodes(allFoundCodes, onResultCallback);
+      } else {
+        toast('Nenhum QR Code legível encontrado nesta imagem.', 'warning');
+      }
+    } catch (err) {
+      console.error(err);
+      toast('Erro ao processar arquivo da nota: ' + err.message, 'error');
+    }
   },
 
   async toggleTorch() {
@@ -394,43 +546,6 @@ const NFCeCameraManager = {
     this.stop();
     this.currentFacingMode = this.currentFacingMode === 'environment' ? 'user' : 'environment';
     await this.start(this.videoElement, onResultCallback, onErrorCallback);
-  },
-
-  async scanImageFile(file, onResultCallback) {
-    await this.initEngines();
-    try {
-      const img = new Image();
-      const objectUrl = URL.createObjectURL(file);
-      await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = objectUrl; });
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      const testResolutions = [1200, 800, 600, 1800];
-      let detectedText = null;
-      for (const maxDim of testResolutions) {
-        let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
-        if (w > maxDim || h > maxDim) {
-          if (w >= h) { h = Math.round((h * maxDim) / w); w = maxDim; } else { w = Math.round((w * maxDim) / h); h = maxDim; }
-        }
-        canvas.width = w; canvas.height = h;
-        ctx.drawImage(img, 0, 0, w, h);
-        const imgData = ctx.getImageData(0, 0, w, h);
-        if (typeof window.jsQR === 'function') {
-          const code = window.jsQR(imgData.data, w, h, { inversionAttempts: 'attemptBoth' });
-          if (code && code.data) { detectedText = code.data; break; }
-        }
-        if (this.barcodeDetector) {
-          try {
-            const b = await this.barcodeDetector.detect(canvas);
-            if (b && b.length > 0 && b[0].rawValue) { detectedText = b[0].rawValue; break; }
-          } catch (e) {}
-        }
-      }
-      URL.revokeObjectURL(objectUrl);
-      if (detectedText) this.handleDetectedCode(detectedText, onResultCallback);
-      else toast('Nenhum QR Code legível encontrado nesta imagem. Tente uma foto mais nítida.', 'warning');
-    } catch (err) {
-      toast('Erro ao processar imagem da nota.', 'error');
-    }
   },
 
   stop() {
@@ -456,7 +571,7 @@ function openNFCeScannerModal(customCallback = null) {
       <div class="scanner-modal-header">
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-size:20px">📷</span>
-          <span style="font-weight:700;font-size:15px;color:var(--text-primary)">Leitor de Nota Fiscal (QR Code)</span>
+          <span style="font-weight:700;font-size:15px;color:var(--text-primary)">Leitor de Nota Fiscal (QR Code & PDF)</span>
         </div>
         <button class="scanner-close-btn" id="scanner-btn-close" title="Fechar">✕</button>
       </div>
@@ -473,20 +588,20 @@ function openNFCeScannerModal(customCallback = null) {
         <div id="scanner-error-fallback" class="scanner-error-overlay" style="display:none">
           <div style="font-size:36px;margin-bottom:8px">⚠️</div>
           <div style="font-weight:600;font-size:14px;margin-bottom:6px" id="scanner-error-msg">Não foi possível acessar a câmera</div>
-          <div style="font-size:12px;color:var(--text-muted);max-width:260px;margin-bottom:12px">Você pode carregar uma foto da nota fiscal abaixo.</div>
-          <label class="btn btn-primary btn-sm" style="cursor:pointer">📁 Carregar Foto da Nota<input type="file" id="scanner-file-fallback" accept="image/*" style="display:none"></label>
+          <div style="font-size:12px;color:var(--text-muted);max-width:260px;margin-bottom:12px">Você pode carregar uma foto ou arquivo PDF da nota fiscal abaixo.</div>
+          <label class="btn btn-primary btn-sm" style="cursor:pointer">📁 Carregar Foto / PDF<input type="file" id="scanner-file-fallback" accept="image/*,application/pdf" style="display:none"></label>
         </div>
       </div>
       <div class="scanner-controls-bar">
-        <div style="font-size:12px;color:var(--text-muted);text-align:center;margin-bottom:10px">Aponte para o <strong>QR Code impresso no cupom fiscal (NFC-e / SAT / Pix)</strong></div>
+        <div style="font-size:12px;color:var(--text-muted);text-align:center;margin-bottom:10px">Aponte para o <strong>QR Code da NFC-e ou PIX</strong> ou importe a nota</div>
         <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
           <button class="btn btn-secondary btn-sm" id="scanner-btn-switch-cam"><span>🔄</span> Trocar Câmera</button>
           <button class="btn btn-secondary btn-sm" id="scanner-btn-torch"><span>💡</span> Lanterna</button>
-          <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0"><span>📁</span> Foto da Nota<input type="file" id="scanner-file-input" accept="image/*" style="display:none"></label>
+          <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0"><span>📁</span> Foto / PDF da Nota<input type="file" id="scanner-file-input" accept="image/*,application/pdf" style="display:none"></label>
         </div>
         <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
           <div style="display:flex;gap:6px">
-            <input type="text" id="scanner-manual-input" placeholder="Cole o link da SEFAZ ou chave de 44 dígitos..." style="font-size:11.5px;padding:6px 10px;flex:1;border-radius:6px;border:1px solid var(--border);background:var(--bg-surface)">
+            <input type="text" id="scanner-manual-input" placeholder="Cole o link da SEFAZ, chave de 44 dígitos ou código PIX..." style="font-size:11.5px;padding:6px 10px;flex:1;border-radius:6px;border:1px solid var(--border);background:var(--bg-surface)">
             <button class="btn btn-primary btn-sm" id="scanner-btn-apply-manual">Processar</button>
           </div>
         </div>
@@ -524,14 +639,14 @@ function openNFCeScannerModal(customCallback = null) {
   });
 
   const fileInput = document.getElementById('scanner-file-input');
-  fileInput.addEventListener('change', (e) => { if (e.target.files && e.target.files[0]) NFCeCameraManager.scanImageFile(e.target.files[0], handleSuccess); });
+  fileInput.addEventListener('change', (e) => { if (e.target.files && e.target.files[0]) NFCeCameraManager.scanFile(e.target.files[0], handleSuccess); });
   const fileFallback = document.getElementById('scanner-file-fallback');
-  if (fileFallback) fileFallback.addEventListener('change', (e) => { if (e.target.files && e.target.files[0]) NFCeCameraManager.scanImageFile(e.target.files[0], handleSuccess); });
+  if (fileFallback) fileFallback.addEventListener('change', (e) => { if (e.target.files && e.target.files[0]) NFCeCameraManager.scanFile(e.target.files[0], handleSuccess); });
 
   const applyManual = () => {
     const val = document.getElementById('scanner-manual-input').value.trim();
-    if (!val) { toast('Digite ou cole a URL da SEFAZ ou chave da nota.', 'warning'); return; }
-    handleSuccess(parseNFCeUrl(val));
+    if (!val) { toast('Digite ou cole a chave ou código Pix da nota.', 'warning'); return; }
+    handleSuccess(parseSingleCode(val));
   };
   document.getElementById('scanner-btn-apply-manual').addEventListener('click', applyManual);
   document.getElementById('scanner-manual-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') applyManual(); });
@@ -573,6 +688,28 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
         </div>
         ${parsedData.accessKey ? `<div style="margin-top:10px;font-size:10px;color:var(--text-muted);background:rgba(0,0,0,0.25);padding:4px 8px;border-radius:6px;word-break:break-all">🔑 Chave: <code>${parsedData.accessKey}</code></div>` : ''}
       </div>
+
+      ${parsedData.pixCode ? `
+        <!-- Destaque do PIX Integrado da Nota Fiscal -->
+        <div style="background:linear-gradient(135deg,rgba(6,182,212,0.12),rgba(16,185,129,0.08));border:1px solid rgba(6,182,212,0.3);border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:20px">⚡</span>
+            <div>
+              <div style="font-size:12px;font-weight:700;color:#38bdf8">PIX de Pagamento Integrado à Nota</div>
+              <div style="font-size:11px;color:var(--text-muted)">O código e QR Code do PIX ficarão salvos no lançamento</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-conf-copy-pix" style="font-size:11px;padding:4px 10px">📋 Copiar Pix</button>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-conf-view-pix" style="font-size:11px;padding:4px 10px;background:#0284c7;border:none">📱 Ver QR Code</button>
+          </div>
+        </div>
+
+        <div id="conf-pix-preview-box" style="display:none;background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;text-align:center">
+          <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:6px">Escaneie com o aplicativo do seu banco:</div>
+          <img id="conf-pix-img" style="width:160px;height:160px;background:white;padding:6px;border-radius:8px;margin:0 auto;display:block">
+        </div>
+      ` : ''}
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="form-group" style="margin:0">
@@ -616,7 +753,7 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
 
       <div class="form-group" style="margin:4px 0 0 0">
         <label style="font-size:12.5px;display:flex;align-items:center;gap:8px;cursor:pointer">
-          <input type="checkbox" id="nfce-conf-paid" checked> Já foi pago / debitado da conta
+          <input type="checkbox" id="nfce-conf-paid" ${parsedData.pixCode ? '' : 'checked'}> Já foi pago / debitado da conta
         </label>
       </div>
 
@@ -672,6 +809,34 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
     });
   }
 
+  // Ações do PIX no Pop-up
+  if (parsedData.pixCode) {
+    const copyPixBtn = document.getElementById('btn-conf-copy-pix');
+    if (copyPixBtn) {
+      copyPixBtn.onclick = () => {
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(parsedData.pixCode);
+        toast('📋 Código PIX copiado para a área de transferência!', 'success');
+      };
+    }
+    const viewPixBtn = document.getElementById('btn-conf-view-pix');
+    const pixBox = document.getElementById('conf-pix-preview-box');
+    const pixImg = document.getElementById('conf-pix-img');
+    if (viewPixBtn && pixBox && pixImg) {
+      viewPixBtn.onclick = async () => {
+        if (pixBox.style.display === 'none') {
+          pixBox.style.display = 'block';
+          if (typeof window.QRCode !== 'undefined' && window.QRCode.toDataURL) {
+            try {
+              pixImg.src = await window.QRCode.toDataURL(parsedData.pixCode, { width: 320, margin: 1 });
+            } catch(e) {}
+          }
+        } else {
+          pixBox.style.display = 'none';
+        }
+      };
+    }
+  }
+
   document.getElementById('nfce-conf-btn-reject').onclick = () => {
     Modal.close();
     toast('Leitura da nota fiscal descartada.', 'info');
@@ -712,7 +877,9 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
       const txData = {
         user_id: State.user.id, account_id, category_id, recurring_item_id: null,
         type: 'expense', amount, description: description || 'Compra Cupom Fiscal',
-        date, is_paid, is_avulso: 1, notes: parsedData.accessKey ? `Chave NFC-e: ${parsedData.accessKey}` : null,
+        date, is_paid, is_avulso: 1,
+        notes: parsedData.notes || (parsedData.accessKey ? `Chave NFC-e: ${parsedData.accessKey}` : null),
+        pix_code: parsedData.pixCode || null,
         credit_product: 'normal', due_date: null, competence_date
       };
 

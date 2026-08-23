@@ -13,10 +13,29 @@ async function openPaymentDateModal(txId, currentDate, onComplete) {
   }
   const compDate = tx ? tx.date.split(' ')[0] : cleanDate;
   const baseAmount = tx ? tx.amount : 0;
+  const pixCode = tx ? (tx.pix_code || (tx.notes ? (tx.notes.match(/000201[0-9A-Za-z.=-]+/) || [])[0] : null)) : null;
 
   Modal.open('Confirmar Pagamento / Liquidação', `
     <div style="padding: 16px;">
-      <p style="margin-bottom: 16px; font-size: 14px; color: var(--text-secondary); text-align: center;">
+      ${pixCode ? `
+        <div style="background: linear-gradient(135deg, rgba(6,182,212,0.12), rgba(16,185,129,0.08)); border: 1px solid rgba(6,182,212,0.35); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 16px; text-align: center;">
+          <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 6px;">
+            <span style="font-size: 20px;">⚡</span>
+            <span style="font-weight: 700; font-size: 14px; color: #38bdf8;">Pagar com PIX (QR Code & Copia e Cola)</span>
+          </div>
+          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Aponte o app do seu banco para o QR Code abaixo ou copie a chave:</p>
+          <div style="display: flex; justify-content: center; margin: 8px 0;">
+            <img id="payment-pix-qrcode-img" alt="QR Code PIX" style="width: 170px; height: 170px; border-radius: 8px; background: white; padding: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+          </div>
+          <div style="display: flex; gap: 8px; justify-content: center; margin-top: 10px;">
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-copy-pix-code" style="font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+              <span>📋</span> Copiar Código PIX
+            </button>
+          </div>
+        </div>
+      ` : ''}
+
+      <p style="margin-bottom: 16px; font-size: 13px; color: var(--text-secondary); text-align: center;">
         Informe a data do efetivo pagamento e eventuais ajustes (juros ou desconto):
       </p>
       
@@ -125,6 +144,24 @@ async function openPaymentDateModal(txId, currentDate, onComplete) {
 
   dateInput.onchange = updatePaymentOptionsUI;
   updatePaymentOptionsUI();
+
+  if (pixCode) {
+    const copyBtn = document.getElementById('btn-copy-pix-code');
+    if (copyBtn) {
+      copyBtn.onclick = () => {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(pixCode);
+        }
+        toast('📋 Código PIX copiado! Cole no app do seu banco.', 'success');
+      };
+    }
+    const qrcodeImg = document.getElementById('payment-pix-qrcode-img');
+    if (qrcodeImg && typeof QRCode !== 'undefined' && QRCode.toDataURL) {
+      QRCode.toDataURL(pixCode, { width: 340, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
+        .then(url => { qrcodeImg.src = url; })
+        .catch(err => console.error('[Pix QR] Erro ao renderizar QR code:', err));
+    }
+  }
 
   document.getElementById('btn-pay-cancel').onclick = Modal.close;
   document.getElementById('btn-pay-confirm').onclick = async () => {

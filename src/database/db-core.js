@@ -768,7 +768,6 @@ class DbCore {
         can_edit_all INTEGER DEFAULT 0,
         FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
       );
-
       CREATE TABLE IF NOT EXISTS server_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         event_type TEXT NOT NULL,
@@ -776,18 +775,18 @@ class DbCore {
         created_at TEXT DEFAULT (datetime('now'))
       );
     `);
-
-    // Auto-migrations for bank sub-limits and transaction credit products
+    // Auto-migrations for bank sub-limits, credit products and PIX codes
     try { this.db.prepare('ALTER TABLE accounts ADD COLUMN overdraft_limit REAL DEFAULT 0').run(); } catch(e) {}
     try { this.db.prepare('ALTER TABLE accounts ADD COLUMN banricompras_limit REAL DEFAULT 0').run(); } catch(e) {}
     try { this.db.prepare('ALTER TABLE accounts ADD COLUMN credit_minuto_limit REAL DEFAULT 0').run(); } catch(e) {}
     try { this.db.prepare("ALTER TABLE transactions ADD COLUMN credit_product TEXT DEFAULT 'normal'").run(); } catch(e) {}
     try { this.db.prepare('ALTER TABLE transactions ADD COLUMN due_date TEXT').run(); } catch(e) {}
+    try { this.db.prepare('ALTER TABLE transactions ADD COLUMN pix_code TEXT').run(); } catch(e) {}
+    try { this.db.prepare('ALTER TABLE recurring_items ADD COLUMN pix_code TEXT').run(); } catch(e) {}
     try { this.db.prepare("ALTER TABLE accounts ADD COLUMN benefit_type TEXT DEFAULT 'va'").run(); } catch(e) {}
     try { this.db.prepare('ALTER TABLE accounts ADD COLUMN benefit_monthly_credit REAL DEFAULT 0').run(); } catch(e) {}
     try { this.db.prepare('ALTER TABLE accounts ADD COLUMN benefit_credit_day INTEGER DEFAULT 1').run(); } catch(e) {}
     try { this.db.prepare('ALTER TABLE accounts ADD COLUMN card_last_digits TEXT').run(); } catch(e) {}
-
     // ── AUTO-MIGRATIONS FOR SMART SYNC & DEDUPLICATION ──
     const syncTables = ['transactions', 'recurring_items', 'accounts', 'categories', 'budgets', 'goals'];
     for (const table of syncTables) {
