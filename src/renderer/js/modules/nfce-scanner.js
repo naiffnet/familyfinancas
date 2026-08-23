@@ -595,19 +595,29 @@ const NFCeCameraManager = {
       const w = canvas.width, h = canvas.height;
       const slices = [
         { x: 0, y: 0, w, h },
+        { x: 0, y: Math.round(h * 0.6), w: Math.round(w * 0.55), h: Math.round(h * 0.4) },
+        { x: Math.round(w * 0.45), y: Math.round(h * 0.6), w: Math.round(w * 0.55), h: Math.round(h * 0.4) },
+        { x: Math.round(w * 0.2), y: Math.round(h * 0.6), w: Math.round(w * 0.6), h: Math.round(h * 0.4) },
+        { x: 0, y: Math.round(h * 0.7), w, h: Math.round(h * 0.3) },
+        { x: 0, y: Math.round(h * 0.4), w: Math.round(w * 0.55), h: Math.round(h * 0.35) },
+        { x: Math.round(w * 0.45), y: Math.round(h * 0.4), w: Math.round(w * 0.55), h: Math.round(h * 0.35) },
         { x: 0, y: 0, w: Math.round(w * 0.55), h: Math.round(h * 0.55) },
-        { x: Math.round(w * 0.45), y: 0, w: Math.round(w * 0.55), h: Math.round(h * 0.55) },
-        { x: 0, y: Math.round(h * 0.45), w: Math.round(w * 0.55), h: Math.round(h * 0.55) },
-        { x: Math.round(w * 0.45), y: Math.round(h * 0.45), w: Math.round(w * 0.55), h: Math.round(h * 0.55) },
-        { x: 0, y: Math.round(h * 0.35), w, h: Math.round(h * 0.65) },
-        { x: 0, y: 0, w, h: Math.round(h * 0.6) },
-        { x: Math.round(w * 0.2), y: Math.round(h * 0.2), w: Math.round(w * 0.6), h: Math.round(h * 0.6) }
+        { x: Math.round(w * 0.45), y: 0, w: Math.round(w * 0.55), h: Math.round(h * 0.55) }
       ];
       for (const s of slices) {
         try {
           const imgData = ctx.getImageData(s.x, s.y, s.w, s.h);
           const qr = window.jsQR(imgData.data, s.w, s.h, { inversionAttempts: 'attemptBoth' });
           if (qr && qr.data) detected.add(qr.data);
+        } catch(e) {}
+      }
+      if (w > 1000) {
+        try {
+          const thumb = document.createElement('canvas'), tw = 800, th = Math.round((h * 800) / w);
+          thumb.width = tw; thumb.height = th;
+          thumb.getContext('2d').drawImage(canvas, 0, 0, tw, th);
+          const tQr = window.jsQR(thumb.getContext('2d').getImageData(0, 0, tw, th).data, tw, th, { inversionAttempts: 'attemptBoth' });
+          if (tQr && tQr.data) detected.add(tQr.data);
         } catch(e) {}
       }
     }
