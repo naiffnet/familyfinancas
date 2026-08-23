@@ -67,7 +67,7 @@ function decodeHexAscii(str) {
 }
 
 const KNOWN_CNPJS = [
-  { root: '08467115', name: 'RGE - Rio Grande Energia', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia (NF3e)' }, { root: '02016440', name: 'CEEE Equatorial Energia', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia (NF3e)' }, { root: '61695227', name: 'Enel Distribuição', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia' }, { root: '04172213', name: 'Copel Energia', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia' }, { root: '02998611', name: 'Cemig Distribuição', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia' }, { root: '03378521', name: 'CPFL Paulista / Energia', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia' }, { root: '07526557', name: 'Neoenergia', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia' }, { root: '04895728', name: 'Energisa', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia' }, { root: '04423567', name: 'Light Energia', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia' },
+  { root: '08467115', name: 'CEEE Equatorial Energia', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia (NF3e)' }, { root: '02016440', name: 'RGE - Rio Grande Energia', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia (NF3e)' }, { root: '61695227', name: 'Enel Distribuição', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia' }, { root: '04172213', name: 'Copel Energia', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia' }, { root: '02998611', name: 'Cemig Distribuição', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia' }, { root: '03378521', name: 'CPFL Paulista / Energia', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia' }, { root: '07526557', name: 'Neoenergia', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia' }, { root: '04895728', name: 'Energisa', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia' }, { root: '04423567', name: 'Light Energia', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia' },
   { root: '92802784', name: 'Corsan - Água e Saneamento', cat: 'Moradia', icon: '💧', docType: 'Fatura de Água' }, { root: '02429919', name: 'DMAE - Água e Esgotos', cat: 'Moradia', icon: '💧', docType: 'Fatura de Água' }, { root: '43776517', name: 'Sabesp', cat: 'Moradia', icon: '💧', docType: 'Fatura de Água' }, { root: '33352394', name: 'Cedae', cat: 'Moradia', icon: '💧', docType: 'Fatura de Água' }, { root: '00628286', name: 'Sanepar', cat: 'Moradia', icon: '💧', docType: 'Fatura de Água' }, { root: '17281106', name: 'Copasa', cat: 'Moradia', icon: '💧', docType: 'Fatura de Água' },
   { root: '02558157', name: 'Telefônica / Vivo', cat: 'Moradia', icon: '🌐', docType: 'Fatura Telecom' }, { root: '33000118', name: 'Telefônica Brasil (Vivo)', cat: 'Moradia', icon: '🌐', docType: 'Fatura Telecom' }, { root: '40432544', name: 'Claro / NET', cat: 'Moradia', icon: '🌐', docType: 'Fatura Telecom' }, { root: '04206050', name: 'TIM Brasil', cat: 'Moradia', icon: '🌐', docType: 'Fatura Telecom' }, { root: '05423963', name: 'Oi Telecomunicações', cat: 'Moradia', icon: '🌐', docType: 'Fatura Telecom' },
   { root: '94896792', name: 'Supermercados Rissul', cat: 'Alimentação', icon: '🛒', docType: 'Cupom Fiscal (NFC-e)' }, { root: '92754738', name: 'Supermercado Zaffari', cat: 'Alimentação', icon: '🛒', docType: 'Cupom Fiscal (NFC-e)' }, { root: '45543915', name: 'Carrefour Supermercado', cat: 'Alimentação', icon: '🛒', docType: 'Cupom Fiscal (NFC-e)' }, { root: '01545822', name: 'Supermercados Asun', cat: 'Alimentação', icon: '🛒', docType: 'Cupom Fiscal (NFC-e)' }, { root: '07170938', name: 'Stok Center Atacado', cat: 'Alimentação', icon: '🛒', docType: 'Cupom Fiscal (NFC-e)' }, { root: '06057223', name: 'Assaí Atacadista', cat: 'Alimentação', icon: '🛒', docType: 'Cupom Fiscal (NFC-e)' }, { root: '47508411', name: 'Pão de Açúcar / Extra', cat: 'Alimentação', icon: '🛒', docType: 'Cupom Fiscal (NFC-e)' }, { root: '75315333', name: 'Bistek Supermercados', cat: 'Alimentação', icon: '🛒', docType: 'Cupom Fiscal (NFC-e)' }, { root: '83646984', name: 'Fort Atacadista', cat: 'Alimentação', icon: '🛒', docType: 'Cupom Fiscal (NFC-e)' }, { root: '02502844', name: 'Angeloni Supermercados', cat: 'Alimentação', icon: '🛒', docType: 'Cupom Fiscal (NFC-e)' },
@@ -299,15 +299,15 @@ function extractInfoFromText(fullText) {
     }
   }
 
-  // 3. Código de Arrecadação Concessionária (48 dig) ou Boleto (47 dig)
-  const barcodeConcessionaria = fullText.match(/\b(8\d{10}[-\s]?\d\s*\d{11}[-\s]?\d\s*\d{11}[-\s]?\d\s*\d{11}[-\s]?\d)\b/) || fullText.match(/\b(8\d{47})\b/);
+  // 3. Código de Arrecadação Concessionária (48 dig) ou Boleto Bancário (47 dig)
   const barcodeBoleto = fullText.match(/\b(\d{5}[.\s]?\d{5}\s+\d{5}[.\s]?\d{6}\s+\d{5}[.\s]?\d{6}\s+\d\s+\d{14})\b/);
-  if (barcodeConcessionaria) {
-    res.boletoCode = barcodeConcessionaria[0].replace(/[^0-9]/g, '');
-    res.isBoleto = true; res.docType = 'Fatura de Concessionária'; res.suggestedCategory = 'Moradia';
-  } else if (barcodeBoleto) {
+  const barcodeConcessionaria = fullText.match(/\b(8\d{10}[-\s]?\d\s*\d{11}[-\s]?\d\s*\d{11}[-\s]?\d\s*\d{11}[-\s]?\d)\b/) || fullText.match(/\b(8\d{47})\b/);
+  if (barcodeBoleto) {
     res.boletoCode = barcodeBoleto[0].replace(/[^0-9]/g, '');
     res.isBoleto = true; res.docType = 'Boleto Bancário'; res.suggestedCategory = 'Moradia';
+  } else if (barcodeConcessionaria) {
+    res.boletoCode = barcodeConcessionaria[0].replace(/[^0-9]/g, '');
+    res.isBoleto = true; res.docType = 'Fatura de Concessionária'; res.suggestedCategory = 'Moradia';
   }
 
   if (!res.cnpj) {
@@ -324,34 +324,54 @@ function extractInfoFromText(fullText) {
     }
   }
 
+  if (!res.description || isInvalidMerchantName(res.description)) {
+    if (/COMPANHIA ESTADUAL DE DISTRIBUI[ÇC][AÃ]O|CEEE/i.test(fullText)) {
+      res.description = 'CEEE Equatorial Energia'; res.suggestedCategory = 'Moradia'; res.docType = 'Fatura de Energia (NF3e)';
+    } else if (/RGE SUL|RIO GRANDE ENERGIA/i.test(fullText)) {
+      res.description = 'RGE - Rio Grande Energia'; res.suggestedCategory = 'Moradia'; res.docType = 'Fatura de Energia (NF3e)';
+    } else if (/CORSAN|COMPANHIA RIOGRANDENSE DE SANEAMENTO/i.test(fullText)) {
+      res.description = 'Corsan - Água e Saneamento'; res.suggestedCategory = 'Moradia'; res.docType = 'Fatura de Água';
+    } else if (/DMAE/i.test(fullText)) {
+      res.description = 'DMAE - Água e Esgotos'; res.suggestedCategory = 'Moradia'; res.docType = 'Fatura de Água';
+    }
+  }
+
   const duePatterns = [
-    /(?:data\s+de\s+vencimento|data\s+vencimento|vencimento|venc|vence\s+em|pagar\s+at[eé]|validade|data\s+limite)\s*[:\s]*(\d{2}[/-]\d{2}[/-]\d{4})/i,
-    /(\d{2}[/-]\d{2}[/-]\d{4})\s*(?:data\s+de\s+vencimento|vencimento|venc)/i,
-    /(?:total\s+a\s+pagar|valor\s+a\s+pagar|vencimento)\s*R?\$?\s*[\d.,]+\s*(\d{2}[/-]\d{2}[/-]\d{4})/i,
-    /(?:vencimento|venc)\s*[:\s]*(\d{4}[/-]\d{2}[/-]\d{2})/i
+    /(?:data\s+de\s+vencimento|data\s+vencimento|vencimento|venc|vence\s+em|pagar\s+at[eé]|validade|data\s+limite)\s*[:\s]*(\d{2}[./-]\d{2}[./-]\d{4})/i,
+    /VENCIMENTO[\s\S]{1,80}?\b(\d{2}[./-]\d{2}[./-]\d{4})\b/i,
+    /R\$\s*[\d.,]+\s+(\d{2}[./-]\d{2}[./-]\d{4})/i,
+    /(\d{2}[./-]\d{2}[./-]\d{4})\s+\d{1,3}\.\d{3}\.\d{3}\.\d{3}/,
+    /(\d{2}[./-]\d{2}[./-]\d{4})\s*(?:data\s+de\s+vencimento|vencimento|venc)/i
   ];
   for (const pat of duePatterns) {
     const m = fullText.match(pat);
     if (m) {
-      const parts = m[1].replace(/\//g, '-').split('-');
+      const cleanDate = m[1].replace(/[./]/g, '-');
+      const parts = cleanDate.split('-');
       res.dueDate = parts[0].length === 4 ? `${parts[0]}-${parts[1]}-${parts[2]}` : `${parts[2]}-${parts[1]}-${parts[0]}`;
       res.date = res.dueDate;
       break;
     }
   }
 
-  const compMatch = fullText.match(/(?:m[eê]s\/ano|refer[eê]ncia|ref\.?|compet[eê]ncia)\s*[:\s]*(\d{2}\/\d{4})/i) || fullText.match(/(\d{2}\/\d{4})\s*(?:refer[eê]ncia|m[eê]s\/ano)/i);
+  const compMatch = fullText.match(/(?:m[eê]s\/ano|refer[eê]ncia|ref\.?|compet[eê]ncia)\s*[:\s]*(\d{2}\/\d{4})/i) ||
+                    fullText.match(/(\d{2}\/\d{4})\s*(?:refer[eê]ncia|m[eê]s\/ano)/i) ||
+                    fullText.match(/(?<!\d[\/-])(0[1-9]|1[0-2])\/(20\d{2})\b/);
   if (compMatch) {
-    const [mm, yyyy] = compMatch[1].split('/');
-    res.competence = `${yyyy}-${mm.padStart(2, '0')}`;
+    if (compMatch[1] && compMatch[2]) res.competence = `${compMatch[2]}-${compMatch[1].padStart(2, '0')}`;
+    else {
+      const [mm, yyyy] = compMatch[1].split('/');
+      res.competence = `${yyyy}-${mm.padStart(2, '0')}`;
+    }
   } else if (res.dueDate && !res.competence) {
     res.competence = res.dueDate.slice(0, 7);
   }
 
   if (!res.date) {
-    const emiMatch = fullText.match(/(?:emiss[aã]o|data\s+da\s+emiss[aã]o|emitido\s+em|data\s+de\s+emiss[aã]o)\s*[:\s]*(\d{2}[/-]\d{2}[/-]\d{4})/i) || fullText.match(/(?:emiss[aã]o)\s*[:\s]*(\d{4}[/-]\d{2}[/-]\d{2})/i);
+    const emiMatch = fullText.match(/(?:emiss[aã]o|data\s+da\s+emiss[aã]o|emitido\s+em|data\s+de\s+emiss[aã]o)\s*[:\s]*(\d{2}[./-]\d{2}[./-]\d{4})/i) || fullText.match(/(?:emiss[aã]o)\s*[:\s]*(\d{4}[./-]\d{2}[./-]\d{2})/i);
     if (emiMatch) {
-      const parts = emiMatch[1].replace(/\//g, '-').split('-');
+      const cleanDate = emiMatch[1].replace(/[./]/g, '-');
+      const parts = cleanDate.split('-');
       res.date = parts[0].length === 4 ? `${parts[0]}-${parts[1]}-${parts[2]}` : `${parts[2]}-${parts[1]}-${parts[0]}`;
       if (!res.competence) res.competence = res.date.slice(0, 7);
     }
@@ -360,7 +380,7 @@ function extractInfoFromText(fullText) {
   if (!res.amount) {
     const valPatterns = [
       /(?:total\s+a\s+pagar|valor\s+a\s+pagar|valor\s+total|total\s+da\s+fatura|total\s+fatura|valor\s+do\s+documento|valor\s+cobrado|valor\s+l[ií]quido|total\s+da\s+nota|total\s+nota|total\s+geral|valor\s+fatura)\s*[:\s]*R?\$?\s*([\d.]+,\d{2})/i,
-      /R\$\s*([\d.]+,\d{2})\s*(?:total\s+a\s+pagar|vencimento)/i,
+      /R\$\s*([\d.]+,\d{2})\s*(?:total\s+a\s+pagar|vencimento|\d{2}[./-]\d{2})/i,
       /R\$\s*([\d.]+,\d{2})/i
     ];
     for (const pat of valPatterns) {
@@ -371,6 +391,9 @@ function extractInfoFromText(fullText) {
       }
     }
   }
+
+  const ucMatch = fullText.match(/(?:unidade\s+consumidora|c[oó]digo\s+do\s+cliente|uc)\s*[:\s]*(\d{1,3}(?:\.\d{3})+(?:-\d+)?|\d{5,15})/i) || fullText.match(/(\d{1,3}\.\d{3}\.\d{3}\.\d{3}-\d{2})/);
+  if (ucMatch) res.consumerUnit = ucMatch[1];
 
   if (!res.description || isInvalidMerchantName(res.description)) {
     const merchantMatch = fullText.match(/(?:benefici[aá]rio|raz[aã]o\s+social|nome\s+empresarial|cedente|prestador|emitente|estabelecimento)\s*[:\s]*([^\n\r,;]{3,50})/i);
@@ -796,33 +819,22 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
           ${parsedData.competence ? `<span>🗓️ Competência: <strong>${parsedData.competence}</strong></span>` : ''}
           ${parsedData.nNF ? `<span>🔢 Nº: <strong>#${parsedData.nNF}</strong></span>` : ''}
           ${parsedData.cnpj ? `<span>🏢 CNPJ: <strong>${parsedData.cnpj}</strong></span>` : ''}
+          ${parsedData.consumerUnit ? `<span>💡 UC: <strong>${parsedData.consumerUnit}</strong></span>` : ''}
         </div>
         ${parsedData.accessKey ? `<div style="margin-top:10px;font-size:10px;color:var(--text-muted);background:rgba(0,0,0,0.25);padding:4px 8px;border-radius:6px;word-break:break-all">🔑 Chave: <code>${parsedData.accessKey}</code></div>` : ''}
       </div>
 
       ${parsedData.pixCode ? `
         <div style="background:linear-gradient(135deg,rgba(6,182,212,0.12),rgba(16,185,129,0.08));border:1px solid rgba(6,182,212,0.3);border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-          <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:20px">⚡</span>
-            <div><div style="font-size:12px;font-weight:700;color:#38bdf8">PIX de Pagamento Integrado à Fatura</div><div style="font-size:11px;color:var(--text-muted)">O código e QR Code do PIX ficarão salvos para pagamento direto</div></div>
-          </div>
-          <div style="display:flex;gap:6px">
-            <button type="button" class="btn btn-secondary btn-sm" id="btn-conf-copy-pix" style="font-size:11px;padding:4px 10px">📋 Copiar Pix</button>
-            <button type="button" class="btn btn-primary btn-sm" id="btn-conf-view-pix" style="font-size:11px;padding:4px 10px;background:#0284c7;border:none">📱 Ver QR Code</button>
-          </div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="font-size:20px">⚡</span><div><div style="font-size:12px;font-weight:700;color:#38bdf8">PIX de Pagamento Integrado à Fatura</div><div style="font-size:11px;color:var(--text-muted)">O código e QR Code do PIX ficarão salvos para pagamento direto</div></div></div>
+          <div style="display:flex;gap:6px"><button type="button" class="btn btn-secondary btn-sm" id="btn-conf-copy-pix" style="font-size:11px;padding:4px 10px">📋 Copiar Pix</button><button type="button" class="btn btn-primary btn-sm" id="btn-conf-view-pix" style="font-size:11px;padding:4px 10px;background:#0284c7;border:none">📱 Ver QR Code</button></div>
         </div>
-        <div id="conf-pix-preview-box" style="display:none;background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;text-align:center">
-          <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:6px">Escaneie com o aplicativo do seu banco:</div>
-          <img id="conf-pix-img" style="width:160px;height:160px;background:white;padding:6px;border-radius:8px;margin:0 auto;display:block">
-        </div>
+        <div id="conf-pix-preview-box" style="display:none;background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;text-align:center"><div style="font-size:11.5px;color:var(--text-muted);margin-bottom:6px">Escaneie com o aplicativo do seu banco:</div><img id="conf-pix-img" style="width:160px;height:160px;background:white;padding:6px;border-radius:8px;margin:0 auto;display:block"></div>
       ` : ''}
 
       ${parsedData.boletoCode ? `
         <div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-          <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:18px">📄</span>
-            <div><div style="font-size:12px;font-weight:700;color:var(--text-primary)">Código de Barras / Arrecadação</div><code style="font-size:10.5px;color:var(--text-muted);word-break:break-all">${parsedData.boletoCode}</code></div>
-          </div>
+          <div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">📄</span><div><div style="font-size:12px;font-weight:700;color:var(--text-primary)">Código de Barras / Arrecadação</div><code style="font-size:10.5px;color:var(--text-muted);word-break:break-all">${parsedData.boletoCode}</code></div></div>
           <button type="button" class="btn btn-secondary btn-sm" id="btn-conf-copy-barcode" style="font-size:11px;padding:4px 10px">📋 Copiar Código</button>
         </div>
       ` : ''}
@@ -831,17 +843,14 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
         <div class="form-group" style="margin:0"><label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Descrição</label><input type="text" id="nfce-conf-desc" value="${descVal}" style="font-size:13px;font-weight:600"></div>
         <div class="form-group" style="margin:0"><label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Valor (R$)</label><input type="number" step="0.01" min="0" id="nfce-conf-amount" placeholder="0,00" value="${amountVal}" style="font-size:13px;font-weight:700;color:var(--accent-light)"></div>
       </div>
-
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="form-group" style="margin:0"><label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Conta / Cartão Pagador</label><select id="nfce-conf-account" style="font-size:13px">${accounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}</select></div>
         <div class="form-group" style="margin:0"><label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Categoria</label><select id="nfce-conf-category" style="font-size:13px"><option value="">Sem categoria</option>${categories.filter(c => c.type === 'expense' || c.type === 'both').map(c => `<option value="${c.id}" ${String(c.id) === String(matchedCatId) ? 'selected' : ''}>${c.icon} ${c.name}</option>`).join('')}</select></div>
       </div>
-
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="form-group" style="margin:0"><label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">${parsedData.dueDate ? 'Data de Vencimento' : 'Data do Pagamento'}</label><input type="date" id="nfce-conf-date" value="${dateVal}" style="font-size:13px"></div>
         <div class="form-group" style="margin:0"><label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Mês de Competência</label><input type="month" id="nfce-conf-competence" value="${competenceVal}" style="font-size:13px"></div>
       </div>
-
       <div class="form-group" style="margin:4px 0 0 0">
         <label style="font-size:12.5px;display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="nfce-conf-paid" ${isPendingBill ? '' : 'checked'}> Já foi pago / debitado da conta</label>
       </div>
@@ -871,28 +880,20 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
     };
     if (amountVal === '' || amountVal === 0) setTimeout(() => { try { amountInput.focus(); } catch (e) {} }, 100);
   }
-
-  if (descInput && previewDesc) {
-    descInput.oninput = () => { previewDesc.innerText = descInput.value.trim() || 'Despesa / Fatura'; };
-  }
+  if (descInput && previewDesc) descInput.oninput = () => { previewDesc.innerText = descInput.value.trim() || 'Despesa / Fatura'; };
   if (dateInput && previewDate) {
     dateInput.onchange = () => {
       if (dateInput.value) {
         previewDate.innerText = fmt.date(dateInput.value);
         const compInput = document.getElementById('nfce-conf-competence');
-        if (compInput) compInput.value = dateInput.value.slice(0, 7);
+        if (compInput && !parsedData.competence) compInput.value = dateInput.value.slice(0, 7);
       }
     };
   }
 
   if (parsedData.pixCode) {
     const copyPixBtn = document.getElementById('btn-conf-copy-pix');
-    if (copyPixBtn) {
-      copyPixBtn.onclick = () => {
-        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(parsedData.pixCode);
-        toast('📋 Código PIX copiado para a área de transferência!', 'success');
-      };
-    }
+    if (copyPixBtn) copyPixBtn.onclick = () => { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(parsedData.pixCode); toast('📋 Código PIX copiado!', 'success'); };
     const viewPixBtn = document.getElementById('btn-conf-view-pix');
     const pixBox = document.getElementById('conf-pix-preview-box');
     const pixImg = document.getElementById('conf-pix-img');
@@ -903,9 +904,7 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
           if (typeof window.QRCode !== 'undefined' && window.QRCode.toDataURL) {
             try { pixImg.src = await window.QRCode.toDataURL(parsedData.pixCode, { width: 320, margin: 1 }); } catch(e) {}
           }
-        } else {
-          pixBox.style.display = 'none';
-        }
+        } else { pixBox.style.display = 'none'; }
       };
     }
   }
