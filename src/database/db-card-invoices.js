@@ -2,6 +2,8 @@
  * src/database/db-card-invoices.js
  * Faturas de cartões de crédito, pagamentos, renegociações e reaberturas.
  */
+const { getCardBillingCycle } = require('./db-core');
+
 module.exports = (Base) => class extends Base {
   getCardInvoices(userId, month, year) {
     const user = this.db.prepare('SELECT family_id FROM users WHERE id = ?').get(userId);

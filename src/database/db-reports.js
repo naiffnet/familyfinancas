@@ -2,6 +2,8 @@
  * src/database/db-reports.js
  * Orçamentos, metas, fluxos de caixa, patrimônio e resumos do Dashboard.
  */
+const { getCardBillingCycle } = require('./db-core');
+
 module.exports = (Base) => class extends Base {
   getDashboardSummary(userId, month, year) {
     if (month && year) {

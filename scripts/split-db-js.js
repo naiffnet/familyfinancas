@@ -140,6 +140,8 @@ const dbCardInvoicesContent = `/**
  * src/database/db-card-invoices.js
  * Faturas de cartões de crédito, pagamentos, renegociações e reaberturas.
  */
+const { getCardBillingCycle } = require('./db-core');
+
 module.exports = (Base) => class extends Base {
 ${getSlice(2354, 2743)}
 };
@@ -150,6 +152,8 @@ const dbReportsContent = `/**
  * src/database/db-reports.js
  * Orçamentos, metas, fluxos de caixa, patrimônio e resumos do Dashboard.
  */
+const { getCardBillingCycle } = require('./db-core');
+
 module.exports = (Base) => class extends Base {
 ${getSlice(2769, 3237)}
 };
