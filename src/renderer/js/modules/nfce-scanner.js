@@ -28,41 +28,20 @@ function vibrateDevice(ms = 70) {
   try { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(ms); } catch (e) {}
 }
 
+function loadVendorScript(src) {
+  return new Promise(res => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = () => res(true); s.onerror = () => res(false);
+    document.head.appendChild(s);
+  });
+}
+
 async function ensureEnginesLoaded() {
-  const promises = [];
-  if (typeof window.jsQR !== 'function') {
-    promises.push(new Promise(res => {
-      const s = document.createElement('script');
-      s.src = 'js/vendor/jsQR.js';
-      s.onload = () => res(true);
-      s.onerror = () => res(false);
-      document.head.appendChild(s);
-    }));
-  }
-  if (typeof window.QRCode === 'undefined') {
-    promises.push(new Promise(res => {
-      const s = document.createElement('script');
-      s.src = 'js/vendor/qrcode.min.js';
-      s.onload = () => res(true);
-      s.onerror = () => res(false);
-      document.head.appendChild(s);
-    }));
-  }
-  if (typeof window.pdfjsLib === 'undefined') {
-    promises.push(new Promise(res => {
-      const s = document.createElement('script');
-      s.src = 'js/vendor/pdf.min.js';
-      s.onload = () => {
-        try {
-          if (window.pdfjsLib) window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/vendor/pdf.worker.min.js';
-        } catch(e) {}
-        res(true);
-      };
-      s.onerror = () => res(false);
-      document.head.appendChild(s);
-    }));
-  }
-  await Promise.all(promises);
+  const tasks = [];
+  if (typeof window.jsQR !== 'function') tasks.push(loadVendorScript('js/vendor/jsQR.js'));
+  if (typeof window.QRCode === 'undefined') tasks.push(loadVendorScript('js/vendor/qrcode.min.js'));
+  if (typeof window.pdfjsLib === 'undefined') tasks.push(loadVendorScript('js/vendor/pdf.min.js'));
+  await Promise.all(tasks);
   try {
     if (window.pdfjsLib && !window.pdfjsLib.GlobalWorkerOptions.workerSrc) {
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/vendor/pdf.worker.min.js';
@@ -88,20 +67,26 @@ function decodeHexAscii(str) {
 }
 
 const KNOWN_CNPJS = [
-  { root: '94896792', name: 'Supermercados Rissul', cat: 'Alimentação' }, { root: '92754738', name: 'Supermercado Zaffari', cat: 'Alimentação' },
-  { root: '45543915', name: 'Carrefour Supermercado', cat: 'Alimentação' }, { root: '01545822', name: 'Supermercados Asun', cat: 'Alimentação' },
-  { root: '07170938', name: 'Stok Center Atacado', cat: 'Alimentação' }, { root: '06057223', name: 'Assaí Atacadista', cat: 'Alimentação' },
-  { root: '47508411', name: 'Pão de Açúcar / Extra', cat: 'Alimentação' }, { root: '75315333', name: 'Bistek Supermercados', cat: 'Alimentação' },
-  { root: '83646984', name: 'Fort Atacadista', cat: 'Alimentação' }, { root: '02502844', name: 'Angeloni Supermercados', cat: 'Alimentação' },
-  { root: '92999999', name: 'Farmácia Panvel', cat: 'Saúde' }, { root: '92999704', name: 'Farmácia Panvel', cat: 'Saúde' },
-  { root: '92665611', name: 'Farmácia Panvel', cat: 'Saúde' }, { root: '61585865', name: 'Droga Raia / Drogasil', cat: 'Saúde' },
-  { root: '88212147', name: 'Farmácias São João', cat: 'Saúde' }, { root: '05493015', name: 'Farmácia Pague Menos', cat: 'Saúde' },
-  { root: '33000167', name: 'Posto Petrobras', cat: 'Transporte' }, { root: '33453598', name: 'Posto Shell', cat: 'Transporte' },
-  { root: '33337122', name: 'Posto Ipiranga', cat: 'Transporte' }, { root: '92798735', name: 'Lojas Renner', cat: 'Vestuário' },
-  { root: '61099966', name: 'Lojas Riachuelo', cat: 'Vestuário' }, { root: '45242914', name: 'Lojas C&A', cat: 'Vestuário' },
-  { root: '00776574', name: 'Cassol Centerlar', cat: 'Moradia' }, { root: '01438784', name: 'Leroy Merlin', cat: 'Moradia' },
-  { root: '42591651', name: 'McDonald\'s', cat: 'Alimentação' }, { root: '13574594', name: 'Burger King', cat: 'Alimentação' }
+  { root: '08467115', name: 'RGE - Rio Grande Energia', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia (NF3e)' }, { root: '02016440', name: 'CEEE Equatorial Energia', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia (NF3e)' }, { root: '61695227', name: 'Enel Distribuição', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia' }, { root: '04172213', name: 'Copel Energia', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia' }, { root: '02998611', name: 'Cemig Distribuição', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia' }, { root: '03378521', name: 'CPFL Paulista / Energia', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia' }, { root: '07526557', name: 'Neoenergia', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia' }, { root: '04895728', name: 'Energisa', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia' }, { root: '04423567', name: 'Light Energia', cat: 'Moradia', icon: '⚡', docType: 'Fatura de Energia' },
+  { root: '92802784', name: 'Corsan - Água e Saneamento', cat: 'Moradia', icon: '💧', docType: 'Fatura de Água' }, { root: '02429919', name: 'DMAE - Água e Esgotos', cat: 'Moradia', icon: '💧', docType: 'Fatura de Água' }, { root: '43776517', name: 'Sabesp', cat: 'Moradia', icon: '💧', docType: 'Fatura de Água' }, { root: '33352394', name: 'Cedae', cat: 'Moradia', icon: '💧', docType: 'Fatura de Água' }, { root: '00628286', name: 'Sanepar', cat: 'Moradia', icon: '💧', docType: 'Fatura de Água' }, { root: '17281106', name: 'Copasa', cat: 'Moradia', icon: '💧', docType: 'Fatura de Água' },
+  { root: '02558157', name: 'Telefônica / Vivo', cat: 'Moradia', icon: '🌐', docType: 'Fatura Telecom' }, { root: '33000118', name: 'Telefônica Brasil (Vivo)', cat: 'Moradia', icon: '🌐', docType: 'Fatura Telecom' }, { root: '40432544', name: 'Claro / NET', cat: 'Moradia', icon: '🌐', docType: 'Fatura Telecom' }, { root: '04206050', name: 'TIM Brasil', cat: 'Moradia', icon: '🌐', docType: 'Fatura Telecom' }, { root: '05423963', name: 'Oi Telecomunicações', cat: 'Moradia', icon: '🌐', docType: 'Fatura Telecom' },
+  { root: '94896792', name: 'Supermercados Rissul', cat: 'Alimentação', icon: '🛒', docType: 'Cupom Fiscal (NFC-e)' }, { root: '92754738', name: 'Supermercado Zaffari', cat: 'Alimentação', icon: '🛒', docType: 'Cupom Fiscal (NFC-e)' }, { root: '45543915', name: 'Carrefour Supermercado', cat: 'Alimentação', icon: '🛒', docType: 'Cupom Fiscal (NFC-e)' }, { root: '01545822', name: 'Supermercados Asun', cat: 'Alimentação', icon: '🛒', docType: 'Cupom Fiscal (NFC-e)' }, { root: '07170938', name: 'Stok Center Atacado', cat: 'Alimentação', icon: '🛒', docType: 'Cupom Fiscal (NFC-e)' }, { root: '06057223', name: 'Assaí Atacadista', cat: 'Alimentação', icon: '🛒', docType: 'Cupom Fiscal (NFC-e)' }, { root: '47508411', name: 'Pão de Açúcar / Extra', cat: 'Alimentação', icon: '🛒', docType: 'Cupom Fiscal (NFC-e)' }, { root: '75315333', name: 'Bistek Supermercados', cat: 'Alimentação', icon: '🛒', docType: 'Cupom Fiscal (NFC-e)' }, { root: '83646984', name: 'Fort Atacadista', cat: 'Alimentação', icon: '🛒', docType: 'Cupom Fiscal (NFC-e)' }, { root: '02502844', name: 'Angeloni Supermercados', cat: 'Alimentação', icon: '🛒', docType: 'Cupom Fiscal (NFC-e)' },
+  { root: '92999999', name: 'Farmácia Panvel', cat: 'Saúde', icon: '💊', docType: 'Cupom Fiscal (NFC-e)' }, { root: '92999704', name: 'Farmácia Panvel', cat: 'Saúde', icon: '💊', docType: 'Cupom Fiscal (NFC-e)' }, { root: '92665611', name: 'Farmácia Panvel', cat: 'Saúde', icon: '💊', docType: 'Cupom Fiscal (NFC-e)' }, { root: '61585865', name: 'Droga Raia / Drogasil', cat: 'Saúde', icon: '💊', docType: 'Cupom Fiscal (NFC-e)' }, { root: '88212147', name: 'Farmácias São João', cat: 'Saúde', icon: '💊', docType: 'Cupom Fiscal (NFC-e)' }, { root: '05493015', name: 'Farmácia Pague Menos', cat: 'Saúde', icon: '💊', docType: 'Cupom Fiscal (NFC-e)' },
+  { root: '33000167', name: 'Posto Petrobras', cat: 'Transporte', icon: '⛽', docType: 'Cupom Fiscal (NFC-e)' }, { root: '33453598', name: 'Posto Shell', cat: 'Transporte', icon: '⛽', docType: 'Cupom Fiscal (NFC-e)' }, { root: '33337122', name: 'Posto Ipiranga', cat: 'Transporte', icon: '⛽', docType: 'Cupom Fiscal (NFC-e)' },
+  { root: '92798735', name: 'Lojas Renner', cat: 'Vestuário', icon: '👕', docType: 'Cupom Fiscal (NFC-e)' }, { root: '61099966', name: 'Lojas Riachuelo', cat: 'Vestuário', icon: '👕', docType: 'Cupom Fiscal (NFC-e)' }, { root: '45242914', name: 'Lojas C&A', cat: 'Vestuário', icon: '👕', docType: 'Cupom Fiscal (NFC-e)' }, { root: '00776574', name: 'Cassol Centerlar', cat: 'Moradia', icon: '🏠', docType: 'Cupom Fiscal (NFC-e)' }, { root: '01438784', name: 'Leroy Merlin', cat: 'Moradia', icon: '🏠', docType: 'Cupom Fiscal (NFC-e)' }, { root: '42591651', name: 'McDonald\'s', cat: 'Alimentação', icon: '🍔', docType: 'Cupom Fiscal (NFC-e)' }, { root: '13574594', name: 'Burger King', cat: 'Alimentação', icon: '🍔', docType: 'Cupom Fiscal (NFC-e)' }
 ];
+
+function isInvalidMerchantName(str) {
+  if (!str) return true;
+  const s = str.trim().toUpperCase();
+  const blackList = [
+    'UNIDADE CONSUMIDORA', 'REFERÊNCIA', 'REFERENCIA', 'AGÊNCIA', 'AGENCIA', 'CÓDIGO', 'CODIGO',
+    'NOTA FISCAL', 'DANFE', 'DOCUMENTO AUXILIAR', 'EXTRATO', 'CONSUMIDOR', 'VALOR A PAGAR',
+    'TOTAL A PAGAR', 'FATURA DE ENERGIA', 'VIA DO CONSUMIDOR', 'EMISSÃO', 'EMISSAO', 'CHAVE DE ACESSO',
+    'CHAVE DE CONSULTA', 'PROTOCOLO', 'INFORMAÇÕES FISCAIS', 'ESTADO DO RIO GRANDE DO SUL', 'SECRETARIA DA FAZENDA'
+  ];
+  return blackList.some(b => s.includes(b)) || s.length < 3;
+}
 
 function parsePixPayload(text) {
   if (!text || typeof text !== 'string') return null;
@@ -115,20 +100,11 @@ function parsePixPayload(text) {
     if (!isNaN(num) && num > 0) res.amount = num;
   }
   const nameMatch = clean.match(/59(\d{2})([^0-9]+)/);
-  if (nameMatch) {
-    const len = parseInt(nameMatch[1], 10);
-    res.receiver = nameMatch[2].substring(0, len).trim();
-  }
+  if (nameMatch) { res.receiver = nameMatch[2].substring(0, parseInt(nameMatch[1], 10)).trim(); }
   const cityMatch = clean.match(/60(\d{2})([^0-9]+)/);
-  if (cityMatch) {
-    const len = parseInt(cityMatch[1], 10);
-    res.city = cityMatch[2].substring(0, len).trim();
-  }
+  if (cityMatch) { res.city = cityMatch[2].substring(0, parseInt(cityMatch[1], 10)).trim(); }
   const txMatch = clean.match(/62\d{2}.*?05(\d{2})([a-zA-Z0-9]+)/);
-  if (txMatch) {
-    const len = parseInt(txMatch[1], 10);
-    res.txid = txMatch[2].substring(0, len);
-  }
+  if (txMatch) { res.txid = txMatch[2].substring(0, parseInt(txMatch[1], 10)); }
   return res;
 }
 
@@ -142,14 +118,14 @@ function parseSingleCode(raw) {
     const today = new Date().toISOString().split('T')[0];
     return {
       type: 'expense', amount: pix.amount, date: today, competence: today.slice(0, 7),
-      description: pix.receiver ? `PIX para ${pix.receiver}` : 'Pagamento PIX', suggestedCategory: 'Alimentação',
-      accessKey: '', cnpj: '', nNF: '', uf: '', rawUrl: text, isPix: true, isBoleto: false,
+      description: pix.receiver ? `PIX para ${pix.receiver}` : 'Pagamento PIX', suggestedCategory: 'Moradia',
+      docType: 'Pagamento PIX', accessKey: '', cnpj: '', nNF: '', uf: '', rawUrl: text, isPix: true, isBoleto: false,
       pixCode: pix.pixCode, pixReceiver: pix.receiver, pixTxid: pix.txid,
       notes: `PIX Copia e Cola: ${pix.pixCode}`
     };
   }
 
-  // 2. Boleto
+  // 2. Boleto / Linha de Arrecadação de Concessionária (48 dígitos) ou Boleto Bancário (47 dígitos)
   const cleanDigits = text.replace(/[^0-9]/g, '');
   if ((cleanDigits.length === 47 || cleanDigits.length === 48) && !text.includes('http')) {
     const today = new Date().toISOString().split('T')[0];
@@ -157,18 +133,24 @@ function parseSingleCode(raw) {
     if (cleanDigits.length === 47) {
       const cents = parseInt(cleanDigits.slice(-10), 10);
       if (cents > 0) amt = cents / 100;
+    } else if (cleanDigits.length === 48 && cleanDigits.startsWith('8')) {
+      const cents = parseInt(cleanDigits.substring(4, 15), 10);
+      if (cents > 0 && cents < 99999999) amt = cents / 100;
     }
     return {
       type: 'expense', amount: amt, date: today, competence: today.slice(0, 7),
-      description: 'Pagamento de Boleto', suggestedCategory: 'Moradia', accessKey: '', cnpj: '',
-      nNF: '', uf: '', rawUrl: text, isPix: false, isBoleto: true, notes: `Código de Barras: ${text}`
+      description: cleanDigits.startsWith('8') ? 'Fatura de Concessionária' : 'Pagamento de Boleto',
+      suggestedCategory: 'Moradia', docType: cleanDigits.startsWith('8') ? 'Fatura / Arrecadação' : 'Boleto Bancário',
+      accessKey: '', cnpj: '', nNF: '', uf: '', rawUrl: text, isPix: false, isBoleto: true,
+      boletoCode: cleanDigits, notes: `Código de Barras: ${text}`
     };
   }
 
-  // 3. NFC-e / NF-e SEFAZ
+  // 3. NFC-e / NF-e / NF3e SEFAZ
   let result = {
-    type: 'expense', amount: null, date: null, competence: null, description: '',
-    suggestedCategory: '', accessKey: '', cnpj: '', nNF: '', uf: '', rawUrl: text, isPix: false, isBoleto: false
+    type: 'expense', amount: null, date: null, dueDate: null, competence: null, description: '',
+    suggestedCategory: '', docType: 'Cupom Fiscal (NFC-e)', accessKey: '', cnpj: '', nNF: '', model: '',
+    uf: '', rawUrl: text, isPix: false, isBoleto: false
   };
 
   const keyMatch = text.match(/\b([0-9]{44})\b/) || text.match(/[?&]p=([0-9]{44})/i) || text.match(/[?&]chNFe=([0-9]{44})/i);
@@ -182,7 +164,17 @@ function parseSingleCode(raw) {
     result.competence = `${parseInt(aa, 10) + 2000}-${mm.padStart(2, '0')}`;
     const rawCnpj = result.accessKey.substring(6, 20);
     result.cnpj = rawCnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+    result.model = result.accessKey.substring(20, 22);
     result.nNF = parseInt(result.accessKey.substring(25, 34), 10).toString();
+
+    if (result.model === '66') {
+      result.docType = 'Fatura de Energia (NF3e)';
+      result.suggestedCategory = 'Moradia';
+    } else if (result.model === '55') {
+      result.docType = 'Nota Fiscal (NF-e)';
+    } else if (result.model === '65') {
+      result.docType = 'Cupom Fiscal (NFC-e)';
+    }
   }
 
   // Query parameters de data
@@ -202,18 +194,15 @@ function parseSingleCode(raw) {
       if (!token) continue;
       if (/^\d+[.,]\d{2}$/.test(token) || (/^\d+[.,]\d+$/.test(token) && parseFloat(token.replace(',', '.')) > 0)) {
         const val = parseFloat(token.replace(',', '.'));
-        if (!isNaN(val) && val > 0 && !(i <= 3 && (val === 1 || val === 2))) {
-          if (!result.amount) result.amount = val;
-        }
+        if (!isNaN(val) && val > 0 && !(i <= 3 && (val === 1 || val === 2)) && !result.amount) result.amount = val;
       }
       const pIsoM = token.match(/(\d{4})-(\d{2})-(\d{2})/);
       if (pIsoM && !result.date) { result.date = `${pIsoM[1]}-${pIsoM[2]}-${pIsoM[3]}`; result.competence = `${pIsoM[1]}-${pIsoM[2]}`; }
       const pBrM = token.match(/(\d{2})\/(\d{2})\/(\d{4})/);
       if (pBrM && !result.date) { result.date = `${pBrM[3]}-${pBrM[2]}-${pBrM[1]}`; result.competence = `${pBrM[3]}-${pBrM[2]}`; }
-
       const decodedHex = decodeHexAscii(token);
       if (decodedHex) {
-        if (/^\d+[.,]\d{2}$/.test(decodedHex) || /^\d+[.,]\d+$/.test(decodedHex)) {
+        if (/^\d+[.,]\d+$/.test(decodedHex)) {
           const valHex = parseFloat(decodedHex.replace(',', '.'));
           if (!isNaN(valHex) && valHex > 0 && !result.amount) result.amount = valHex;
         }
@@ -243,7 +232,11 @@ function parseSingleCode(raw) {
   if (result.cnpj) {
     const root = result.cnpj.replace(/[^0-9]/g, '').substring(0, 8);
     const k = KNOWN_CNPJS.find(x => x.root === root);
-    if (k) { result.description = `${k.name}${result.nNF ? ` (NFC-e #${result.nNF})` : ''}`; result.suggestedCategory = k.cat; }
+    if (k) {
+      result.description = `${k.name}${result.nNF ? ` (#${result.nNF})` : ''}`;
+      result.suggestedCategory = k.cat;
+      if (k.docType) result.docType = k.docType;
+    }
   }
 
   if (!result.description) {
@@ -258,16 +251,16 @@ function parseSingleCode(raw) {
       { pattern: /riachuelo/i, name: 'Lojas Riachuelo', cat: 'Vestuário' }
     ];
     for (const m of merchants) {
-      if (m.pattern.test(text)) { result.description = `${m.name}${result.nNF ? ` (NFC-e #${result.nNF})` : ''}`; result.suggestedCategory = m.cat; break; }
+      if (m.pattern.test(text)) { result.description = `${m.name}${result.nNF ? ` (#${result.nNF})` : ''}`; result.suggestedCategory = m.cat; break; }
     }
   }
 
   if (!result.description) {
-    result.description = result.nNF ? `Compra Cupom Fiscal NFC-e #${result.nNF}` : `Compra Cupom Fiscal (${result.uf || 'NFC-e'})`;
-    result.suggestedCategory = 'Alimentação';
+    result.description = result.nNF ? `Nota Fiscal #${result.nNF}` : `Nota Fiscal (${result.uf || 'SEFAZ'})`;
+    result.suggestedCategory = result.model === '66' ? 'Moradia' : 'Alimentação';
   }
 
-  if (result.accessKey) result.notes = `Chave NFC-e: ${result.accessKey}`;
+  if (result.accessKey) result.notes = `Chave: ${result.accessKey}`;
   return result;
 }
 
@@ -275,8 +268,9 @@ function extractInfoFromText(fullText) {
   if (!fullText || typeof fullText !== 'string') return null;
   const res = {
     type: 'expense', amount: null, date: null, dueDate: null, competence: null,
-    description: '', suggestedCategory: 'Alimentação', accessKey: '', cnpj: '',
-    nNF: '', pixCode: null, boletoCode: null, notes: '', isPix: false, isBoleto: false
+    description: '', suggestedCategory: 'Alimentação', docType: 'Fatura / Nota Fiscal',
+    accessKey: '', cnpj: '', nNF: '', model: '', pixCode: null, boletoCode: null,
+    notes: '', isPix: false, isBoleto: false
   };
 
   // 1. Procura Código PIX Copia e Cola no texto (EMVCo 000201...)
@@ -285,81 +279,110 @@ function extractInfoFromText(fullText) {
     res.pixCode = pixMatch[1].trim();
     res.isPix = true;
     const p = parsePixPayload(res.pixCode);
-    if (p && p.amount) res.amount = p.amount;
-    if (p && p.receiver) res.description = p.receiver;
+    if (p && p.amount && !res.amount) res.amount = p.amount;
+    if (p && p.receiver && (!res.description || isInvalidMerchantName(res.description))) res.description = p.receiver;
   }
 
-  // 2. Procura Chave de Acesso de NF-e / NFC-e (44 dígitos)
-  const keyRawMatch = fullText.match(/\b(\d{4}[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{4})\b/);
+  // 2. Chave de Acesso NF (44 dígitos)
+  const keyRawMatch = fullText.match(/\b(\d{4}[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{4})\b/) || fullText.match(/([0-9]{44})/);
   if (keyRawMatch) {
-    const cleanKey = keyRawMatch[1].replace(/[^0-9]/g, '');
+    const cleanKey = (keyRawMatch[1] || keyRawMatch[0]).replace(/[^0-9]/g, '');
     if (cleanKey.length === 44) {
       res.accessKey = cleanKey;
-      const rawCnpj = cleanKey.substring(6, 20);
-      res.cnpj = rawCnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+      res.cnpj = cleanKey.substring(6, 20).replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+      res.model = cleanKey.substring(20, 22);
       res.nNF = parseInt(cleanKey.substring(25, 34), 10).toString();
-      const aa = cleanKey.substring(2, 4);
-      const mm = cleanKey.substring(4, 6);
-      res.competence = `${parseInt(aa, 10) + 2000}-${mm.padStart(2, '0')}`;
+      res.competence = `${parseInt(cleanKey.substring(2, 4), 10) + 2000}-${cleanKey.substring(4, 6)}`;
+      if (res.model === '66') { res.docType = 'Fatura de Energia (NF3e)'; res.suggestedCategory = 'Moradia'; }
+      else if (res.model === '55') { res.docType = 'Nota Fiscal (NF-e)'; }
+      else if (res.model === '65') { res.docType = 'Cupom Fiscal (NFC-e)'; }
     }
   }
 
-  // 3. Procura Linha Digitável de Boleto
-  const boletoMatch = fullText.match(/\b(\d{5}[.\s]?\d{5}\s+\d{5}[.\s]?\d{6}\s+\d{5}[.\s]?\d{6}\s+\d\s+\d{14})\b/);
-  if (boletoMatch) {
-    res.boletoCode = boletoMatch[1].replace(/[^0-9]/g, '');
-    res.isBoleto = true;
+  // 3. Código de Arrecadação Concessionária (48 dig) ou Boleto (47 dig)
+  const barcodeConcessionaria = fullText.match(/\b(8\d{10}[-\s]?\d\s*\d{11}[-\s]?\d\s*\d{11}[-\s]?\d\s*\d{11}[-\s]?\d)\b/) || fullText.match(/\b(8\d{47})\b/);
+  const barcodeBoleto = fullText.match(/\b(\d{5}[.\s]?\d{5}\s+\d{5}[.\s]?\d{6}\s+\d{5}[.\s]?\d{6}\s+\d\s+\d{14})\b/);
+  if (barcodeConcessionaria) {
+    res.boletoCode = barcodeConcessionaria[0].replace(/[^0-9]/g, '');
+    res.isBoleto = true; res.docType = 'Fatura de Concessionária'; res.suggestedCategory = 'Moradia';
+  } else if (barcodeBoleto) {
+    res.boletoCode = barcodeBoleto[0].replace(/[^0-9]/g, '');
+    res.isBoleto = true; res.docType = 'Boleto Bancário'; res.suggestedCategory = 'Moradia';
   }
 
-  // 4. Procura CNPJ no texto
-  const cnpjMatch = fullText.match(/\b(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})\b/);
-  if (cnpjMatch && !res.cnpj) res.cnpj = cnpjMatch[1];
+  if (!res.cnpj) {
+    const cnpjMatch = fullText.match(/\b(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})\b/);
+    if (cnpjMatch) res.cnpj = cnpjMatch[1];
+  }
 
-  // 5. Procura Data de Vencimento
-  const dueMatch = fullText.match(/(?:vencimento|venc|data\s+de\s+vencimento|data\s+vencimento|vence\s+em|pagar\s+at[eé]|validade)\s*[:\s]*(\d{2}[/-]\d{2}[/-]\d{4})/i) ||
-                   fullText.match(/(?:vencimento|venc)\s*[:\s]*(\d{4}[/-]\d{2}[/-]\d{2})/i);
-  if (dueMatch) {
-    const rawDue = dueMatch[1].replace(/\//g, '-');
-    const parts = rawDue.split('-');
-    if (parts[0].length === 4) res.dueDate = `${parts[0]}-${parts[1]}-${parts[2]}`;
-    else res.dueDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
-    res.date = res.dueDate;
+  if (res.cnpj) {
+    const root = res.cnpj.replace(/[^0-9]/g, '').substring(0, 8);
+    const k = KNOWN_CNPJS.find(x => x.root === root);
+    if (k) {
+      res.description = k.name; res.suggestedCategory = k.cat;
+      if (k.docType) res.docType = k.docType;
+    }
+  }
+
+  const duePatterns = [
+    /(?:data\s+de\s+vencimento|data\s+vencimento|vencimento|venc|vence\s+em|pagar\s+at[eé]|validade|data\s+limite)\s*[:\s]*(\d{2}[/-]\d{2}[/-]\d{4})/i,
+    /(\d{2}[/-]\d{2}[/-]\d{4})\s*(?:data\s+de\s+vencimento|vencimento|venc)/i,
+    /(?:total\s+a\s+pagar|valor\s+a\s+pagar|vencimento)\s*R?\$?\s*[\d.,]+\s*(\d{2}[/-]\d{2}[/-]\d{4})/i,
+    /(?:vencimento|venc)\s*[:\s]*(\d{4}[/-]\d{2}[/-]\d{2})/i
+  ];
+  for (const pat of duePatterns) {
+    const m = fullText.match(pat);
+    if (m) {
+      const parts = m[1].replace(/\//g, '-').split('-');
+      res.dueDate = parts[0].length === 4 ? `${parts[0]}-${parts[1]}-${parts[2]}` : `${parts[2]}-${parts[1]}-${parts[0]}`;
+      res.date = res.dueDate;
+      break;
+    }
+  }
+
+  const compMatch = fullText.match(/(?:m[eê]s\/ano|refer[eê]ncia|ref\.?|compet[eê]ncia)\s*[:\s]*(\d{2}\/\d{4})/i) || fullText.match(/(\d{2}\/\d{4})\s*(?:refer[eê]ncia|m[eê]s\/ano)/i);
+  if (compMatch) {
+    const [mm, yyyy] = compMatch[1].split('/');
+    res.competence = `${yyyy}-${mm.padStart(2, '0')}`;
+  } else if (res.dueDate && !res.competence) {
     res.competence = res.dueDate.slice(0, 7);
   }
 
-  // 6. Procura Data de Emissão (se não achou vencimento)
   if (!res.date) {
-    const emiMatch = fullText.match(/(?:emiss[aã]o|data\s+da\s+emiss[aã]o|emitido\s+em|data\s+de\s+emiss[aã]o)\s*[:\s]*(\d{2}[/-]\d{2}[/-]\d{4})/i) ||
-                     fullText.match(/(?:emiss[aã]o)\s*[:\s]*(\d{4}[/-]\d{2}[/-]\d{2})/i);
+    const emiMatch = fullText.match(/(?:emiss[aã]o|data\s+da\s+emiss[aã]o|emitido\s+em|data\s+de\s+emiss[aã]o)\s*[:\s]*(\d{2}[/-]\d{2}[/-]\d{4})/i) || fullText.match(/(?:emiss[aã]o)\s*[:\s]*(\d{4}[/-]\d{2}[/-]\d{2})/i);
     if (emiMatch) {
-      const rawEmi = emiMatch[1].replace(/\//g, '-');
-      const parts = rawEmi.split('-');
-      if (parts[0].length === 4) res.date = `${parts[0]}-${parts[1]}-${parts[2]}`;
-      else res.date = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      const parts = emiMatch[1].replace(/\//g, '-').split('-');
+      res.date = parts[0].length === 4 ? `${parts[0]}-${parts[1]}-${parts[2]}` : `${parts[2]}-${parts[1]}-${parts[0]}`;
       if (!res.competence) res.competence = res.date.slice(0, 7);
     }
   }
 
-  // 7. Procura Valor Total / Valor a Pagar
   if (!res.amount) {
-    const valMatch = fullText.match(/(?:valor\s+total|total\s+a\s+pagar|valor\s+a\s+pagar|valor\s+do\s+documento|valor\s+cobrado|valor\s+l[ií]quido|total\s+da\s+nota|total\s+nota|total\s+geral|valor\s+fatura)\s*[:\s]*R?\$?\s*([\d.]+,\d{2})/i) ||
-                     fullText.match(/R\$\s*([\d.]+,\d{2})/i);
-    if (valMatch) {
-      const cleanNum = valMatch[1].replace(/\./g, '').replace(',', '.');
-      const parsedAmt = parseFloat(cleanNum);
-      if (!isNaN(parsedAmt) && parsedAmt > 0) res.amount = parsedAmt;
+    const valPatterns = [
+      /(?:total\s+a\s+pagar|valor\s+a\s+pagar|valor\s+total|total\s+da\s+fatura|total\s+fatura|valor\s+do\s+documento|valor\s+cobrado|valor\s+l[ií]quido|total\s+da\s+nota|total\s+nota|total\s+geral|valor\s+fatura)\s*[:\s]*R?\$?\s*([\d.]+,\d{2})/i,
+      /R\$\s*([\d.]+,\d{2})\s*(?:total\s+a\s+pagar|vencimento)/i,
+      /R\$\s*([\d.]+,\d{2})/i
+    ];
+    for (const pat of valPatterns) {
+      const m = fullText.match(pat);
+      if (m) {
+        const parsedAmt = parseFloat(m[1].replace(/\./g, '').replace(',', '.'));
+        if (!isNaN(parsedAmt) && parsedAmt > 0) { res.amount = parsedAmt; break; }
+      }
     }
   }
 
-  // 8. Procura Razão Social / Beneficiário
-  if (!res.description) {
+  if (!res.description || isInvalidMerchantName(res.description)) {
     const merchantMatch = fullText.match(/(?:benefici[aá]rio|raz[aã]o\s+social|nome\s+empresarial|cedente|prestador|emitente|estabelecimento)\s*[:\s]*([^\n\r,;]{3,50})/i);
-    if (merchantMatch) {
-      const rawName = merchantMatch[1].trim();
-      if (rawName.length > 3) res.description = rawName;
-    }
+    if (merchantMatch && !isInvalidMerchantName(merchantMatch[1])) res.description = merchantMatch[1].trim();
   }
 
+  if (!res.description || isInvalidMerchantName(res.description)) {
+    if (res.model === '66') res.description = 'Conta de Energia Elétrica';
+    else if (res.isBoleto) res.description = 'Fatura / Boleto';
+    else if (res.nNF) res.description = `Nota Fiscal #${res.nNF}`;
+    else res.description = 'Despesa / Fatura';
+  }
   return res;
 }
 
@@ -387,8 +410,8 @@ function mergeScanResults(codes, textData = null) {
         pixTxid: pixObj.pixTxid
       };
       if (!baseObj.amount && pixObj.amount) baseObj.amount = pixObj.amount;
-      if (pixObj.pixReceiver && (!baseObj.description || baseObj.description.startsWith('Compra Cupom Fiscal'))) {
-        baseObj.description = `${pixObj.pixReceiver}${baseObj.nNF ? ` (NFC-e #${baseObj.nNF})` : ''}`;
+      if (pixObj.pixReceiver && (!baseObj.description || isInvalidMerchantName(baseObj.description) || baseObj.description.startsWith('Compra Cupom'))) {
+        baseObj.description = `${pixObj.pixReceiver}${baseObj.nNF ? ` (#${baseObj.nNF})` : ''}`;
       }
     } else {
       baseObj = nfceObj || pixObj || parseSingleCode(visualList[0]);
@@ -401,45 +424,44 @@ function mergeScanResults(codes, textData = null) {
     if (textData.dueDate) {
       baseObj.dueDate = textData.dueDate;
       baseObj.date = textData.dueDate;
-      baseObj.competence = textData.dueDate.slice(0, 7);
+      if (!baseObj.competence) baseObj.competence = textData.competence || textData.dueDate.slice(0, 7);
     } else if (textData.date && !baseObj.date) {
       baseObj.date = textData.date;
-      baseObj.competence = textData.date.slice(0, 7);
+      if (!baseObj.competence) baseObj.competence = textData.competence || textData.date.slice(0, 7);
     }
+    if (textData.competence) baseObj.competence = textData.competence;
     if (textData.amount && (!baseObj.amount || baseObj.amount <= 0)) baseObj.amount = textData.amount;
-    if (textData.pixCode && !baseObj.pixCode) {
-      baseObj.pixCode = textData.pixCode;
-      baseObj.isPix = true;
-    }
+    if (textData.pixCode && !baseObj.pixCode) { baseObj.pixCode = textData.pixCode; baseObj.isPix = true; }
+    if (textData.boletoCode && !baseObj.boletoCode) { baseObj.boletoCode = textData.boletoCode; baseObj.isBoleto = true; }
     if (textData.accessKey && !baseObj.accessKey) {
-      baseObj.accessKey = textData.accessKey;
-      baseObj.cnpj = textData.cnpj;
-      baseObj.nNF = textData.nNF;
+      baseObj.accessKey = textData.accessKey; baseObj.cnpj = textData.cnpj; baseObj.nNF = textData.nNF; baseObj.model = textData.model;
       if (!baseObj.competence) baseObj.competence = textData.competence;
     }
-    if (textData.description && (!baseObj.description || baseObj.description.startsWith('Compra Cupom Fiscal'))) {
-      baseObj.description = textData.description;
+    if (textData.docType && (!baseObj.docType || baseObj.docType === 'Cupom Fiscal (NFC-e)')) baseObj.docType = textData.docType;
+    if (textData.description && (!baseObj.description || isInvalidMerchantName(baseObj.description) || baseObj.description.startsWith('Compra Cupom'))) baseObj.description = textData.description;
+  }
+  if (!baseObj) return null;
+
+  if (baseObj.cnpj) {
+    const k = KNOWN_CNPJS.find(x => x.root === baseObj.cnpj.replace(/[^0-9]/g, '').substring(0, 8));
+    if (k) {
+      baseObj.description = `${k.name}${baseObj.nNF ? ` (#${baseObj.nNF})` : ''}`;
+      baseObj.suggestedCategory = k.cat;
+      if (k.docType) baseObj.docType = k.docType;
     }
   }
 
-  if (!baseObj) return null;
+  if (baseObj.model === '66' || (baseObj.accessKey && baseObj.accessKey.substring(20, 22) === '66')) {
+    baseObj.suggestedCategory = 'Moradia'; baseObj.docType = 'Fatura de Energia (NF3e)';
+    if (!baseObj.description || isInvalidMerchantName(baseObj.description)) baseObj.description = 'Conta de Energia Elétrica';
+  }
 
   const today = new Date().toISOString().split('T')[0];
   if (!baseObj.date) {
-    baseObj.date = baseObj.competence && baseObj.competence !== today.slice(0, 7) ? `${baseObj.competence}-01` : today;
+    baseObj.date = baseObj.dueDate || (baseObj.competence && baseObj.competence !== today.slice(0, 7) ? `${baseObj.competence}-01` : today);
     baseObj.competence = baseObj.competence || today.slice(0, 7);
   }
-
-  if (baseObj.cnpj && (!baseObj.description || baseObj.description.startsWith('Compra Cupom Fiscal'))) {
-    const root = baseObj.cnpj.replace(/[^0-9]/g, '').substring(0, 8);
-    const k = KNOWN_CNPJS.find(x => x.root === root);
-    if (k) {
-      baseObj.description = `${k.name}${baseObj.nNF ? ` (NFC-e #${baseObj.nNF})` : ''}`;
-      baseObj.suggestedCategory = k.cat;
-    }
-  }
-
-  if (!baseObj.description) {
+  if (!baseObj.description || isInvalidMerchantName(baseObj.description)) {
     baseObj.description = baseObj.nNF ? `Nota Fiscal #${baseObj.nNF}` : (baseObj.isPix ? 'Pagamento PIX' : 'Despesa / Fatura');
   }
 
@@ -448,7 +470,6 @@ function mergeScanResults(codes, textData = null) {
   if (baseObj.pixCode) notesParts.push(`PIX Copia e Cola: ${baseObj.pixCode}`);
   if (baseObj.boletoCode) notesParts.push(`Linha Digitável: ${baseObj.boletoCode}`);
   baseObj.notes = notesParts.join('\n');
-
   return baseObj;
 }
 
@@ -465,16 +486,13 @@ const NFCeCameraManager = {
     if ('BarcodeDetector' in window) {
       try {
         const formats = await window.BarcodeDetector.getSupportedFormats();
-        if (formats.includes('qr_code')) {
-          this.barcodeDetector = new window.BarcodeDetector({ formats: ['qr_code', 'ean_13', 'code_128', 'itf'] });
-        }
+        if (formats.includes('qr_code')) this.barcodeDetector = new window.BarcodeDetector({ formats: ['qr_code', 'ean_13', 'code_128', 'itf'] });
       } catch (e) {}
     }
   },
 
   async start(videoEl, onResultCallback, onErrorCallback) {
-    this.videoElement = videoEl;
-    this.isScanning = true;
+    this.videoElement = videoEl; this.isScanning = true;
     await this.initEngines();
     try {
       const constraints = { video: { facingMode: { ideal: this.currentFacingMode }, width: { min: 640, ideal: 1280 }, height: { min: 480, ideal: 720 } }, audio: false };
@@ -498,9 +516,7 @@ const NFCeCameraManager = {
         if (this.isScanning) this.scanIntervalId = requestAnimationFrame(scanFrame);
         return;
       }
-      const video = this.videoElement;
-      const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
-
+      const video = this.videoElement, vw = video.videoWidth || 640, vh = video.videoHeight || 480;
       if (this.barcodeDetector) {
         try {
           const barcodes = await this.barcodeDetector.detect(video);
@@ -523,13 +539,9 @@ const NFCeCameraManager = {
           if (!code) {
             const cropW = Math.round(targetW * 0.65), cropH = Math.round(targetH * 0.65);
             const cropX = Math.round((targetW - cropW) / 2), cropY = Math.round((targetH - cropH) / 2);
-            const cropData = ctx.getImageData(cropX, cropY, cropW, cropH);
-            code = window.jsQR(cropData.data, cropW, cropH, { inversionAttempts: 'attemptBoth' });
+            code = window.jsQR(ctx.getImageData(cropX, cropY, cropW, cropH).data, cropW, cropH, { inversionAttempts: 'attemptBoth' });
           }
-          if (code && code.data) {
-            this.handleDetectedCodes([code.data], onResultCallback);
-            return;
-          }
+          if (code && code.data) { this.handleDetectedCodes([code.data], onResultCallback); return; }
         } catch (err) {}
       }
       if (this.isScanning) this.scanIntervalId = setTimeout(() => requestAnimationFrame(scanFrame), 80);
@@ -555,21 +567,19 @@ const NFCeCameraManager = {
         if (barcodes) barcodes.forEach(b => { if (b.rawValue) detected.add(b.rawValue); });
       } catch(e) {}
     }
-
     if (typeof window.jsQR === 'function') {
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       const w = canvas.width, h = canvas.height;
       const slices = [
-        { x: 0, y: 0, w: w, h: h },
+        { x: 0, y: 0, w, h },
         { x: 0, y: 0, w: Math.round(w * 0.55), h: Math.round(h * 0.55) },
         { x: Math.round(w * 0.45), y: 0, w: Math.round(w * 0.55), h: Math.round(h * 0.55) },
         { x: 0, y: Math.round(h * 0.45), w: Math.round(w * 0.55), h: Math.round(h * 0.55) },
         { x: Math.round(w * 0.45), y: Math.round(h * 0.45), w: Math.round(w * 0.55), h: Math.round(h * 0.55) },
-        { x: 0, y: Math.round(h * 0.35), w: w, h: Math.round(h * 0.65) },
-        { x: 0, y: 0, w: w, h: Math.round(h * 0.6) },
+        { x: 0, y: Math.round(h * 0.35), w, h: Math.round(h * 0.65) },
+        { x: 0, y: 0, w, h: Math.round(h * 0.6) },
         { x: Math.round(w * 0.2), y: Math.round(h * 0.2), w: Math.round(w * 0.6), h: Math.round(h * 0.6) }
       ];
-
       for (const s of slices) {
         try {
           const imgData = ctx.getImageData(s.x, s.y, s.w, s.h);
@@ -584,7 +594,6 @@ const NFCeCameraManager = {
   async scanFile(file, onResultCallback) {
     await this.initEngines();
     try {
-      // 1. PDF
       if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
         if (!window.pdfjsLib) throw new Error('Leitor de PDF não inicializado.');
         toast('Lendo páginas e dados fiscais do PDF...', 'info');
@@ -592,35 +601,25 @@ const NFCeCameraManager = {
         const pdfDoc = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         const allCodes = [];
         let fullPdfText = '';
-
         for (let pageNum = 1; pageNum <= Math.min(pdfDoc.numPages, 4); pageNum++) {
           const page = await pdfDoc.getPage(pageNum);
-          
           try {
             const textContent = await page.getTextContent();
-            const pageText = textContent.items.map(item => item.str).join(' ');
-            fullPdfText += ' ' + pageText;
+            fullPdfText += ' ' + textContent.items.map(item => item.str).join(' ');
           } catch(e) {}
-
           const viewport = page.getViewport({ scale: 2.0 });
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d', { willReadFrequently: true });
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
+          canvas.width = viewport.width; canvas.height = viewport.height;
           await page.render({ canvasContext: ctx, viewport }).promise;
-
           const pageCodes = await this.scanCanvasMultiQR(canvas);
           pageCodes.forEach(c => allCodes.push(c));
         }
-
         const textExtracted = extractInfoFromText(fullPdfText);
         const mergedResult = mergeScanResults(allCodes, textExtracted);
-
         if (mergedResult && (mergedResult.accessKey || mergedResult.pixCode || mergedResult.amount || mergedResult.dueDate || mergedResult.nNF || (mergedResult.description && !mergedResult.description.startsWith('Compra Cupom')))) {
           this.isScanning = false;
-          playScanBeep();
-          vibrateDevice(80);
-          this.stop();
+          playScanBeep(); vibrateDevice(80); this.stop();
           if (onResultCallback) onResultCallback(mergedResult);
         } else {
           toast('Nenhum dado fiscal ou QR Code legível foi identificado neste PDF. Você pode digitar ou colar as informações abaixo.', 'warning');
@@ -628,17 +627,13 @@ const NFCeCameraManager = {
         return;
       }
 
-      // 2. Imagem
       const img = new Image();
       const objectUrl = URL.createObjectURL(file);
       await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = objectUrl; });
-
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      const testResolutions = [2000, 1400, 900];
       let allFoundCodes = [];
-
-      for (const maxDim of testResolutions) {
+      for (const maxDim of [2000, 1400, 900]) {
         let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
         if (w > maxDim || h > maxDim) {
           if (w >= h) { h = Math.round((h * maxDim) / w); w = maxDim; } else { w = Math.round((w * maxDim) / h); h = maxDim; }
@@ -649,12 +644,8 @@ const NFCeCameraManager = {
         if (codes.length) { allFoundCodes = codes; break; }
       }
       URL.revokeObjectURL(objectUrl);
-
-      if (allFoundCodes.length) {
-        this.handleDetectedCodes(allFoundCodes, onResultCallback);
-      } else {
-        toast('Nenhum QR Code legível encontrado nesta imagem.', 'warning');
-      }
+      if (allFoundCodes.length) this.handleDetectedCodes(allFoundCodes, onResultCallback);
+      else toast('Nenhum QR Code legível encontrado nesta imagem.', 'warning');
     } catch (err) {
       console.error(err);
       toast('Erro ao processar arquivo da nota: ' + err.message, 'error');
@@ -706,9 +697,7 @@ function openNFCeScannerModal(customCallback = null) {
       </div>
       <div class="scanner-viewport-container">
         <video id="nfce-scanner-video" class="scanner-video-feed" playsinline muted autoplay></video>
-        <div class="scanner-hud-overlay">
-          <div class="scanner-viewfinder"><div class="viewfinder-corner tl"></div><div class="viewfinder-corner tr"></div><div class="viewfinder-corner bl"></div><div class="viewfinder-corner br"></div><div class="scanner-laser-line"></div></div>
-        </div>
+        <div class="scanner-hud-overlay"><div class="scanner-viewfinder"><div class="viewfinder-corner tl"></div><div class="viewfinder-corner tr"></div><div class="viewfinder-corner bl"></div><div class="viewfinder-corner br"></div><div class="scanner-laser-line"></div></div></div>
         <div class="scanner-live-badge"><span class="scanner-pulse-dot"></span> Câmera Ao Vivo</div>
         <div id="scanner-error-fallback" class="scanner-error-overlay" style="display:none">
           <div style="font-size:36px;margin-bottom:8px">⚠️</div>
@@ -731,14 +720,12 @@ function openNFCeScannerModal(customCallback = null) {
           </div>
         </div>
       </div>
-    </div>
-  `;
+    </div>`;
   document.body.appendChild(modalWrap);
 
   const videoEl = document.getElementById('nfce-scanner-video');
   const errorOverlay = document.getElementById('scanner-error-fallback');
   const errorMsg = document.getElementById('scanner-error-msg');
-
   const handleSuccess = (parsedData) => { NFCeCameraManager.stop(); modalWrap.remove(); handleNFCeScanResult(parsedData, customCallback); };
   const handleError = (err) => {
     if (errorOverlay) {
@@ -747,60 +734,67 @@ function openNFCeScannerModal(customCallback = null) {
       else if (err.name === 'NotFoundError') errorMsg.innerText = 'Nenhuma câmera detectada';
     }
   };
-
   const closeScannerModal = () => { NFCeCameraManager.stop(); modalWrap.remove(); };
-  document.getElementById('scanner-btn-close').addEventListener('click', closeScannerModal);
-  modalWrap.addEventListener('click', (e) => { if (e.target === modalWrap) closeScannerModal(); });
-  document.getElementById('scanner-btn-switch-cam').addEventListener('click', () => NFCeCameraManager.switchCamera(handleSuccess, handleError));
-  document.getElementById('scanner-btn-torch').addEventListener('click', async () => {
+  document.getElementById('scanner-btn-close').onclick = closeScannerModal;
+  modalWrap.onclick = (e) => { if (e.target === modalWrap) closeScannerModal(); };
+  document.getElementById('scanner-btn-switch-cam').onclick = () => NFCeCameraManager.switchCamera(handleSuccess, handleError);
+  document.getElementById('scanner-btn-torch').onclick = async () => {
     const isLit = await NFCeCameraManager.toggleTorch();
     const btn = document.getElementById('scanner-btn-torch');
     if (btn) { btn.style.borderColor = isLit ? 'var(--accent)' : 'var(--border)'; btn.style.color = isLit ? 'var(--accent-light)' : 'var(--text-primary)'; }
-  });
+  };
 
   const fileInput = document.getElementById('scanner-file-input');
-  fileInput.addEventListener('change', (e) => { if (e.target.files && e.target.files[0]) NFCeCameraManager.scanFile(e.target.files[0], handleSuccess); });
+  fileInput.onchange = (e) => { if (e.target.files && e.target.files[0]) NFCeCameraManager.scanFile(e.target.files[0], handleSuccess); };
   const fileFallback = document.getElementById('scanner-file-fallback');
-  if (fileFallback) fileFallback.addEventListener('change', (e) => { if (e.target.files && e.target.files[0]) NFCeCameraManager.scanFile(e.target.files[0], handleSuccess); });
+  if (fileFallback) fileFallback.onchange = (e) => { if (e.target.files && e.target.files[0]) NFCeCameraManager.scanFile(e.target.files[0], handleSuccess); };
 
   const applyManual = () => {
     const val = document.getElementById('scanner-manual-input').value.trim();
     if (!val) { toast('Digite ou cole a chave ou código Pix da nota.', 'warning'); return; }
     handleSuccess(parseSingleCode(val));
   };
-  document.getElementById('scanner-btn-apply-manual').addEventListener('click', applyManual);
-  document.getElementById('scanner-manual-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') applyManual(); });
+  document.getElementById('scanner-btn-apply-manual').onclick = applyManual;
+  document.getElementById('scanner-manual-input').onkeydown = (e) => { if (e.key === 'Enter') applyManual(); };
 
   NFCeCameraManager.start(videoEl, handleSuccess, handleError);
 }
 
 function openNFCeConfirmationModal(parsedData, accounts, categories) {
   const today = new Date().toISOString().split('T')[0];
-  const dateVal = parsedData.date || today;
+  const dateVal = parsedData.date || parsedData.dueDate || today;
   const competenceVal = parsedData.competence || (dateVal ? dateVal.slice(0, 7) : today.slice(0, 7));
   const amountVal = parsedData.amount != null ? parsedData.amount : '';
-  const descVal = parsedData.description || 'Compra Cupom Fiscal';
+  const descVal = parsedData.description || 'Despesa / Fatura';
 
   let matchedCatId = '';
   if (parsedData.suggestedCategory) {
-    const matchedCat = categories.find(c => c.name.toLowerCase().includes(parsedData.suggestedCategory.toLowerCase()) || parsedData.suggestedCategory.toLowerCase().includes(c.name.toLowerCase()));
+    const term = parsedData.suggestedCategory.toLowerCase();
+    const matchedCat = categories.find(c => {
+      const cn = c.name.toLowerCase();
+      return cn.includes(term) || term.includes(cn) || (term === 'moradia' && (cn.includes('casa') || cn.includes('contas') || cn.includes('fixas') || cn.includes('luz') || cn.includes('energia') || cn.includes('habita')));
+    });
     if (matchedCat) matchedCatId = matchedCat.id;
   }
 
-  Modal.open('📋 Conferência da Nota Fiscal', `
+  const isPendingBill = Boolean(parsedData.dueDate || parsedData.pixCode || parsedData.boletoCode || parsedData.model === '66');
+
+  Modal.open('📋 Conferência da Nota Fiscal / Fatura', `
     <div class="nfce-confirm-container" style="display:flex;flex-direction:column;gap:14px">
       <div style="background:linear-gradient(135deg,rgba(16,185,129,0.12),rgba(6,182,212,0.06));border:1px solid rgba(16,185,129,0.25);border-radius:var(--radius);padding:16px 18px;text-align:center;position:relative;box-shadow:0 4px 16px rgba(0,0,0,0.15)">
-        <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:2px">
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
           <span style="font-size:22px">🧾</span>
-          <span style="font-size:15px;font-weight:700;color:var(--text-primary)" id="nfce-preview-desc">${descVal}</span>
+          <span style="font-size:16px;font-weight:800;color:var(--text-primary)" id="nfce-preview-desc">${descVal}</span>
+          ${parsedData.docType ? `<span class="badge badge-purple" style="font-size:10.5px;padding:2px 8px">${parsedData.docType}</span>` : ''}
           ${parsedData.uf ? `<span class="badge badge-blue" style="font-size:10px;padding:2px 6px">${parsedData.uf}</span>` : ''}
         </div>
         <div style="font-size:34px;font-weight:900;color:${amountVal !== '' ? 'var(--accent-light)' : '#fbbf24'};letter-spacing:-0.02em;margin:6px 0" id="nfce-preview-amount-display">
           ${amountVal !== '' ? fmt.currency(amountVal) : 'R$ 0,00'}
         </div>
-        <div style="font-size:11.5px;color:var(--text-muted);display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap">
+        <div style="font-size:11.5px;color:var(--text-muted);display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap">
           <span>📅 ${parsedData.dueDate ? 'Vencimento' : 'Data'}: <strong id="nfce-preview-date" style="color:${parsedData.dueDate ? '#60a5fa' : 'inherit'}">${fmt.date(dateVal)}</strong></span>
-          ${parsedData.nNF ? `<span>🔢 NF-e: <strong>#${parsedData.nNF}</strong></span>` : ''}
+          ${parsedData.competence ? `<span>🗓️ Competência: <strong>${parsedData.competence}</strong></span>` : ''}
+          ${parsedData.nNF ? `<span>🔢 Nº: <strong>#${parsedData.nNF}</strong></span>` : ''}
           ${parsedData.cnpj ? `<span>🏢 CNPJ: <strong>${parsedData.cnpj}</strong></span>` : ''}
         </div>
         ${parsedData.accessKey ? `<div style="margin-top:10px;font-size:10px;color:var(--text-muted);background:rgba(0,0,0,0.25);padding:4px 8px;border-radius:6px;word-break:break-all">🔑 Chave: <code>${parsedData.accessKey}</code></div>` : ''}
@@ -810,20 +804,26 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
         <div style="background:linear-gradient(135deg,rgba(6,182,212,0.12),rgba(16,185,129,0.08));border:1px solid rgba(6,182,212,0.3);border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
           <div style="display:flex;align-items:center;gap:8px">
             <span style="font-size:20px">⚡</span>
-            <div>
-              <div style="font-size:12px;font-weight:700;color:#38bdf8">PIX de Pagamento Integrado à Nota</div>
-              <div style="font-size:11px;color:var(--text-muted)">O código e QR Code do PIX ficarão salvos no lançamento</div>
-            </div>
+            <div><div style="font-size:12px;font-weight:700;color:#38bdf8">PIX de Pagamento Integrado à Fatura</div><div style="font-size:11px;color:var(--text-muted)">O código e QR Code do PIX ficarão salvos para pagamento direto</div></div>
           </div>
           <div style="display:flex;gap:6px">
             <button type="button" class="btn btn-secondary btn-sm" id="btn-conf-copy-pix" style="font-size:11px;padding:4px 10px">📋 Copiar Pix</button>
             <button type="button" class="btn btn-primary btn-sm" id="btn-conf-view-pix" style="font-size:11px;padding:4px 10px;background:#0284c7;border:none">📱 Ver QR Code</button>
           </div>
         </div>
-
         <div id="conf-pix-preview-box" style="display:none;background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;text-align:center">
           <div style="font-size:11.5px;color:var(--text-muted);margin-bottom:6px">Escaneie com o aplicativo do seu banco:</div>
           <img id="conf-pix-img" style="width:160px;height:160px;background:white;padding:6px;border-radius:8px;margin:0 auto;display:block">
+        </div>
+      ` : ''}
+
+      ${parsedData.boletoCode ? `
+        <div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:18px">📄</span>
+            <div><div style="font-size:12px;font-weight:700;color:var(--text-primary)">Código de Barras / Arrecadação</div><code style="font-size:10.5px;color:var(--text-muted);word-break:break-all">${parsedData.boletoCode}</code></div>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-conf-copy-barcode" style="font-size:11px;padding:4px 10px">📋 Copiar Código</button>
         </div>
       ` : ''}
 
@@ -843,7 +843,7 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
       </div>
 
       <div class="form-group" style="margin:4px 0 0 0">
-        <label style="font-size:12.5px;display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="nfce-conf-paid" ${(parsedData.dueDate || parsedData.pixCode) ? '' : 'checked'}> Já foi pago / debitado da conta</label>
+        <label style="font-size:12.5px;display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="nfce-conf-paid" ${isPendingBill ? '' : 'checked'}> Já foi pago / debitado da conta</label>
       </div>
 
       <div style="padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
@@ -864,35 +864,27 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
   const previewDate = document.getElementById('nfce-preview-date');
 
   if (amountInput && previewAmount) {
-    amountInput.addEventListener('input', () => {
+    amountInput.oninput = () => {
       const val = parseFloat(amountInput.value);
-      if (!isNaN(val) && val > 0) {
-        previewAmount.innerText = fmt.currency(val);
-        previewAmount.style.color = 'var(--accent-light)';
-      } else {
-        previewAmount.innerText = 'R$ 0,00';
-        previewAmount.style.color = '#fbbf24';
-      }
-    });
-    if (amountVal === '' || amountVal === 0) {
-      setTimeout(() => { try { amountInput.focus(); } catch (e) {} }, 100);
-    }
+      previewAmount.innerText = (!isNaN(val) && val > 0) ? fmt.currency(val) : 'R$ 0,00';
+      previewAmount.style.color = (!isNaN(val) && val > 0) ? 'var(--accent-light)' : '#fbbf24';
+    };
+    if (amountVal === '' || amountVal === 0) setTimeout(() => { try { amountInput.focus(); } catch (e) {} }, 100);
   }
 
   if (descInput && previewDesc) {
-    descInput.addEventListener('input', () => { previewDesc.innerText = descInput.value.trim() || 'Compra Cupom Fiscal'; });
+    descInput.oninput = () => { previewDesc.innerText = descInput.value.trim() || 'Despesa / Fatura'; };
   }
   if (dateInput && previewDate) {
-    dateInput.addEventListener('change', () => {
+    dateInput.onchange = () => {
       if (dateInput.value) {
         previewDate.innerText = fmt.date(dateInput.value);
         const compInput = document.getElementById('nfce-conf-competence');
         if (compInput) compInput.value = dateInput.value.slice(0, 7);
       }
-    });
+    };
   }
 
-  // Ações do PIX no Pop-up
   if (parsedData.pixCode) {
     const copyPixBtn = document.getElementById('btn-conf-copy-pix');
     if (copyPixBtn) {
@@ -909,9 +901,7 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
         if (pixBox.style.display === 'none') {
           pixBox.style.display = 'block';
           if (typeof window.QRCode !== 'undefined' && window.QRCode.toDataURL) {
-            try {
-              pixImg.src = await window.QRCode.toDataURL(parsedData.pixCode, { width: 320, margin: 1 });
-            } catch(e) {}
+            try { pixImg.src = await window.QRCode.toDataURL(parsedData.pixCode, { width: 320, margin: 1 }); } catch(e) {}
           }
         } else {
           pixBox.style.display = 'none';
@@ -920,10 +910,17 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
     }
   }
 
-  document.getElementById('nfce-conf-btn-reject').onclick = () => {
-    Modal.close();
-    toast('Leitura da nota fiscal descartada.', 'info');
-  };
+  if (parsedData.boletoCode) {
+    const copyBarcodeBtn = document.getElementById('btn-conf-copy-barcode');
+    if (copyBarcodeBtn) {
+      copyBarcodeBtn.onclick = () => {
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(parsedData.boletoCode);
+        toast('📋 Código de Barras copiado para a área de transferência!', 'success');
+      };
+    }
+  }
+
+  document.getElementById('nfce-conf-btn-reject').onclick = () => { Modal.close(); toast('Leitura da nota fiscal descartada.', 'info'); };
 
   document.getElementById('nfce-conf-btn-more-options').onclick = () => {
     const updatedPrefill = {
@@ -949,21 +946,17 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
       const competence_date = competenceMonthVal ? `${competenceMonthVal}-01` : null;
       const is_paid = document.getElementById('nfce-conf-paid').checked ? 1 : 0;
 
-      if (!amount || amount <= 0) {
-        toast('Informe o valor da compra.', 'error');
-        amountInput.focus();
-        return;
-      }
-      if (!date) { toast('Informe a data da compra.', 'error'); return; }
+      if (!amount || amount <= 0) { toast('Informe o valor da despesa/fatura.', 'error'); amountInput.focus(); return; }
+      if (!date) { toast('Informe a data de vencimento/pagamento.', 'error'); return; }
       if (!account_id || isNaN(account_id)) { toast('Selecione a conta pagadora.', 'error'); return; }
 
       const txData = {
         user_id: State.user.id, account_id, category_id, recurring_item_id: null,
-        type: 'expense', amount, description: description || 'Compra Cupom Fiscal',
+        type: 'expense', amount, description: description || 'Fatura / Nota Fiscal',
         date, is_paid, is_avulso: 1,
-        notes: parsedData.notes || (parsedData.accessKey ? `Chave NFC-e: ${parsedData.accessKey}` : null),
+        notes: parsedData.notes || (parsedData.accessKey ? `Chave: ${parsedData.accessKey}` : null),
         pix_code: parsedData.pixCode || null,
-        credit_product: 'normal', due_date: null, competence_date
+        credit_product: 'normal', due_date: parsedData.dueDate || null, competence_date
       };
 
       const res = await window.api.transactions.create(txData);
@@ -971,7 +964,6 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
 
       Modal.close();
       toast(`✅ Lançamento de ${fmt.currency(amount)} criado com sucesso!`, 'success');
-
       if (typeof renderRecurring === 'function' && State.currentPage === 'recurring') renderRecurring();
       if (typeof renderDashboard === 'function' && (State.currentPage === 'dashboard' || !State.currentPage)) renderDashboard();
     } catch (err) {
