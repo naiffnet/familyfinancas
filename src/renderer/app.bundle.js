@@ -1,7 +1,7 @@
 /* ============================================
  * app.bundle.js — FamilyFinancas Renderer
  * Gerado por: npm run build:renderer
- * 2026-08-23T14:25:56.516Z
+ * 2026-08-23T14:38:13.065Z
  * Modulos: 21
  * ============================================ */
 
@@ -5929,8 +5929,14 @@ function getManualSidebarHtml() {
           <span class="wiki-tree-arrow">▾</span>
         </div>
         <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-modos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #fb923c; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+            • 🎛️ 3 Modos de Dashboard (Novo)
+          </div>
+          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-filtros-membros" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #60a5fa; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+            • 👥 Filtros de Membros & Titularidade
+          </div>
           <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-kpis" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 📊 Indicadores Principais (KPIs)
+            • 📊 Indicadores Principais (KPIs & Sincronia)
           </div>
           <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-pendencias-anteriores" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #fbbf24; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
             • ⚠️ Pendências de Meses Anteriores (Novo)
@@ -5977,6 +5983,9 @@ function getManualSidebarHtml() {
           </div>
           <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-avulsos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
             • Despesas Variáveis (Avulsas)
+          </div>
+          <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-similares" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #fbbf24; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+            • 🔔 Alerta de Similar em Tempo Real (Novo)
           </div>
           <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-juros" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
             • Juros, Multas e Descontos
@@ -6218,23 +6227,62 @@ function getManualTopicsPart1Html() {
       </div>
     </div>
 
-    <!-- TÓPICO 2.1: DASHBOARD > KPIS PRINCIPAIS -->
-    <div class="manual-topic-content" id="topic-dash-kpis" style="display: none;">
+    <!-- TÓPICO 2.0A: DASHBOARD > 3 MODOS DE LAYOUT (NOVO) -->
+    <div class="manual-topic-content" id="topic-dash-modos" style="display: none;">
       <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>📊 Indicadores Principais de Fluxo de Caixa (KPIs)</span>
+        <span>🎛️ 3 Modos de Visualização do Dashboard</span>
+        <span class="badge badge-yellow">Novo Recurso</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
         <div style="background: rgba(249,115,22,0.08); border-left: 4px solid #fb923c; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Visão Geral Instantânea da Saúde Financeira do Mês:</strong>
+          <strong>Personalize a Experiência Visual Conforme sua Preferência:</strong>
         </div>
-        <p style="margin-bottom: 10px;">Os 4 cards de topo do Dashboard resumem com exatidão a competência financeira selecionada:</p>
+        <p style="margin-bottom: 10px;">Você pode alternar o layout do Dashboard a qualquer momento pelo menu <strong>Configurações ⚙️ &gt; Geral</strong> ou pelo seletor rápido no topo da tela:</p>
         <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🟢 <strong>Receitas Totais:</strong> Soma de todas as entradas fixas (salários, pró-labore, pensões, aluguéis recebidos) e receitas variáveis já recebidas ou projetadas para o mês.</li>
-          <li>🔴 <strong>Despesas Totais:</strong> Soma consolidada de todas as despesas fixas, variáveis avulsas e faturas de cartão de crédito que vencem no mês.</li>
-          <li>⏳ <strong>À Pagar (Pendentes):</strong> Montante total das contas do mês que ainda não foram baixadas como pagas (<code>is_paid = 0</code>).</li>
-          <li>⚖️ <strong>Saldo Previsto:</strong> Diferença matemática <code>Receitas Totais - Despesas Totais</code>. Se positivo, indica sobra orçamentária; se negativo, alerta para necessidade de remanejar recursos.</li>
+          <li>🌟 <strong>1. Executivo por Zonas (Padrão):</strong> Visão 360° com KPIs consolidados, pílulas de ação rápida, previsão de cartões e contas com filtro de membros e o Painel Kanban 3 colunas.</li>
+          <li>📑 <strong>2. Sub-Abas Operacionais:</strong> Reduz a rolagem vertical agrupando os dados em 3 abas temáticas focadas (<em>📋 Operação</em>, <em>💳 Cartões & Bancos</em> e <em>📈 Gráficos</em>).</li>
+          <li>🎛️ <strong>3. Cockpit Integrado:</strong> Layout otimizado com barra de filtros no topo em linha, quadro de Cartões e Contas logo abaixo em largura total, KPIs sincronizados, Painel Kanban 3 colunas em 100% de largura e Gráficos no rodapé.</li>
         </ul>
-        <p style="margin: 0;">📊 <strong>Barra de Progresso:</strong> Logo abaixo dos KPIs, uma barra dinâmica indica a proporção de contas já quitadas no mês (ex: <em>7 de 10 contas pagas • 70%</em>).</p>
+      </div>
+    </div>
+
+    <!-- TÓPICO 2.0B: DASHBOARD > FILTROS DE MEMBROS E TITULARIDADE (NOVO) -->
+    <div class="manual-topic-content" id="topic-dash-filtros-membros" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #60a5fa; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>👥 Barra Superior de Filtros por Membro & Titularidade Efetiva</span>
+        <span class="badge badge-blue">Recurso Novo</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <div style="background: rgba(59, 130, 246, 0.08); border-left: 4px solid #3b82f6; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>Visão Familiar e Individual com 1 Clique:</strong>
+        </div>
+        <p style="margin-bottom: 10px;">A barra superior em linha (<code>dash-top-filter-bar</code>) permite filtrar instantaneamente todos os índices, cartões, alertas e contas do mês:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>👨‍👩‍👧 <strong>Toda a Família:</strong> Consolida a soma global de todos os familiares do grupo.</li>
+          <li>👤 <strong>Filtro por Membro Individual:</strong> Ao clicar no chip de um membro (ex: <em>William, Jennifer, etc.</em>), todos os KPIs, gráficos, alertas de vencimento e colunas do Kanban se ajustam para exibir apenas os lançamentos daquele titular.</li>
+          <li>🛡️ <strong>Titularidade Inteligente de Contas & Extratos:</strong> Mesmo que um extrato bancário (OFX/CSV) seja importado pelo Administrador da família, o sistema atribui as transações ao proprietário efetivo da conta bancária/cartão, garantindo que os filtros mostrem os dados perfeitamente.</li>
+          <li>💳 <strong>Filtro por Tipo de Produto:</strong> Alterne rapidamente entre <em>Tudo</em>, <em>Cartões de Crédito</em> ou <em>Contas Correntes/Poupanças</em>.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- TÓPICO 2.1: DASHBOARD > KPIS PRINCIPAIS -->
+    <div class="manual-topic-content" id="topic-dash-kpis" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📊 Indicadores Principais de Fluxo de Caixa (KPIs & Sincronia)</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <div style="background: rgba(249,115,22,0.08); border-left: 4px solid #fb923c; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>Sincronização Matemática 100% Precisa com o Painel Kanban:</strong>
+        </div>
+        <p style="margin-bottom: 10px;">Os 4 cards de topo do Dashboard resumem com exatidão a competência financeira selecionada, sincronizados com as colunas operacionais:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>🟢 <strong>Receitas (Pagas):</strong> Soma de todas as entradas e rendimentos recebidos no mês.</li>
+          <li>🔴 <strong>Despesas (Pagas):</strong> Soma das contas já quitadas no mês, correspondendo exatamente ao total da coluna <em>✅ Contas Pagas</em> do Kanban.</li>
+          <li>⏳ <strong>À Pagar (Pendentes):</strong> Montante total das contas em aberto do mês, correspondendo exatamente à coluna <em>⏳ A Pagar</em> do Kanban.</li>
+          <li>⚖️ <strong>Saldo do Mês:</strong> Diferença matemática direta <code>Receitas Pagas - Despesas Pagas</code>.</li>
+        </ul>
+        <p style="margin: 0;">📊 <strong>Barra de Progresso de Contas:</strong> Indica a proporção exata de despesas quitadas em relação ao total de despesas do mês (ex: <em>8 de 20 pagas • 40%</em>).</p>
       </div>
     </div>
 
@@ -6432,6 +6480,25 @@ function getManualTopicsPart1Html() {
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
         <p style="margin-bottom: 10px;">Gastos esporádicos do dia a dia (Supermercado, Farmácia, Restaurante, Combustível):</p>
         <p style="margin: 0;">Clique no botão roxo <code>+ Nova Variável</code> em qualquer momento para registrar uma compra rápida, escolhendo a categoria, conta/cartão e quem realizou o gasto.</p>
+      </div>
+    </div>
+
+    <!-- TÓPICO 3.3B: LANÇAMENTOS > ALERTA DE SIMILARES EM TEMPO REAL -->
+    <div class="manual-topic-content" id="topic-lanc-similares" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fbbf24; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🔔 Alerta Inteligente de Lançamento Similar em Tempo Real</span>
+        <span class="badge badge-yellow">Novo Recurso</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <div style="background: rgba(245, 158, 11, 0.08); border-left: 4px solid #f59e0b; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>Prevenção Ativa Contra Cadastros Duplicados Acidentais:</strong>
+        </div>
+        <p style="margin-bottom: 10px;">Ao preencher os formulários de <strong>Novo Lançamento Avulso</strong> ou <strong>Despesa Fixa Recorrente</strong>, o sistema analisa instantaneamente os dados digitados:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>⚡ <strong>Verificação Automática:</strong> Conforme você digita o valor, a data, a conta e a descrição, o motor busca se já existe um lançamento com características idênticas ou muito próximas.</li>
+          <li>⚠️ <strong>Aviso Visual em Destaque:</strong> Se houver similaridade, surge um banner amarelo no formulário informando: <em>"Atenção: Já existe um lançamento similar [Descrição] no valor de R$ X,XX na conta [Banco]..."</em>.</li>
+          <li>🔒 <strong>Segurança e Liberdade:</strong> O aviso não impede você de salvar caso seja uma compra legítima repetida, mas evita que você lance duas vezes a mesma conta por engano.</li>
+        </ul>
       </div>
     </div>
 

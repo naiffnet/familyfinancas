@@ -97,6 +97,19 @@ O sistema implementa rigorosa segurança contra acesso indevido entre famílias 
 - Rastreia automaticamente todas as contas de meses anteriores que ainda estão em aberto (`is_paid = 0`).
 - **Navegação com 1 Clique (`goToTransaction`)**: Ao clicar em qualquer item pendente no Dashboard, o app abre o mês de competência exato no Planejamento e aplica destaque animado com brilho pulsante (*glow flash*).
 
+### 7. 3 Modos de Visualização do Dashboard & Barra de Filtros no Topo
+- **3 Layouts Configuráveis**:
+  1. *🌟 Executivo por Zonas (Padrão)*: Visão 360° com KPIs, pílulas de ação rápida, previsão de cartões e Kanban 3 colunas.
+  2. *📑 Sub-Abas Operacionais*: Agrupa em 3 abas sem rolagem excessiva (*Operação, Cartões & Bancos, Gráficos*).
+  3. *🎛️ Cockpit Integrado*: Barra de filtros no topo em linha, quadro de Cartões e Contas logo abaixo em largura total, KPIs sincronizados, Kanban 3 colunas em 100% de largura e Gráficos no rodapé.
+- **Barra Superior em Linha (`dash-top-filter-bar`)**: Filtro rápido por membro (*Toda a Família | Membros Individuais*) e por tipo de produto (*Tudo | Cartões | Contas*).
+- **Titularidade Efetiva da Conta**: Contas e extratos bancários importados (OFX/CSV) vinculam-se automaticamente ao dono real da conta, garantindo filtragem e KPIs consistentes por pessoa.
+- **Sincronização 100% dos Indicadores com o Kanban**: Total de Despesas e À Pagar refletem exatamente as contas pagas e pendentes do Kanban, e o progresso mensal contabiliza estritamente as despesas do mês.
+
+### 8. Inteligência Anti-Duplicidade para Receitas & Alerta em Tempo Real
+- **Regra de Ouro para Receitas**: Contas diferentes de usuários distintos são **100% ignoradas** (rendas legítimas e independentes). O alerta de duplicidade atua se a mesma receita for lançada na **mesma conta bancária** (95-100%) ou em contas diferentes do **mesmo titular** (85-90%).
+- **Alerta de Lançamento Similar em Tempo Real**: Ao digitar um novo lançamento avulso ou fixo, o modal avisa instantaneamente se já existir um registro similar, prevenindo erros operacionais antes mesmo de salvar.
+
 ---
 
 ## ❓ 5. FAQ — Perguntas Frequentes & Solução de Problemas
