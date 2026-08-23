@@ -37,13 +37,77 @@ module.exports = (Base) => class extends Base {
   }
 
   calculateSimilarity(txA, txB) {
-    let score = 0;
     if (!txA || !txB) return 0;
 
     // 1. Tipo deve ser o mesmo (expense vs expense, income vs income)
     if (txA.type !== txB.type) return 0;
 
-    // 2. Proximidade de datas (tolerância inteligente com finais de semana)
+    const isIncome = txA.type === 'income';
+
+    // REGRA DE OURO PARA RECEITAS (INCOME):
+    // Se forem receitas e as contas bancárias forem DIFERENTES, 100% IGNORADAS (são rendas reais independentes)
+    if (isIncome) {
+      if (txA.account_id && txB.account_id && txA.account_id !== txB.account_id) {
+        return 0;
+      }
+    }
+
+    // 2. Análise Textual Preliminar (NLP & Stopwords)
+    const rawA = txA.description || txA.recurring_name || txA.rec_name || '';
+    const rawB = txB.description || txB.recurring_name || txB.rec_name || '';
+    const tokensA = this._cleanBankDescriptionTokens(rawA);
+    const tokensB = this._cleanBankDescriptionTokens(rawB);
+
+    let textMatchCount = 0;
+    let jaccardScore = 0;
+
+    if (tokensA.length > 0 && tokensB.length > 0) {
+      const setA = new Set(tokensA);
+      const setB = new Set(tokensB);
+
+      for (const tA of setA) {
+        if (setB.has(tA)) {
+          textMatchCount++;
+        } else {
+          // Checa prefixos (mínimo 4 caracteres, ex: 'supermerc' em 'supermercado')
+          for (const tB of setB) {
+            if (tA.length >= 4 && tB.length >= 4 && (tA.startsWith(tB) || tB.startsWith(tA))) {
+              textMatchCount += 0.8;
+              break;
+            }
+          }
+        }
+      }
+
+      const totalDistinct = new Set([...setA, ...setB]).size;
+      jaccardScore = totalDistinct > 0 ? (textMatchCount / totalDistinct) : 0;
+    } else if (rawA && rawB && this._normalizeSyncText(rawA) === this._normalizeSyncText(rawB)) {
+      jaccardScore = 1.0;
+    }
+
+    // REGRA DE DESPESAS COM CONTAS DIFERENTES:
+    // Se as contas forem conhecidas e diferentes, E não houver termos em comum (jaccard < 0.25):
+    // IGNORAR TOTALMENTE! (São gastos reais e distintos em contas diferentes)
+    const hasDifferentAccounts = txA.account_id && txB.account_id && txA.account_id !== txB.account_id;
+    if (!isIncome && hasDifferentAccounts) {
+      if (jaccardScore < 0.25 && !txA.recurring_item_id && !txB.recurring_item_id) {
+        return 0; // Contas diferentes e títulos diferentes = 0% duplicata
+      }
+    }
+
+    // 3. Verificação de Parcelamento (X/Y ou X de Y)
+    const instA = this._extractInstallment(rawA);
+    const instB = this._extractInstallment(rawB);
+    if (instA && instB) {
+      // Se forem parcelas DIFERENTES do mesmo produto (ex: 2/10 vs 3/10) -> NÃO é duplicata!
+      if (instA.current !== instB.current) {
+        return 0;
+      }
+    }
+
+    let score = 0;
+
+    // 4. Proximidade de Datas (tolerância inteligente com fins de semana)
     if (!txA.date || !txB.date) return 0;
     const dtA = new Date(txA.date + 'T12:00:00Z');
     const dtB = new Date(txB.date + 'T12:00:00Z');
@@ -64,15 +128,15 @@ module.exports = (Base) => class extends Base {
     } else if (diffDays <= 2) {
       score += 20;
     } else if (diffDays <= 4 && isWeekendComp) {
-      // Compensação bancária de compras feitas na sexta/sábado/domingo e registradas na segunda/terça
-      score += 22;
+      // Compensação bancária de compras feitas na sexta/sábado/domingo registradas na segunda/terça
+      score += 25;
     } else if (diffDays <= 3) {
       score += 10;
     } else {
       return 0; // Mais de 3-4 dias de distância não é duplicata
     }
 
-    // 3. Proximidade de valores monetários
+    // 5. Proximidade de Valores Monetários (Nível 1 & Nível 2)
     const vA = Math.abs(Number(txA.amount) || 0);
     const vB = Math.abs(Number(txB.amount) || 0);
     if (vA <= 0 || vB <= 0) return 0;
@@ -82,64 +146,47 @@ module.exports = (Base) => class extends Base {
     const diffPct = diffAmount / maxAmount;
 
     if (diffAmount === 0) {
-      score += 40;
+      score += 40; // Nível 1: Valor exato
     } else if (diffAmount <= 1.00) {
       score += 35;
     } else if (diffPct <= 0.02 || diffAmount <= 2.50) {
-      score += 30;
+      score += 30; // Nível 2: Valores muito próximos
     } else if (diffPct <= 0.05) {
       score += 20;
     } else {
-      return 0; // Valores muito discrepantes
+      return 0; // Valores discrepantes (> 5%)
     }
 
-    // 4. Semelhança de texto na descrição com NLP e Stopwords
-    const rawA = txA.description || txA.rec_name || '';
-    const rawB = txB.description || txB.rec_name || '';
-    const tokensA = this._cleanBankDescriptionTokens(rawA);
-    const tokensB = this._cleanBankDescriptionTokens(rawB);
+    // 6. Pontuação por Título / NLP (Nível 3)
+    if (jaccardScore > 0) {
+      score += Math.round(jaccardScore * 25);
+    }
 
-    if (tokensA.length > 0 && tokensB.length > 0) {
-      const setA = new Set(tokensA);
-      const setB = new Set(tokensB);
-      let matchCount = 0;
+    // 7. Pontuação por Parcela Coincidente (ex: 3/10 == 3/10)
+    if (instA && instB && instA.current === instB.current && instA.total === instB.total) {
+      score += 15;
+    }
 
-      for (const tA of setA) {
-        if (setB.has(tA)) {
-          matchCount++;
-        } else {
-          // Checa se é prefixo com pelo menos 4 caracteres (ex: 'supermerc' em 'supermercado')
-          for (const tB of setB) {
-            if (tA.length >= 4 && tB.length >= 4 && (tA.startsWith(tB) || tB.startsWith(tA))) {
-              matchCount += 0.8;
-              break;
-            }
-          }
-        }
-      }
-
-      const totalDistinct = new Set([...setA, ...setB]).size;
-      const jaccard = matchCount / totalDistinct;
-      score += Math.round(jaccard * 20);
-    } else if (this._normalizeSyncText(rawA) === this._normalizeSyncText(rawB) && rawA.length > 0) {
+    // 8. Vínculo com mesma Despesa Fixa / Recorrente
+    if (txA.recurring_item_id && txB.recurring_item_id && txA.recurring_item_id === txB.recurring_item_id) {
       score += 20;
     }
 
-    // 5. Comparação de parcelamentos (ex: '3/10' vs '3/10')
-    const instA = this._extractInstallment(rawA);
-    const instB = this._extractInstallment(rawB);
-    if (instA && instB) {
-      if (instA.current === instB.current && instA.total === instB.total) {
-        score += 10;
+    // 9. Mesma Conta Bancária vs Contas Diferentes
+    if (txA.account_id && txB.account_id) {
+      if (txA.account_id === txB.account_id) {
+        score += 10; // Mesma conta bancária (+10 pts)
+      } else {
+        score -= 15; // Penalidade por conta diferente (-15 pts)
       }
     }
 
-    // 6. Mesma Conta Bancária / Cartão Pagador
-    if (txA.account_id && txB.account_id && txA.account_id === txB.account_id) {
+    // 10. Mesmo Usuário Lançando
+    if (txA.user_id && txB.user_id && txA.user_id === txB.user_id) {
       score += 5;
     }
 
-    return Math.min(100, Math.round(score));
+    return Math.max(0, Math.min(100, Math.round(score)));
   }
 
   checkDuplicateCandidate({ familyId, amount, date, description, accountId, type = 'expense', excludeId = null }) {
@@ -149,10 +196,11 @@ module.exports = (Base) => class extends Base {
 
     // Busca transações recentes da família na janela de +- 4 dias
     const candidates = this.db.prepare(`
-      SELECT t.*, u.name as user_name, u.avatar_color as user_avatar_color, a.name as account_name
+      SELECT t.*, u.name as user_name, u.avatar_color as user_avatar_color, a.name as account_name, r.name as recurring_name
       FROM transactions t
       JOIN users u ON t.user_id = u.id
       LEFT JOIN accounts a ON t.account_id = a.id
+      LEFT JOIN recurring_items r ON t.recurring_item_id = r.id
       WHERE u.family_id = ? 
         AND (t.is_deleted IS NULL OR t.is_deleted = 0)
         AND abs(julianday(t.date) - julianday(?)) <= 4
@@ -205,11 +253,12 @@ module.exports = (Base) => class extends Base {
     const minDate = new Date(Date.now() - daysWindow * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     let query = `
-      SELECT t.*, u.name as user_name, u.avatar_color as user_avatar_color, a.name as account_name, c.name as category_name
+      SELECT t.*, u.name as user_name, u.avatar_color as user_avatar_color, a.name as account_name, c.name as category_name, r.name as recurring_name
       FROM transactions t
       JOIN users u ON t.user_id = u.id
       LEFT JOIN accounts a ON t.account_id = a.id
       LEFT JOIN categories c ON t.category_id = c.id
+      LEFT JOIN recurring_items r ON t.recurring_item_id = r.id
       WHERE u.family_id = ? AND (t.is_deleted IS NULL OR t.is_deleted = 0) AND t.date >= ?
     `;
     const params = [familyId, minDate];
