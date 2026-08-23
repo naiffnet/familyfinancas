@@ -118,42 +118,67 @@ module.exports = (Base) => class extends Base {
     if (profileType === 1) {
       priorityItems = this.db.prepare(`
         SELECT t.*, ri.is_priority, ri.due_day, ri.name as rec_name, ri.icon as rec_icon,
-               a.name as account_name
+               a.name as account_name,
+               COALESCE(a.user_id, ri.user_id, t.user_id) as user_id,
+               COALESCE(u_acc.name, u_rec.name, u_tx.name) as user_name,
+               COALESCE(u_acc.avatar_color, u_rec.avatar_color, u_tx.avatar_color) as user_avatar_color
         FROM transactions t
         JOIN recurring_items ri ON t.recurring_item_id = ri.id
         LEFT JOIN accounts a ON t.account_id = a.id
+        LEFT JOIN users u_acc ON a.user_id = u_acc.id
+        LEFT JOIN users u_rec ON ri.user_id = u_rec.id
+        LEFT JOIN users u_tx ON t.user_id = u_tx.id
         WHERE ri.is_priority=1 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
         ORDER BY t.is_paid ASC, t.date ASC
       `).all(m, y);
     } else if (perm.can_view_all === 1) {
       priorityItems = this.db.prepare(`
         SELECT t.*, ri.is_priority, ri.due_day, ri.name as rec_name, ri.icon as rec_icon,
-               a.name as account_name
+               a.name as account_name,
+               COALESCE(a.user_id, ri.user_id, t.user_id) as user_id,
+               COALESCE(u_acc.name, u_rec.name, u_tx.name) as user_name,
+               COALESCE(u_acc.avatar_color, u_rec.avatar_color, u_tx.avatar_color) as user_avatar_color
         FROM transactions t
         JOIN recurring_items ri ON t.recurring_item_id = ri.id
         LEFT JOIN accounts a ON t.account_id = a.id
-        JOIN users u ON t.user_id = u.id
-        WHERE u.family_id=? AND ri.is_priority=1 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
+        LEFT JOIN users u_acc ON a.user_id = u_acc.id
+        LEFT JOIN users u_rec ON ri.user_id = u_rec.id
+        LEFT JOIN users u_tx ON t.user_id = u_tx.id
+        WHERE (u_tx.family_id=? OR u_acc.family_id=?) AND ri.is_priority=1 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
         ORDER BY t.is_paid ASC, t.date ASC
-      `).all(familyId, m, y);
+      `).all(familyId, familyId, m, y);
     } else {
       priorityItems = this.db.prepare(`
         SELECT t.*, ri.is_priority, ri.due_day, ri.name as rec_name, ri.icon as rec_icon,
-               a.name as account_name
+               a.name as account_name,
+               COALESCE(a.user_id, ri.user_id, t.user_id) as user_id,
+               COALESCE(u_acc.name, u_rec.name, u_tx.name) as user_name,
+               COALESCE(u_acc.avatar_color, u_rec.avatar_color, u_tx.avatar_color) as user_avatar_color
         FROM transactions t
         JOIN recurring_items ri ON t.recurring_item_id = ri.id
         LEFT JOIN accounts a ON t.account_id = a.id
-        WHERE t.user_id=? AND ri.is_priority=1 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
+        LEFT JOIN users u_acc ON a.user_id = u_acc.id
+        LEFT JOIN users u_rec ON ri.user_id = u_rec.id
+        LEFT JOIN users u_tx ON t.user_id = u_tx.id
+        WHERE (t.user_id=? OR a.user_id=?) AND ri.is_priority=1 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
         ORDER BY t.is_paid ASC, t.date ASC
-      `).all(userId, m, y);
+      `).all(userId, userId, m, y);
     }
 
     // Alert items (due within alertDays days, unpaid)
     if (profileType === 1) {
       alertItems = this.db.prepare(`
-        SELECT t.*, ri.due_day, ri.name as rec_name, ri.icon as rec_icon, ri.is_priority
+        SELECT t.*, ri.due_day, ri.name as rec_name, ri.icon as rec_icon, ri.is_priority,
+               a.name as account_name,
+               COALESCE(a.user_id, ri.user_id, t.user_id) as user_id,
+               COALESCE(u_acc.name, u_rec.name, u_tx.name) as user_name,
+               COALESCE(u_acc.avatar_color, u_rec.avatar_color, u_tx.avatar_color) as user_avatar_color
         FROM transactions t
         JOIN recurring_items ri ON t.recurring_item_id = ri.id
+        LEFT JOIN accounts a ON t.account_id = a.id
+        LEFT JOIN users u_acc ON a.user_id = u_acc.id
+        LEFT JOIN users u_rec ON ri.user_id = u_rec.id
+        LEFT JOIN users u_tx ON t.user_id = u_tx.id
         WHERE t.is_paid=0 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
       `).all(m, y).filter(t => {
         if (!t.due_day) return false;
@@ -162,23 +187,38 @@ module.exports = (Base) => class extends Base {
       });
     } else if (perm.can_view_all === 1) {
       alertItems = this.db.prepare(`
-        SELECT t.*, ri.due_day, ri.name as rec_name, ri.icon as rec_icon, ri.is_priority
+        SELECT t.*, ri.due_day, ri.name as rec_name, ri.icon as rec_icon, ri.is_priority,
+               a.name as account_name,
+               COALESCE(a.user_id, ri.user_id, t.user_id) as user_id,
+               COALESCE(u_acc.name, u_rec.name, u_tx.name) as user_name,
+               COALESCE(u_acc.avatar_color, u_rec.avatar_color, u_tx.avatar_color) as user_avatar_color
         FROM transactions t
         JOIN recurring_items ri ON t.recurring_item_id = ri.id
-        JOIN users u ON t.user_id = u.id
-        WHERE u.family_id=? AND t.is_paid=0 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
-      `).all(familyId, m, y).filter(t => {
+        LEFT JOIN accounts a ON t.account_id = a.id
+        LEFT JOIN users u_acc ON a.user_id = u_acc.id
+        LEFT JOIN users u_rec ON ri.user_id = u_rec.id
+        LEFT JOIN users u_tx ON t.user_id = u_tx.id
+        WHERE (u_tx.family_id=? OR u_acc.family_id=?) AND t.is_paid=0 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
+      `).all(familyId, familyId, m, y).filter(t => {
         if (!t.due_day) return false;
         const daysLeft = t.due_day - today;
         return daysLeft >= 0 && daysLeft <= alertDays;
       });
     } else {
       alertItems = this.db.prepare(`
-        SELECT t.*, ri.due_day, ri.name as rec_name, ri.icon as rec_icon, ri.is_priority
+        SELECT t.*, ri.due_day, ri.name as rec_name, ri.icon as rec_icon, ri.is_priority,
+               a.name as account_name,
+               COALESCE(a.user_id, ri.user_id, t.user_id) as user_id,
+               COALESCE(u_acc.name, u_rec.name, u_tx.name) as user_name,
+               COALESCE(u_acc.avatar_color, u_rec.avatar_color, u_tx.avatar_color) as user_avatar_color
         FROM transactions t
         JOIN recurring_items ri ON t.recurring_item_id = ri.id
-        WHERE t.user_id=? AND t.is_paid=0 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
-      `).all(userId, m, y).filter(t => {
+        LEFT JOIN accounts a ON t.account_id = a.id
+        LEFT JOIN users u_acc ON a.user_id = u_acc.id
+        LEFT JOIN users u_rec ON ri.user_id = u_rec.id
+        LEFT JOIN users u_tx ON t.user_id = u_tx.id
+        WHERE (t.user_id=? OR a.user_id=?) AND t.is_paid=0 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
+      `).all(userId, userId, m, y).filter(t => {
         if (!t.due_day) return false;
         const daysLeft = t.due_day - today;
         return daysLeft >= 0 && daysLeft <= alertDays;
@@ -205,13 +245,17 @@ module.exports = (Base) => class extends Base {
         SELECT t.id, t.description, t.amount, t.type, t.date, t.is_paid, t.recurring_item_id,
                c.name as category_name, c.icon as category_icon,
                a.name as account_name, a.bank as account_bank, a.color as account_color,
-               u.name as user_name, u.avatar_color as user_avatar_color,
+               COALESCE(a.user_id, ri.user_id, t.user_id) as user_id,
+               COALESCE(u_acc.name, u_rec.name, u_tx.name) as user_name,
+               COALESCE(u_acc.avatar_color, u_rec.avatar_color, u_tx.avatar_color) as user_avatar_color,
                ri.name as rec_name, ri.icon as rec_icon
         FROM transactions t
-        LEFT JOIN categories c ON t.category_id = c.id
         LEFT JOIN accounts a ON t.account_id = a.id
-        LEFT JOIN users u ON t.user_id = u.id
         LEFT JOIN recurring_items ri ON t.recurring_item_id = ri.id
+        LEFT JOIN users u_acc ON a.user_id = u_acc.id
+        LEFT JOIN users u_rec ON ri.user_id = u_rec.id
+        LEFT JOIN users u_tx ON t.user_id = u_tx.id
+        LEFT JOIN categories c ON t.category_id = c.id
         WHERE t.is_paid = 0 AND t.amount > 0 AND t.date < ?
         ORDER BY t.date DESC, t.amount DESC
       `).all(monthStartThreshold);
@@ -220,31 +264,39 @@ module.exports = (Base) => class extends Base {
         SELECT t.id, t.description, t.amount, t.type, t.date, t.is_paid, t.recurring_item_id,
                c.name as category_name, c.icon as category_icon,
                a.name as account_name, a.bank as account_bank, a.color as account_color,
-               u.name as user_name, u.avatar_color as user_avatar_color,
+               COALESCE(a.user_id, ri.user_id, t.user_id) as user_id,
+               COALESCE(u_acc.name, u_rec.name, u_tx.name) as user_name,
+               COALESCE(u_acc.avatar_color, u_rec.avatar_color, u_tx.avatar_color) as user_avatar_color,
                ri.name as rec_name, ri.icon as rec_icon
         FROM transactions t
-        JOIN users u ON t.user_id = u.id
-        LEFT JOIN categories c ON t.category_id = c.id
         LEFT JOIN accounts a ON t.account_id = a.id
         LEFT JOIN recurring_items ri ON t.recurring_item_id = ri.id
-        WHERE u.family_id = ? AND t.is_paid = 0 AND t.amount > 0 AND t.date < ?
+        LEFT JOIN users u_acc ON a.user_id = u_acc.id
+        LEFT JOIN users u_rec ON ri.user_id = u_rec.id
+        LEFT JOIN users u_tx ON t.user_id = u_tx.id
+        LEFT JOIN categories c ON t.category_id = c.id
+        WHERE (u_tx.family_id=? OR u_acc.family_id=?) AND t.is_paid = 0 AND t.amount > 0 AND t.date < ?
         ORDER BY t.date DESC, t.amount DESC
-      `).all(familyId, monthStartThreshold);
+      `).all(familyId, familyId, monthStartThreshold);
     } else {
       overduePreviousItems = this.db.prepare(`
         SELECT t.id, t.description, t.amount, t.type, t.date, t.is_paid, t.recurring_item_id,
                c.name as category_name, c.icon as category_icon,
                a.name as account_name, a.bank as account_bank, a.color as account_color,
-               u.name as user_name, u.avatar_color as user_avatar_color,
+               COALESCE(a.user_id, ri.user_id, t.user_id) as user_id,
+               COALESCE(u_acc.name, u_rec.name, u_tx.name) as user_name,
+               COALESCE(u_acc.avatar_color, u_rec.avatar_color, u_tx.avatar_color) as user_avatar_color,
                ri.name as rec_name, ri.icon as rec_icon
         FROM transactions t
-        LEFT JOIN categories c ON t.category_id = c.id
         LEFT JOIN accounts a ON t.account_id = a.id
-        LEFT JOIN users u ON t.user_id = u.id
         LEFT JOIN recurring_items ri ON t.recurring_item_id = ri.id
-        WHERE t.user_id = ? AND t.is_paid = 0 AND t.amount > 0 AND t.date < ?
+        LEFT JOIN users u_acc ON a.user_id = u_acc.id
+        LEFT JOIN users u_rec ON ri.user_id = u_rec.id
+        LEFT JOIN users u_tx ON t.user_id = u_tx.id
+        LEFT JOIN categories c ON t.category_id = c.id
+        WHERE (t.user_id=? OR a.user_id=?) AND t.is_paid = 0 AND t.amount > 0 AND t.date < ?
         ORDER BY t.date DESC, t.amount DESC
-      `).all(userId, monthStartThreshold);
+      `).all(userId, userId, monthStartThreshold);
     }
 
     return { income, expense, pending, balance: income - expense, accounts, cardSpending, cardMonthlyInvoices, priorityItems, alertItems, totalRecurring, paidRecurring, alertDays, overduePreviousItems };
@@ -435,11 +487,15 @@ module.exports = (Base) => class extends Base {
     if (profileType === 1) {
       return this.db.prepare(`
         SELECT t.*, c.name as category_name, c.color as category_color, c.icon as category_icon,
-               a.name as account_name, u.name as user_name, u.avatar_color as user_avatar_color
+               a.name as account_name,
+               COALESCE(a.user_id, t.user_id) as user_id,
+               COALESCE(u_acc.name, u_tx.name) as user_name,
+               COALESCE(u_acc.avatar_color, u_tx.avatar_color) as user_avatar_color
         FROM transactions t 
-        JOIN users u ON t.user_id = u.id
-        LEFT JOIN categories c ON t.category_id=c.id 
-        LEFT JOIN accounts a ON t.account_id=a.id
+        LEFT JOIN accounts a ON t.account_id = a.id
+        LEFT JOIN users u_acc ON a.user_id = u_acc.id
+        LEFT JOIN users u_tx ON t.user_id = u_tx.id
+        LEFT JOIN categories c ON t.category_id = c.id
         WHERE strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
         ORDER BY t.date DESC
       `).all(m, y);
@@ -448,26 +504,34 @@ module.exports = (Base) => class extends Base {
     if (perm.can_view_all === 1) {
       return this.db.prepare(`
         SELECT t.*, c.name as category_name, c.color as category_color, c.icon as category_icon,
-               a.name as account_name, u.name as user_name, u.avatar_color as user_avatar_color
+               a.name as account_name,
+               COALESCE(a.user_id, t.user_id) as user_id,
+               COALESCE(u_acc.name, u_tx.name) as user_name,
+               COALESCE(u_acc.avatar_color, u_tx.avatar_color) as user_avatar_color
         FROM transactions t 
-        JOIN users u ON t.user_id = u.id
-        LEFT JOIN categories c ON t.category_id=c.id 
-        LEFT JOIN accounts a ON t.account_id=a.id
-        WHERE u.family_id=? AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
+        LEFT JOIN accounts a ON t.account_id = a.id
+        LEFT JOIN users u_acc ON a.user_id = u_acc.id
+        LEFT JOIN users u_tx ON t.user_id = u_tx.id
+        LEFT JOIN categories c ON t.category_id = c.id
+        WHERE (u_tx.family_id=? OR u_acc.family_id=?) AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
         ORDER BY t.date DESC
-      `).all(familyId, m, y);
+      `).all(familyId, familyId, m, y);
     }
 
     return this.db.prepare(`
       SELECT t.*, c.name as category_name, c.color as category_color, c.icon as category_icon,
-             a.name as account_name, u.name as user_name, u.avatar_color as user_avatar_color
+             a.name as account_name,
+             COALESCE(a.user_id, t.user_id) as user_id,
+             COALESCE(u_acc.name, u_tx.name) as user_name,
+             COALESCE(u_acc.avatar_color, u_tx.avatar_color) as user_avatar_color
       FROM transactions t 
-      JOIN users u ON t.user_id = u.id
-      LEFT JOIN categories c ON t.category_id=c.id 
-      LEFT JOIN accounts a ON t.account_id=a.id
-      WHERE t.user_id=? AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
+      LEFT JOIN accounts a ON t.account_id = a.id
+      LEFT JOIN users u_acc ON a.user_id = u_acc.id
+      LEFT JOIN users u_tx ON t.user_id = u_tx.id
+      LEFT JOIN categories c ON t.category_id = c.id
+      WHERE (t.user_id=? OR a.user_id=?) AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
       ORDER BY t.date DESC
-    `).all(userId, m, y);
+    `).all(userId, userId, m, y);
   }
 
   getPatrimony(userId) {
