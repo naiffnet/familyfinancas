@@ -1,7 +1,7 @@
 /* ============================================
  * app.bundle.js — FamilyFinancas Renderer
  * Gerado por: npm run build:renderer
- * 2026-08-23T22:54:53.173Z
+ * 2026-08-23T23:11:21.147Z
  * Modulos: 22
  * ============================================ */
 
@@ -4489,7 +4489,7 @@ function isInvalidMerchantName(str) {
 function parsePixPayload(text) {
   if (!text || typeof text !== 'string') return null;
   const clean = text.trim();
-  if (!clean.startsWith('000201') || !clean.includes('BR.GOV.BCB.PIX')) return null;
+  if (!clean.startsWith('000201') || !/br\.gov\.bcb\.pix/i.test(clean)) return null;
   const res = { isPix: true, pixCode: clean, amount: null, receiver: '', txid: '', city: '' };
   const valMatch = clean.match(/54(\d{2})([0-9.]+)/);
   if (valMatch) {
@@ -4551,7 +4551,7 @@ function parseSingleCode(raw) {
     uf: '', rawUrl: text, isPix: false, isBoleto: false
   };
 
-  const keyMatch = text.match(/\b([0-9]{44})\b/) || text.match(/[?&]p=([0-9]{44})/i) || text.match(/[?&]chNFe=([0-9]{44})/i);
+  const keyMatch = text.match(/[?&](?:p|chNFe|chNF3e|chNFCe|chave|ch)=([0-9]{44})/i) || text.match(/\b([0-9]{44})\b/);
   if (keyMatch) {
     result.accessKey = keyMatch[1];
     const ufCode = result.accessKey.substring(0, 2);
