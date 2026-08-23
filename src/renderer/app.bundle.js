@@ -1,7 +1,7 @@
 /* ============================================
  * app.bundle.js — FamilyFinancas Renderer
  * Gerado por: npm run build:renderer
- * 2026-08-23T14:58:11.686Z
+ * 2026-08-23T15:10:16.487Z
  * Modulos: 22
  * ============================================ */
 
@@ -4423,6 +4423,27 @@ function vibrateDevice(ms = 70) {
 }
 
 /**
+ * Garante que a biblioteca jsQR esteja carregada e pronta para uso
+ */
+async function ensureJsQRLoaded() {
+  if (typeof window.jsQR === 'function') return true;
+
+  // Tenta carregar via script tag dinâmico
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    script.src = 'js/vendor/jsQR.js';
+    script.onload = () => {
+      resolve(typeof window.jsQR === 'function');
+    };
+    script.onerror = () => {
+      console.warn('[Scanner] Não foi possível carregar jsQR local');
+      resolve(false);
+    };
+    document.head.appendChild(script);
+  });
+}
+
+/**
  * Parser inteligente de URLs de QR Code da SEFAZ (NFC-e / NF-e), SAT-CF-e, Pix e Boletos
  */
 function parseNFCeUrl(raw) {
@@ -4606,7 +4627,7 @@ function parseNFCeUrl(raw) {
 }
 
 /**
- * Controlador de Câmera e Scanner de QR Code
+ * Controlador de Câmera e Scanner de QR Code com Motor Híbrido (BarcodeDetector + jsQR)
  */
 const NFCeCameraManager = {
   videoElement: null,
@@ -4618,7 +4639,9 @@ const NFCeCameraManager = {
   isTorchOn: false,
   barcodeDetector: null,
 
-  async initDetector() {
+  async initEngines() {
+    await ensureJsQRLoaded();
+
     if ('BarcodeDetector' in window) {
       try {
         const formats = await window.BarcodeDetector.getSupportedFormats();
@@ -4626,7 +4649,7 @@ const NFCeCameraManager = {
           this.barcodeDetector = new window.BarcodeDetector({ formats: ['qr_code', 'ean_13', 'code_128', 'itf'] });
         }
       } catch (e) {
-        console.debug('[Scanner] Falha ao inicializar BarcodeDetector nativo:', e);
+        console.debug('[Scanner] BarcodeDetector nativo indisponível:', e);
       }
     }
   },
@@ -4634,14 +4657,14 @@ const NFCeCameraManager = {
   async start(videoEl, onResultCallback, onErrorCallback) {
     this.videoElement = videoEl;
     this.isScanning = true;
-    await this.initDetector();
+    await this.initEngines();
 
     try {
       const constraints = {
         video: {
           facingMode: { ideal: this.currentFacingMode },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+          width: { min: 640, ideal: 1280, max: 1920 },
+          height: { min: 480, ideal: 720, max: 1080 }
         },
         audio: false
       };
@@ -4656,7 +4679,7 @@ const NFCeCameraManager = {
 
       this.track = this.stream.getVideoTracks()[0];
 
-      // Inicia loop de escaneamento
+      // Inicia loop contínuo de escaneamento
       this.startScanLoop(onResultCallback);
     } catch (err) {
       this.isScanning = false;
@@ -4676,27 +4699,69 @@ const NFCeCameraManager = {
         return;
       }
 
-      try {
-        // 1. Tentativa nativa ultra-rápida (BarcodeDetector)
-        if (this.barcodeDetector) {
-          const barcodes = await this.barcodeDetector.detect(this.videoElement);
-          if (barcodes && barcodes.length > 0) {
-            const rawVal = barcodes[0].rawValue;
-            if (rawVal) {
-              this.handleDetectedCode(rawVal, onResultCallback);
-              return;
-            }
+      const video = this.videoElement;
+      const vw = video.videoWidth || 640;
+      const vh = video.videoHeight || 480;
+
+      // 1. Tentativa nativa BarcodeDetector (se disponível no navegador)
+      if (this.barcodeDetector) {
+        try {
+          const barcodes = await this.barcodeDetector.detect(video);
+          if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+            this.handleDetectedCode(barcodes[0].rawValue, onResultCallback);
+            return;
           }
+        } catch (e) {}
+      }
+
+      // 2. Tentativa universal robusta via jsQR (CPU Canvas)
+      if (typeof window.jsQR === 'function') {
+        try {
+          // Escala frame para tamanho ideal (max 800px) para alta velocidade e precisão
+          const maxDim = 800;
+          let targetW = vw;
+          let targetH = vh;
+          if (targetW > maxDim) {
+            targetH = Math.round((vh * maxDim) / targetW);
+            targetW = maxDim;
+          }
+
+          canvas.width = targetW;
+          canvas.height = targetH;
+          ctx.drawImage(video, 0, 0, targetW, targetH);
+          const imageData = ctx.getImageData(0, 0, targetW, targetH);
+
+          // Passo A: Escaneamento do frame completo
+          let code = window.jsQR(imageData.data, targetW, targetH, {
+            inversionAttempts: 'dontInvert'
+          });
+
+          // Passo B: Se não encontrou, foca no centro (área do retículo viewfinder)
+          if (!code) {
+            const cropW = Math.round(targetW * 0.65);
+            const cropH = Math.round(targetH * 0.65);
+            const cropX = Math.round((targetW - cropW) / 2);
+            const cropY = Math.round((targetH - cropH) / 2);
+            const cropData = ctx.getImageData(cropX, cropY, cropW, cropH);
+            code = window.jsQR(cropData.data, cropW, cropH, {
+              inversionAttempts: 'attemptBoth'
+            });
+          }
+
+          if (code && code.data) {
+            this.handleDetectedCode(code.data, onResultCallback);
+            return;
+          }
+        } catch (err) {
+          console.debug('[Scanner] Erro na análise de frame jsQR:', err);
         }
-      } catch (err) {
-        // Se falhar a detecção nativa em frame
       }
 
       // Reagenda próximo frame
       if (this.isScanning) {
         this.scanIntervalId = setTimeout(() => {
           requestAnimationFrame(scanFrame);
-        }, 120);
+        }, 80);
       }
     };
 
@@ -4740,19 +4805,68 @@ const NFCeCameraManager = {
   },
 
   async scanImageFile(file, onResultCallback) {
-    await this.initDetector();
-    if (!this.barcodeDetector) {
-      toast('Detecção de imagem não suportada neste navegador.', 'warning');
-      return;
-    }
+    await this.initEngines();
 
     try {
-      const bitmap = await createImageBitmap(file);
-      const barcodes = await this.barcodeDetector.detect(bitmap);
-      if (barcodes && barcodes.length > 0) {
-        this.handleDetectedCode(barcodes[0].rawValue, onResultCallback);
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = objectUrl;
+      });
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+      // Testa em múltiplas resoluções caso a foto seja muito grande (ex: 48MP)
+      const testResolutions = [1200, 800, 600, 1800];
+      let detectedText = null;
+
+      for (const maxDim of testResolutions) {
+        let w = img.naturalWidth || img.width;
+        let h = img.naturalHeight || img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w >= h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+
+        canvas.width = w;
+        canvas.height = h;
+        ctx.drawImage(img, 0, 0, w, h);
+        const imgData = ctx.getImageData(0, 0, w, h);
+
+        if (typeof window.jsQR === 'function') {
+          const code = window.jsQR(imgData.data, w, h, { inversionAttempts: 'attemptBoth' });
+          if (code && code.data) {
+            detectedText = code.data;
+            break;
+          }
+        }
+
+        if (this.barcodeDetector) {
+          try {
+            const barcodes = await this.barcodeDetector.detect(canvas);
+            if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+              detectedText = barcodes[0].rawValue;
+              break;
+            }
+          } catch (e) {}
+        }
+      }
+
+      URL.revokeObjectURL(objectUrl);
+
+      if (detectedText) {
+        this.handleDetectedCode(detectedText, onResultCallback);
       } else {
-        toast('Nenhum QR Code legível foi encontrado nesta imagem.', 'warning');
+        toast('Nenhum QR Code legível foi encontrado nesta imagem. Aproxime mais a câmera do código.', 'warning');
       }
     } catch (err) {
       console.error('[Scanner] Erro ao escanear imagem:', err);
