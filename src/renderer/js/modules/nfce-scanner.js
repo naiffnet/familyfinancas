@@ -336,22 +336,15 @@ function extractInfoFromText(fullText) {
     }
   }
 
-  const duePatterns = [
-    /(?:data\s+de\s+vencimento|data\s+vencimento|vencimento|venc|vence\s+em|pagar\s+at[eé]|validade|data\s+limite)\s*[:\s]*(\d{2}[./-]\d{2}[./-]\d{4})/i,
-    /VENCIMENTO[\s\S]{1,80}?\b(\d{2}[./-]\d{2}[./-]\d{4})\b/i,
-    /R\$\s*[\d.,]+\s+(\d{2}[./-]\d{2}[./-]\d{4})/i,
-    /(\d{2}[./-]\d{2}[./-]\d{4})\s+\d{1,3}\.\d{3}\.\d{3}\.\d{3}/,
-    /(\d{2}[./-]\d{2}[./-]\d{4})\s*(?:data\s+de\s+vencimento|vencimento|venc)/i
-  ];
-  for (const pat of duePatterns) {
-    const m = fullText.match(pat);
-    if (m) {
-      const cleanDate = m[1].replace(/[./]/g, '-');
-      const parts = cleanDate.split('-');
-      res.dueDate = parts[0].length === 4 ? `${parts[0]}-${parts[1]}-${parts[2]}` : `${parts[2]}-${parts[1]}-${parts[0]}`;
-      res.date = res.dueDate;
-      break;
-    }
+  const dueMatch = fullText.match(/(?:data\s+de\s+vencimento|data\s+vencimento|vencimento|venc|vence\s+em|pagar\s+at[eé]|validade|data\s+limite)\s*[:\s]*(\d{2}[./-]\d{2}[./-]\d{4})/i) ||
+                   fullText.match(/VENCIMENTO[\s\S]{1,80}?\b(\d{2}[./-]\d{2}[./-]\d{4})\b/i) ||
+                   fullText.match(/R\$\s*[\d.,]+\s+(\d{2}[./-]\d{2}[./-]\d{4})/i) ||
+                   fullText.match(/(\d{2}[./-]\d{2}[./-]\d{4})\s+\d{1,3}\.\d{3}\.\d{3}\.\d{3}/) ||
+                   fullText.match(/(\d{2}[./-]\d{2}[./-]\d{4})\s*(?:data\s+de\s+vencimento|vencimento|venc)/i);
+  if (dueMatch) {
+    const parts = dueMatch[1].replace(/[./]/g, '-').split('-');
+    res.dueDate = parts[0].length === 4 ? `${parts[0]}-${parts[1]}-${parts[2]}` : `${parts[2]}-${parts[1]}-${parts[0]}`;
+    res.date = res.dueDate;
   }
 
   const compMatch = fullText.match(/(?:m[eê]s\/ano|refer[eê]ncia|ref\.?|compet[eê]ncia)\s*[:\s]*(\d{2}\/\d{4})/i) ||
@@ -359,10 +352,7 @@ function extractInfoFromText(fullText) {
                     fullText.match(/(?<!\d[\/-])(0[1-9]|1[0-2])\/(20\d{2})\b/);
   if (compMatch) {
     if (compMatch[1] && compMatch[2]) res.competence = `${compMatch[2]}-${compMatch[1].padStart(2, '0')}`;
-    else {
-      const [mm, yyyy] = compMatch[1].split('/');
-      res.competence = `${yyyy}-${mm.padStart(2, '0')}`;
-    }
+    else { const [mm, yyyy] = compMatch[1].split('/'); res.competence = `${yyyy}-${mm.padStart(2, '0')}`; }
   } else if (res.dueDate && !res.competence) {
     res.competence = res.dueDate.slice(0, 7);
   }
@@ -370,25 +360,19 @@ function extractInfoFromText(fullText) {
   if (!res.date) {
     const emiMatch = fullText.match(/(?:emiss[aã]o|data\s+da\s+emiss[aã]o|emitido\s+em|data\s+de\s+emiss[aã]o)\s*[:\s]*(\d{2}[./-]\d{2}[./-]\d{4})/i) || fullText.match(/(?:emiss[aã]o)\s*[:\s]*(\d{4}[./-]\d{2}[./-]\d{2})/i);
     if (emiMatch) {
-      const cleanDate = emiMatch[1].replace(/[./]/g, '-');
-      const parts = cleanDate.split('-');
+      const parts = emiMatch[1].replace(/[./]/g, '-').split('-');
       res.date = parts[0].length === 4 ? `${parts[0]}-${parts[1]}-${parts[2]}` : `${parts[2]}-${parts[1]}-${parts[0]}`;
       if (!res.competence) res.competence = res.date.slice(0, 7);
     }
   }
 
   if (!res.amount) {
-    const valPatterns = [
-      /(?:total\s+a\s+pagar|valor\s+a\s+pagar|valor\s+total|total\s+da\s+fatura|total\s+fatura|valor\s+do\s+documento|valor\s+cobrado|valor\s+l[ií]quido|total\s+da\s+nota|total\s+nota|total\s+geral|valor\s+fatura)\s*[:\s]*R?\$?\s*([\d.]+,\d{2})/i,
-      /R\$\s*([\d.]+,\d{2})\s*(?:total\s+a\s+pagar|vencimento|\d{2}[./-]\d{2})/i,
-      /R\$\s*([\d.]+,\d{2})/i
-    ];
-    for (const pat of valPatterns) {
-      const m = fullText.match(pat);
-      if (m) {
-        const parsedAmt = parseFloat(m[1].replace(/\./g, '').replace(',', '.'));
-        if (!isNaN(parsedAmt) && parsedAmt > 0) { res.amount = parsedAmt; break; }
-      }
+    const valMatch = fullText.match(/(?:total\s+a\s+pagar|valor\s+a\s+pagar|valor\s+total|total\s+da\s+fatura|total\s+fatura|valor\s+do\s+documento|valor\s+cobrado|valor\s+l[ií]quido|total\s+da\s+nota|total\s+nota|total\s+geral|valor\s+fatura)\s*[:\s]*R?\$?\s*([\d.]+,\d{2})/i) ||
+                     fullText.match(/R\$\s*([\d.]+,\d{2})\s*(?:total\s+a\s+pagar|vencimento|\d{2}[./-]\d{2})/i) ||
+                     fullText.match(/R\$\s*([\d.]+,\d{2})/i);
+    if (valMatch) {
+      const parsedAmt = parseFloat(valMatch[1].replace(/\./g, '').replace(',', '.'));
+      if (!isNaN(parsedAmt) && parsedAmt > 0) res.amount = parsedAmt;
     }
   }
 
@@ -496,13 +480,10 @@ function mergeScanResults(codes, textData = null) {
   return baseObj;
 }
 
-function parseNFCeUrl(raw) {
-  return parseSingleCode(raw);
-}
+function parseNFCeUrl(raw) { return parseSingleCode(raw); }
 
 const NFCeCameraManager = {
-  videoElement: null, stream: null, track: null, scanIntervalId: null, isScanning: false,
-  currentFacingMode: 'environment', isTorchOn: false, barcodeDetector: null,
+  videoElement: null, stream: null, track: null, scanIntervalId: null, isScanning: false, currentFacingMode: 'environment', isTorchOn: false, barcodeDetector: null,
 
   async initEngines() {
     await ensureEnginesLoaded();
@@ -518,9 +499,8 @@ const NFCeCameraManager = {
     this.videoElement = videoEl; this.isScanning = true;
     await this.initEngines();
     try {
-      const constraints = { video: { facingMode: { ideal: this.currentFacingMode }, width: { min: 640, ideal: 1280 }, height: { min: 480, ideal: 720 } }, audio: false };
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('Câmera não suportada.');
-      this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+      this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: this.currentFacingMode }, width: { min: 640, ideal: 1280 }, height: { min: 480, ideal: 720 } }, audio: false });
       this.videoElement.srcObject = this.stream;
       await this.videoElement.play();
       this.track = this.stream.getVideoTracks()[0];
@@ -532,8 +512,7 @@ const NFCeCameraManager = {
   },
 
   startScanLoop(onResultCallback) {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d', { willReadFrequently: true });
     const scanFrame = async () => {
       if (!this.isScanning || !this.videoElement || this.videoElement.readyState < 2) {
         if (this.isScanning) this.scanIntervalId = requestAnimationFrame(scanFrame);
@@ -557,12 +536,10 @@ const NFCeCameraManager = {
           if (targetW > maxDim) { targetH = Math.round((vh * maxDim) / targetW); targetW = maxDim; }
           canvas.width = targetW; canvas.height = targetH;
           ctx.drawImage(video, 0, 0, targetW, targetH);
-          const imageData = ctx.getImageData(0, 0, targetW, targetH);
-          let code = window.jsQR(imageData.data, targetW, targetH, { inversionAttempts: 'dontInvert' });
+          let code = window.jsQR(ctx.getImageData(0, 0, targetW, targetH).data, targetW, targetH, { inversionAttempts: 'dontInvert' });
           if (!code) {
             const cropW = Math.round(targetW * 0.65), cropH = Math.round(targetH * 0.65);
-            const cropX = Math.round((targetW - cropW) / 2), cropY = Math.round((targetH - cropH) / 2);
-            code = window.jsQR(ctx.getImageData(cropX, cropY, cropW, cropH).data, cropW, cropH, { inversionAttempts: 'attemptBoth' });
+            code = window.jsQR(ctx.getImageData(Math.round((targetW - cropW) / 2), Math.round((targetH - cropH) / 2), cropW, cropH).data, cropW, cropH, { inversionAttempts: 'attemptBoth' });
           }
           if (code && code.data) { this.handleDetectedCodes([code.data], onResultCallback); return; }
         } catch (err) {}
@@ -575,8 +552,7 @@ const NFCeCameraManager = {
   handleDetectedCodes(rawList, onResultCallback) {
     if (!this.isScanning) return;
     this.isScanning = false;
-    playScanBeep();
-    vibrateDevice(80);
+    playScanBeep(); vibrateDevice(80);
     const parsed = mergeScanResults(rawList, null);
     this.stop();
     if (onResultCallback) onResultCallback(parsed);
@@ -642,9 +618,8 @@ const NFCeCameraManager = {
           } catch(e) {}
           const viewport = page.getViewport({ scale: 2.0 });
           const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d', { willReadFrequently: true });
           canvas.width = viewport.width; canvas.height = viewport.height;
-          await page.render({ canvasContext: ctx, viewport }).promise;
+          await page.render({ canvasContext: canvas.getContext('2d', { willReadFrequently: true }), viewport }).promise;
           const pageCodes = await this.scanCanvasMultiQR(canvas);
           pageCodes.forEach(c => allCodes.push(c));
         }
@@ -655,16 +630,14 @@ const NFCeCameraManager = {
           playScanBeep(); vibrateDevice(80); this.stop();
           if (onResultCallback) onResultCallback(mergedResult);
         } else {
-          toast('Nenhum dado fiscal ou QR Code legível foi identificado neste PDF. Você pode digitar ou colar as informações abaixo.', 'warning');
+          toast('Nenhum dado fiscal ou QR Code legível foi identificado neste PDF.', 'warning');
         }
         return;
       }
 
-      const img = new Image();
-      const objectUrl = URL.createObjectURL(file);
+      const img = new Image(), objectUrl = URL.createObjectURL(file);
       await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = objectUrl; });
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d', { willReadFrequently: true });
       let allFoundCodes = [];
       for (const maxDim of [2000, 1400, 900]) {
         let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
@@ -724,17 +697,13 @@ function openNFCeScannerModal(customCallback = null) {
   modalWrap.className = 'scanner-modal-backdrop';
   modalWrap.innerHTML = `
     <div class="scanner-modal-card">
-      <div class="scanner-modal-header">
-        <div style="display:flex;align-items:center;gap:8px"><span style="font-size:20px">📷</span><span style="font-weight:700;font-size:15px;color:var(--text-primary)">Leitor de Nota Fiscal (QR Code & PDF)</span></div>
-        <button class="scanner-close-btn" id="scanner-btn-close" title="Fechar">✕</button>
-      </div>
+      <div class="scanner-modal-header"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:20px">📷</span><span style="font-weight:700;font-size:15px;color:var(--text-primary)">Leitor de Nota Fiscal (QR Code & PDF)</span></div><button class="scanner-close-btn" id="scanner-btn-close" title="Fechar">✕</button></div>
       <div class="scanner-viewport-container">
         <video id="nfce-scanner-video" class="scanner-video-feed" playsinline muted autoplay></video>
         <div class="scanner-hud-overlay"><div class="scanner-viewfinder"><div class="viewfinder-corner tl"></div><div class="viewfinder-corner tr"></div><div class="viewfinder-corner bl"></div><div class="viewfinder-corner br"></div><div class="scanner-laser-line"></div></div></div>
         <div class="scanner-live-badge"><span class="scanner-pulse-dot"></span> Câmera Ao Vivo</div>
         <div id="scanner-error-fallback" class="scanner-error-overlay" style="display:none">
-          <div style="font-size:36px;margin-bottom:8px">⚠️</div>
-          <div style="font-weight:600;font-size:14px;margin-bottom:6px" id="scanner-error-msg">Não foi possível acessar a câmera</div>
+          <div style="font-size:36px;margin-bottom:8px">⚠️</div><div style="font-weight:600;font-size:14px;margin-bottom:6px" id="scanner-error-msg">Não foi possível acessar a câmera</div>
           <div style="font-size:12px;color:var(--text-muted);max-width:260px;margin-bottom:12px">Você pode carregar uma foto ou arquivo PDF da nota fiscal abaixo.</div>
           <label class="btn btn-primary btn-sm" style="cursor:pointer">📁 Carregar Foto / PDF<input type="file" id="scanner-file-fallback" accept="image/*,application/pdf" style="display:none"></label>
         </div>
@@ -799,7 +768,6 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
   const competenceVal = parsedData.competence || (dateVal ? dateVal.slice(0, 7) : today.slice(0, 7));
   const amountVal = parsedData.amount != null ? parsedData.amount : '';
   const descVal = parsedData.description || 'Despesa / Fatura';
-
   let matchedCatId = '';
   if (parsedData.suggestedCategory) {
     const term = parsedData.suggestedCategory.toLowerCase();
@@ -809,60 +777,79 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
     });
     if (matchedCat) matchedCatId = matchedCat.id;
   }
-
   const isPendingBill = Boolean(parsedData.dueDate || parsedData.pixCode || parsedData.boletoCode || parsedData.model === '66');
 
   Modal.open('📋 Conferência da Nota Fiscal / Fatura', `
     <div class="nfce-confirm-container" style="display:flex;flex-direction:column;gap:14px">
-      <div style="background:linear-gradient(135deg,rgba(16,185,129,0.12),rgba(6,182,212,0.06));border:1px solid rgba(16,185,129,0.25);border-radius:var(--radius);padding:16px 18px;text-align:center;position:relative;box-shadow:0 4px 16px rgba(0,0,0,0.15)">
-        <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
-          <span style="font-size:22px">🧾</span>
-          <span style="font-size:16px;font-weight:800;color:var(--text-primary)" id="nfce-preview-desc">${descVal}</span>
-          ${parsedData.docType ? `<span class="badge badge-purple" style="font-size:10.5px;padding:2px 8px">${parsedData.docType}</span>` : ''}
+      <div style="background:linear-gradient(135deg,rgba(16,185,129,0.12),rgba(6,182,212,0.06));border:1px solid rgba(16,185,129,0.25);border-radius:var(--radius);padding:14px 16px;text-align:center;position:relative;box-shadow:0 4px 16px rgba(0,0,0,0.15)">
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:4px;flex-wrap:wrap">
+          <span style="font-size:20px">🧾</span>
+          <span style="font-size:15px;font-weight:800;color:var(--text-primary)" id="nfce-preview-desc">${descVal}</span>
+          ${parsedData.docType ? `<span class="badge badge-purple" style="font-size:10px;padding:2px 6px">${parsedData.docType}</span>` : ''}
           ${parsedData.uf ? `<span class="badge badge-blue" style="font-size:10px;padding:2px 6px">${parsedData.uf}</span>` : ''}
         </div>
-        <div style="font-size:34px;font-weight:900;color:${amountVal !== '' ? 'var(--accent-light)' : '#fbbf24'};letter-spacing:-0.02em;margin:6px 0" id="nfce-preview-amount-display">
+        <div style="font-size:32px;font-weight:900;color:${amountVal !== '' ? 'var(--accent-light)' : '#fbbf24'};letter-spacing:-0.02em;margin:4px 0" id="nfce-preview-amount-display">
           ${amountVal !== '' ? fmt.currency(amountVal) : 'R$ 0,00'}
         </div>
-        <div style="font-size:11.5px;color:var(--text-muted);display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap">
+        <div style="font-size:11.5px;color:var(--text-muted);display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap">
           <span>📅 ${parsedData.dueDate ? 'Vencimento' : 'Data'}: <strong id="nfce-preview-date" style="color:${parsedData.dueDate ? '#60a5fa' : 'inherit'}">${fmt.date(dateVal)}</strong></span>
           ${parsedData.competence ? `<span>🗓️ Competência: <strong>${parsedData.competence}</strong></span>` : ''}
           ${parsedData.nNF ? `<span>🔢 Nº: <strong>#${parsedData.nNF}</strong></span>` : ''}
           ${parsedData.cnpj ? `<span>🏢 CNPJ: <strong>${parsedData.cnpj}</strong></span>` : ''}
           ${parsedData.consumerUnit ? `<span>💡 UC: <strong>${parsedData.consumerUnit}</strong></span>` : ''}
         </div>
-        ${parsedData.accessKey ? `<div style="margin-top:10px;font-size:10px;color:var(--text-muted);background:rgba(0,0,0,0.25);padding:4px 8px;border-radius:6px;word-break:break-all">🔑 Chave: <code>${parsedData.accessKey}</code></div>` : ''}
+        ${parsedData.accessKey ? `<div style="margin-top:8px;font-size:10px;color:var(--text-muted);background:rgba(0,0,0,0.25);padding:3px 6px;border-radius:6px;word-break:break-all">🔑 Chave: <code>${parsedData.accessKey}</code></div>` : ''}
       </div>
 
       ${parsedData.pixCode ? `
-        <div style="background:linear-gradient(135deg,rgba(6,182,212,0.12),rgba(16,185,129,0.08));border:1px solid rgba(6,182,212,0.3);border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-          <div style="display:flex;align-items:center;gap:8px"><span style="font-size:20px">⚡</span><div><div style="font-size:12px;font-weight:700;color:#38bdf8">PIX de Pagamento Integrado à Fatura</div><div style="font-size:11px;color:var(--text-muted)">O código e QR Code do PIX ficarão salvos para pagamento direto</div></div></div>
-          <div style="display:flex;gap:6px"><button type="button" class="btn btn-secondary btn-sm" id="btn-conf-copy-pix" style="font-size:11px;padding:4px 10px">📋 Copiar Pix</button><button type="button" class="btn btn-primary btn-sm" id="btn-conf-view-pix" style="font-size:11px;padding:4px 10px;background:#0284c7;border:none">📱 Ver QR Code</button></div>
+        <div style="background:linear-gradient(135deg,rgba(6,182,212,0.14),rgba(16,185,129,0.08));border:1px solid rgba(6,182,212,0.35);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:6px"><span style="font-size:18px">⚡</span><strong style="font-size:12px;color:#38bdf8">Pagar com PIX (QR Code & Copia e Cola)</strong></div>
+            <div style="display:flex;gap:6px">
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-conf-copy-pix" style="font-size:11px;padding:3px 8px">📋 Copiar PIX</button>
+              <button type="button" class="btn btn-primary btn-sm" id="btn-conf-view-pix" style="font-size:11px;padding:3px 8px;background:#0284c7;border:none">📱 Ver QR Code</button>
+            </div>
+          </div>
+          <code style="font-size:10px;color:var(--text-muted);word-break:break-all;background:rgba(0,0,0,0.25);padding:4px 6px;border-radius:4px;max-height:42px;overflow-y:auto;display:block">${parsedData.pixCode}</code>
         </div>
-        <div id="conf-pix-preview-box" style="display:none;background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;text-align:center"><div style="font-size:11.5px;color:var(--text-muted);margin-bottom:6px">Escaneie com o aplicativo do seu banco:</div><img id="conf-pix-img" style="width:160px;height:160px;background:white;padding:6px;border-radius:8px;margin:0 auto;display:block"></div>
-      ` : ''}
+        <div id="conf-pix-preview-box" style="display:none;background:rgba(0,0,0,0.3);border-radius:8px;padding:10px;text-align:center">
+          <img id="conf-pix-img" style="width:160px;height:160px;background:white;padding:6px;border-radius:8px;margin:0 auto;display:block;box-shadow:0 4px 12px rgba(0,0,0,0.2)">
+        </div>
+      ` : `
+        <div style="background:rgba(255,255,255,0.03);border:1px dashed var(--border);border-radius:8px;padding:8px 12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+            <div style="font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:6px"><span>⚡</span> <span>Deseja pagar via PIX?</span></div>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-conf-add-pix-prompt" style="font-size:11px;padding:3px 8px"><span>⚡</span> Adicionar PIX</button>
+          </div>
+          <div id="conf-add-pix-container" style="display:none;margin-top:8px">
+            <div style="display:flex;gap:6px">
+              <input type="text" id="conf-input-custom-pix" placeholder="Cole o código PIX Copia e Cola (00020126...)..." style="flex:1;font-size:12px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-surface);color:var(--text-primary)">
+              <button type="button" class="btn btn-primary btn-sm" id="btn-conf-save-custom-pix" style="font-size:11px;background:#0284c7;border:none;font-weight:700">Salvar PIX</button>
+            </div>
+            <div id="conf-custom-pix-preview" style="display:none;text-align:center;margin-top:8px">
+              <img id="conf-custom-pix-img" style="width:150px;height:150px;background:white;padding:6px;border-radius:8px;margin:0 auto;display:block">
+            </div>
+          </div>
+        </div>
+      `}
 
       ${parsedData.boletoCode ? `
-        <div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-          <div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">📄</span><div><div style="font-size:12px;font-weight:700;color:var(--text-primary)">Código de Barras / Arrecadação</div><code style="font-size:10.5px;color:var(--text-muted);word-break:break-all">${parsedData.boletoCode}</code></div></div>
-          <button type="button" class="btn btn-secondary btn-sm" id="btn-conf-copy-barcode" style="font-size:11px;padding:4px 10px">📋 Copiar Código</button>
+        <div style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:6px"><span style="font-size:16px">📄</span><code style="font-size:10.5px;color:var(--text-muted);word-break:break-all">${parsedData.boletoCode}</code></div>
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-conf-copy-barcode" style="font-size:11px;padding:3px 8px">📋 Copiar Código</button>
         </div>
       ` : ''}
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="form-group" style="margin:0"><label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Descrição</label><input type="text" id="nfce-conf-desc" value="${descVal}" style="font-size:13px;font-weight:600"></div>
-        <div class="form-group" style="margin:0"><label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Valor (R$)</label><input type="number" step="0.01" min="0" id="nfce-conf-amount" placeholder="0,00" value="${amountVal}" style="font-size:13px;font-weight:700;color:var(--accent-light)"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group" style="margin:0"><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted)">Descrição</label><input type="text" id="nfce-conf-desc" value="${descVal}" style="font-size:12.5px;font-weight:600"></div>
+        <div class="form-group" style="margin:0"><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted)">Valor (R$)</label><input type="number" step="0.01" min="0" id="nfce-conf-amount" placeholder="0,00" value="${amountVal}" style="font-size:12.5px;font-weight:700;color:var(--accent-light)"></div>
+        <div class="form-group" style="margin:0"><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted)">Conta / Cartão</label><select id="nfce-conf-account" style="font-size:12.5px">${accounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}</select></div>
+        <div class="form-group" style="margin:0"><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted)">Categoria</label><select id="nfce-conf-category" style="font-size:12.5px"><option value="">Sem categoria</option>${categories.filter(c => c.type === 'expense' || c.type === 'both').map(c => `<option value="${c.id}" ${String(c.id) === String(matchedCatId) ? 'selected' : ''}>${c.icon} ${c.name}</option>`).join('')}</select></div>
+        <div class="form-group" style="margin:0"><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted)">${parsedData.dueDate ? 'Vencimento' : 'Data'}</label><input type="date" id="nfce-conf-date" value="${dateVal}" style="font-size:12.5px"></div>
+        <div class="form-group" style="margin:0"><label style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-muted)">Competência</label><input type="month" id="nfce-conf-competence" value="${competenceVal}" style="font-size:12.5px"></div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="form-group" style="margin:0"><label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Conta / Cartão Pagador</label><select id="nfce-conf-account" style="font-size:13px">${accounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}</select></div>
-        <div class="form-group" style="margin:0"><label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Categoria</label><select id="nfce-conf-category" style="font-size:13px"><option value="">Sem categoria</option>${categories.filter(c => c.type === 'expense' || c.type === 'both').map(c => `<option value="${c.id}" ${String(c.id) === String(matchedCatId) ? 'selected' : ''}>${c.icon} ${c.name}</option>`).join('')}</select></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="form-group" style="margin:0"><label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">${parsedData.dueDate ? 'Data de Vencimento' : 'Data do Pagamento'}</label><input type="date" id="nfce-conf-date" value="${dateVal}" style="font-size:13px"></div>
-        <div class="form-group" style="margin:0"><label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Mês de Competência</label><input type="month" id="nfce-conf-competence" value="${competenceVal}" style="font-size:13px"></div>
-      </div>
-      <div class="form-group" style="margin:4px 0 0 0">
-        <label style="font-size:12.5px;display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="nfce-conf-paid" ${isPendingBill ? '' : 'checked'}> Já foi pago / debitado da conta</label>
+      <div class="form-group" style="margin:2px 0 0 0">
+        <label style="font-size:12px;display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="nfce-conf-paid" ${isPendingBill ? '' : 'checked'}> Já foi pago / debitado da conta</label>
       </div>
 
       <div style="padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
@@ -904,40 +891,60 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
   if (parsedData.pixCode) {
     const copyPixBtn = document.getElementById('btn-conf-copy-pix');
     if (copyPixBtn) copyPixBtn.onclick = () => { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(parsedData.pixCode); toast('📋 Código PIX copiado!', 'success'); };
-    const viewPixBtn = document.getElementById('btn-conf-view-pix');
-    const pixBox = document.getElementById('conf-pix-preview-box');
-    const pixImg = document.getElementById('conf-pix-img');
+    const viewPixBtn = document.getElementById('btn-conf-view-pix'), pixBox = document.getElementById('conf-pix-preview-box'), pixImg = document.getElementById('conf-pix-img');
     if (viewPixBtn && pixBox && pixImg) {
       viewPixBtn.onclick = async () => {
-        if (pixBox.style.display === 'none') {
-          pixBox.style.display = 'block';
-          if (typeof window.QRCode !== 'undefined' && window.QRCode.toDataURL) {
-            try { pixImg.src = await window.QRCode.toDataURL(parsedData.pixCode, { width: 320, margin: 1 }); } catch(e) {}
-          }
-        } else { pixBox.style.display = 'none'; }
+        const isHidden = pixBox.style.display === 'none';
+        pixBox.style.display = isHidden ? 'block' : 'none';
+        viewPixBtn.innerHTML = isHidden ? '<span>📱</span> Ocultar QR' : '<span>📱</span> Ver QR Code';
+        if (isHidden && typeof window.QRCode !== 'undefined' && window.QRCode.toDataURL) {
+          try { pixImg.src = await window.QRCode.toDataURL(parsedData.pixCode, { width: 320, margin: 1 }); } catch(e) {}
+        }
       };
     }
   }
 
+  const btnAddPixPrompt = document.getElementById('btn-conf-add-pix-prompt');
+  const addPixContainer = document.getElementById('conf-add-pix-container');
+  const inputCustomPix = document.getElementById('conf-input-custom-pix');
+  const btnSaveCustomPix = document.getElementById('btn-conf-save-custom-pix');
+  const customPixPreview = document.getElementById('conf-custom-pix-preview');
+  const customPixImg = document.getElementById('conf-custom-pix-img');
+
+  if (btnAddPixPrompt && addPixContainer) {
+    btnAddPixPrompt.onclick = () => {
+      addPixContainer.style.display = addPixContainer.style.display === 'none' ? 'block' : 'none';
+      if (addPixContainer.style.display === 'block' && inputCustomPix) inputCustomPix.focus();
+    };
+  }
+
+  if (btnSaveCustomPix && inputCustomPix) {
+    btnSaveCustomPix.onclick = async () => {
+      const val = inputCustomPix.value.trim();
+      if (!val) { toast('Informe o código ou chave PIX.', 'warning'); return; }
+      parsedData.pixCode = val;
+      parsedData.isPix = true;
+      if (typeof window.QRCode !== 'undefined' && window.QRCode.toDataURL && customPixPreview && customPixImg) {
+        try {
+          customPixImg.src = await window.QRCode.toDataURL(val, { width: 300, margin: 1 });
+          customPixPreview.style.display = 'block';
+        } catch(e) {}
+      }
+      toast('✅ Código PIX associado!', 'success');
+    };
+  }
+
   if (parsedData.boletoCode) {
     const copyBarcodeBtn = document.getElementById('btn-conf-copy-barcode');
-    if (copyBarcodeBtn) {
-      copyBarcodeBtn.onclick = () => {
-        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(parsedData.boletoCode);
-        toast('📋 Código de Barras copiado para a área de transferência!', 'success');
-      };
-    }
+    if (copyBarcodeBtn) copyBarcodeBtn.onclick = () => { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(parsedData.boletoCode); toast('📋 Código de Barras copiado!', 'success'); };
   }
 
   document.getElementById('nfce-conf-btn-reject').onclick = () => { Modal.close(); toast('Leitura da nota fiscal descartada.', 'info'); };
 
   document.getElementById('nfce-conf-btn-more-options').onclick = () => {
     const updatedPrefill = {
-      ...parsedData,
-      description: descInput.value.trim(),
-      amount: parseFloat(amountInput.value) || null,
-      date: dateInput.value,
-      competence: document.getElementById('nfce-conf-competence').value,
+      ...parsedData, description: descInput.value.trim(), amount: parseFloat(amountInput.value) || null,
+      date: dateInput.value, competence: document.getElementById('nfce-conf-competence').value,
       suggestedCategory: categories.find(c => String(c.id) === String(document.getElementById('nfce-conf-category').value))?.name || parsedData.suggestedCategory
     };
     Modal.close();
@@ -975,23 +982,15 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
       toast(`✅ Lançamento de ${fmt.currency(amount)} criado com sucesso!`, 'success');
       if (typeof renderRecurring === 'function' && State.currentPage === 'recurring') renderRecurring();
       if (typeof renderDashboard === 'function' && (State.currentPage === 'dashboard' || !State.currentPage)) renderDashboard();
-    } catch (err) {
-      toast('Erro ao criar lançamento: ' + err.message, 'error');
-    }
+    } catch (err) { toast('Erro ao criar lançamento: ' + err.message, 'error'); }
   };
 }
 
 async function handleNFCeScanResult(parsedData, customCallback = null) {
   if (!parsedData) { toast('Não foi possível extrair dados válidos da nota fiscal.', 'error'); return; }
   if (customCallback && typeof customCallback === 'function') { customCallback(parsedData); return; }
-
   try {
-    const [accounts, categories] = await Promise.all([
-      window.api.accounts.getAll(State.user.id),
-      window.api.categories.getAll(State.user.id)
-    ]);
+    const [accounts, categories] = await Promise.all([window.api.accounts.getAll(State.user.id), window.api.categories.getAll(State.user.id)]);
     openNFCeConfirmationModal(parsedData, accounts, categories);
-  } catch (err) {
-    toast('Erro ao carregar dados para confirmação do lançamento.', 'error');
-  }
+  } catch (err) { toast('Erro ao carregar dados para confirmação do lançamento.', 'error'); }
 }
