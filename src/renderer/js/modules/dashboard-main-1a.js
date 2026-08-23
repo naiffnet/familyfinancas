@@ -283,52 +283,41 @@ function renderTabbedLayout(contentDiv, members, activeMemberFilter, activeTypeF
 }
 
 /**
- * Modo 3: Cockpit Split (2:1) com Filtros no Topo
+ * Modo 3: Cockpit Integrado (Filtros -> Carteira/Cartões -> KPIs -> Action Pills -> Kanban -> Gráficos)
  */
 function renderCockpitLayout(contentDiv, members, activeMemberFilter, activeTypeFilter, summary, monthly, txs, potentialDuplicates, today, paidBills, unpaidBills, recurringPct, activeMemberName) {
   contentDiv.innerHTML = `
     <!-- 0. BARRA DE FILTROS SUPERIOR EM LINHA (EM CIMA DE TUDO) -->
     ${renderDashboardTopFilterBar(members, activeMemberFilter, activeTypeFilter)}
 
-    <!-- 1. HERO KPIS DINÂMICOS -->
+    <!-- 1. CARTEIRA & CARTÕES (ABAIXO DA LINHA DE FILTRO) -->
+    ${renderDashboardCardsGrid(summary, true)}
+
+    <!-- 2. HERO KPIS DINÂMICOS -->
     ${renderDashboardHeroKpis(summary, recurringPct, activeMemberName)}
 
-    <!-- 2. ACTION PILLS HUB -->
+    <!-- 3. ACTION PILLS HUB -->
     ${renderDashboardActionPills(summary, potentialDuplicates, today)}
 
-    <!-- 3. CONTAINER COCKPIT SPLIT 2:1 -->
-    <div class="dash-cockpit-container">
-      
-      <!-- COLUNA ESQUERDA (68%): OPERACIONAL + GRÁFICOS DO FILTRO -->
-      <div style="display: flex; flex-direction: column; gap: 20px; min-width: 0;">
-        <div>
-          <div style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-            <span>📋</span> Painel de Contas (${paidBills.length + unpaidBills.length})
-          </div>
-          ${renderDashboardKanbanColumns(summary, paidBills, unpaidBills)}
-        </div>
+    <!-- 4. PAINEL OPERACIONAL KANBAN 3 COLUNAS (LARGURA TOTAL) -->
+    <div style="margin-bottom: 20px;">
+      <div style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+        <span>📋</span> Painel de Contas (${paidBills.length + unpaidBills.length})
+      </div>
+      ${renderDashboardKanbanColumns(summary, paidBills, unpaidBills)}
+    </div>
 
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px;">
-          <div class="chart-card" id="dashboard-category-interactive-card" style="display: flex; flex-direction: column; min-height: 380px;">
-            <div class="card-title">Despesas por categoria</div>
-          </div>
-          <div class="chart-card" style="min-height: 380px; display: flex; flex-direction: column;">
-            <div class="card-title">Receitas × Despesas — últimos 6 meses</div>
-            <div style="flex: 1; display: flex; align-items: center; justify-content: center; position: relative;">
-              <canvas id="chart-monthly" style="max-height:280px; width: 100%;"></canvas>
-            </div>
-          </div>
+    <!-- 5. GRÁFICOS EM LARGURA TOTAL -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; margin-bottom: 16px;">
+      <div class="chart-card" id="dashboard-category-interactive-card" style="display: flex; flex-direction: column; min-height: 380px;">
+        <div class="card-title">Despesas por categoria</div>
+      </div>
+      <div class="chart-card" style="min-height: 380px; display: flex; flex-direction: column;">
+        <div class="card-title">Receitas × Despesas — últimos 6 meses</div>
+        <div style="flex: 1; display: flex; align-items: center; justify-content: center; position: relative;">
+          <canvas id="chart-monthly" style="max-height:280px; width: 100%;"></canvas>
         </div>
       </div>
-
-      <!-- COLUNA DIREITA (32%): CARDS & SALDOS FIXOS DO FILTRO -->
-      <div class="dash-cockpit-sidebar">
-        <div style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-          <span>💳</span> Carteira & Cartões
-        </div>
-        ${renderDashboardCardsGrid(summary, false)}
-      </div>
-
     </div>
   `;
 }

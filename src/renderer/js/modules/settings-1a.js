@@ -348,18 +348,18 @@ async function openSettingsModal(activeTab = 'profile') {
             </div>
           </div>
 
-          <!-- MODO 3: COCKPIT SPLIT 2:1 -->
+          <!-- MODO 3: COCKPIT INTEGRADO -->
           <div class="dash-layout-option ${State.dashboardLayoutMode === 'cockpit' ? 'active' : ''}" data-layout-val="cockpit" style="padding:16px; border-radius:var(--radius-md); border:2px solid ${State.dashboardLayoutMode === 'cockpit' ? 'var(--accent)' : 'var(--border)'}; background:var(--bg-raised); cursor:pointer; transition:all 0.2s; display:flex; flex-direction:column; justify-content:space-between; gap:12px; position:relative;">
             ${State.dashboardLayoutMode === 'cockpit' ? `<span class="badge badge-green" style="position:absolute; top:12px; right:12px; font-size:10px; padding:2px 8px;">Ativo</span>` : ''}
             <div>
               <div style="font-size:24px; margin-bottom:8px">🎛️</div>
-              <div style="font-weight:700; font-size:14px; color:var(--text-primary)">Cockpit Split (2:1)</div>
+              <div style="font-weight:700; font-size:14px; color:var(--text-primary)">Cockpit Integrado</div>
               <div style="font-size:11.5px; color:var(--text-muted); margin-top:4px; line-height:1.4">
-                Painel duplo: Contas e gráficos à esquerda (68%) com cartões de crédito e saldos bancários fixos à direita (32%).
+                Filtros no topo com Cartões e Bancos em destaque logo abaixo, seguidos pelos KPIs, Kanban 3 colunas e Gráficos em tela cheia.
               </div>
             </div>
             <div style="font-size:10.5px; font-weight:600; color:#c084fc; background:rgba(139,92,246,0.1); padding:4px 8px; border-radius:4px; text-align:center;">
-              Visual Moderno & Acesso Rápido a Saldos
+              Previsibilidade Direta no Topo
             </div>
           </div>
 

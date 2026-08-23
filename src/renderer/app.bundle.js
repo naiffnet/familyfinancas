@@ -1,7 +1,7 @@
 /* ============================================
  * app.bundle.js — FamilyFinancas Renderer
  * Gerado por: npm run build:renderer
- * 2026-08-23T14:19:33.077Z
+ * 2026-08-23T14:25:56.516Z
  * Modulos: 21
  * ============================================ */
 
@@ -1026,52 +1026,41 @@ function renderTabbedLayout(contentDiv, members, activeMemberFilter, activeTypeF
 }
 
 /**
- * Modo 3: Cockpit Split (2:1) com Filtros no Topo
+ * Modo 3: Cockpit Integrado (Filtros -> Carteira/Cartões -> KPIs -> Action Pills -> Kanban -> Gráficos)
  */
 function renderCockpitLayout(contentDiv, members, activeMemberFilter, activeTypeFilter, summary, monthly, txs, potentialDuplicates, today, paidBills, unpaidBills, recurringPct, activeMemberName) {
   contentDiv.innerHTML = `
     <!-- 0. BARRA DE FILTROS SUPERIOR EM LINHA (EM CIMA DE TUDO) -->
     ${renderDashboardTopFilterBar(members, activeMemberFilter, activeTypeFilter)}
 
-    <!-- 1. HERO KPIS DINÂMICOS -->
+    <!-- 1. CARTEIRA & CARTÕES (ABAIXO DA LINHA DE FILTRO) -->
+    ${renderDashboardCardsGrid(summary, true)}
+
+    <!-- 2. HERO KPIS DINÂMICOS -->
     ${renderDashboardHeroKpis(summary, recurringPct, activeMemberName)}
 
-    <!-- 2. ACTION PILLS HUB -->
+    <!-- 3. ACTION PILLS HUB -->
     ${renderDashboardActionPills(summary, potentialDuplicates, today)}
 
-    <!-- 3. CONTAINER COCKPIT SPLIT 2:1 -->
-    <div class="dash-cockpit-container">
-      
-      <!-- COLUNA ESQUERDA (68%): OPERACIONAL + GRÁFICOS DO FILTRO -->
-      <div style="display: flex; flex-direction: column; gap: 20px; min-width: 0;">
-        <div>
-          <div style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-            <span>📋</span> Painel de Contas (${paidBills.length + unpaidBills.length})
-          </div>
-          ${renderDashboardKanbanColumns(summary, paidBills, unpaidBills)}
-        </div>
+    <!-- 4. PAINEL OPERACIONAL KANBAN 3 COLUNAS (LARGURA TOTAL) -->
+    <div style="margin-bottom: 20px;">
+      <div style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+        <span>📋</span> Painel de Contas (${paidBills.length + unpaidBills.length})
+      </div>
+      ${renderDashboardKanbanColumns(summary, paidBills, unpaidBills)}
+    </div>
 
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px;">
-          <div class="chart-card" id="dashboard-category-interactive-card" style="display: flex; flex-direction: column; min-height: 380px;">
-            <div class="card-title">Despesas por categoria</div>
-          </div>
-          <div class="chart-card" style="min-height: 380px; display: flex; flex-direction: column;">
-            <div class="card-title">Receitas × Despesas — últimos 6 meses</div>
-            <div style="flex: 1; display: flex; align-items: center; justify-content: center; position: relative;">
-              <canvas id="chart-monthly" style="max-height:280px; width: 100%;"></canvas>
-            </div>
-          </div>
+    <!-- 5. GRÁFICOS EM LARGURA TOTAL -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; margin-bottom: 16px;">
+      <div class="chart-card" id="dashboard-category-interactive-card" style="display: flex; flex-direction: column; min-height: 380px;">
+        <div class="card-title">Despesas por categoria</div>
+      </div>
+      <div class="chart-card" style="min-height: 380px; display: flex; flex-direction: column;">
+        <div class="card-title">Receitas × Despesas — últimos 6 meses</div>
+        <div style="flex: 1; display: flex; align-items: center; justify-content: center; position: relative;">
+          <canvas id="chart-monthly" style="max-height:280px; width: 100%;"></canvas>
         </div>
       </div>
-
-      <!-- COLUNA DIREITA (32%): CARDS & SALDOS FIXOS DO FILTRO -->
-      <div class="dash-cockpit-sidebar">
-        <div style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-          <span>💳</span> Carteira & Cartões
-        </div>
-        ${renderDashboardCardsGrid(summary, false)}
-      </div>
-
     </div>
   `;
 }
@@ -7297,18 +7286,18 @@ async function openSettingsModal(activeTab = 'profile') {
             </div>
           </div>
 
-          <!-- MODO 3: COCKPIT SPLIT 2:1 -->
+          <!-- MODO 3: COCKPIT INTEGRADO -->
           <div class="dash-layout-option ${State.dashboardLayoutMode === 'cockpit' ? 'active' : ''}" data-layout-val="cockpit" style="padding:16px; border-radius:var(--radius-md); border:2px solid ${State.dashboardLayoutMode === 'cockpit' ? 'var(--accent)' : 'var(--border)'}; background:var(--bg-raised); cursor:pointer; transition:all 0.2s; display:flex; flex-direction:column; justify-content:space-between; gap:12px; position:relative;">
             ${State.dashboardLayoutMode === 'cockpit' ? `<span class="badge badge-green" style="position:absolute; top:12px; right:12px; font-size:10px; padding:2px 8px;">Ativo</span>` : ''}
             <div>
               <div style="font-size:24px; margin-bottom:8px">🎛️</div>
-              <div style="font-weight:700; font-size:14px; color:var(--text-primary)">Cockpit Split (2:1)</div>
+              <div style="font-weight:700; font-size:14px; color:var(--text-primary)">Cockpit Integrado</div>
               <div style="font-size:11.5px; color:var(--text-muted); margin-top:4px; line-height:1.4">
-                Painel duplo: Contas e gráficos à esquerda (68%) com cartões de crédito e saldos bancários fixos à direita (32%).
+                Filtros no topo com Cartões e Bancos em destaque logo abaixo, seguidos pelos KPIs, Kanban 3 colunas e Gráficos em tela cheia.
               </div>
             </div>
             <div style="font-size:10.5px; font-weight:600; color:#c084fc; background:rgba(139,92,246,0.1); padding:4px 8px; border-radius:4px; text-align:center;">
-              Visual Moderno & Acesso Rápido a Saldos
+              Previsibilidade Direta no Topo
             </div>
           </div>
 
