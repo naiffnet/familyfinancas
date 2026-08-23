@@ -143,6 +143,11 @@ function renderDashboardActionPills(summary, potentialDuplicates, today) {
           <span>${incomeAlerts.length} recebimento${incomeAlerts.length > 1 ? 's' : ''}</span>
           <span class="pill-arrow" id="pill-income-arrow" style="opacity: 0.8; font-size: 10px;">▾</span>
         </div>` : ''}
+
+      <div class="dash-action-pill dash-action-pill-scanner" id="pill-scan-nfce" title="Escanear Cupom Fiscal por QR Code" style="background: rgba(16, 185, 129, 0.12); color: var(--accent-light); border: 1px solid var(--accent); cursor: pointer; font-weight: 600;">
+        <span>📷</span>
+        <span>Ler Nota Fiscal</span>
+      </div>
     </div>
 
     <!-- Dropdown / Container expansível de detalhes dos alertas se aberto -->

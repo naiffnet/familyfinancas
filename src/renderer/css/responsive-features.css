@@ -902,4 +902,170 @@
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
+/* ═══════════════════════════════════════════════════
+   📷 NFC-E / QR CODE SCANNER MODAL & VIEWPORT HUD
+   ═══════════════════════════════════════════════════ */
+.scanner-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(5, 8, 15, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.2s ease;
+}
+
+.scanner-modal-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 480px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 30px rgba(16, 185, 129, 0.1);
+  display: flex;
+  flex-direction: column;
+}
+
+.scanner-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-raised);
+}
+
+.scanner-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+.scanner-close-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.scanner-viewport-container {
+  position: relative;
+  width: 100%;
+  height: 320px;
+  background: #000;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scanner-video-feed {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.scanner-hud-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.scanner-viewfinder {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  border-radius: 12px;
+  box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.5);
+}
+
+/* Glowing Neon Viewfinder Corners */
+.viewfinder-corner {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-color: #10b981;
+  border-style: solid;
+}
+.viewfinder-corner.tl { top: -2px; left: -2px; border-width: 4px 0 0 4px; border-top-left-radius: 10px; }
+.viewfinder-corner.tr { top: -2px; right: -2px; border-width: 4px 4px 0 0; border-top-right-radius: 10px; }
+.viewfinder-corner.bl { bottom: -2px; left: -2px; border-width: 0 0 4px 4px; border-bottom-left-radius: 10px; }
+.viewfinder-corner.br { bottom: -2px; right: -2px; border-width: 0 4px 4px 0; border-bottom-right-radius: 10px; }
+
+/* Futuristic Laser Scan Sweep */
+.scanner-laser-line {
+  position: absolute;
+  left: 5%;
+  right: 5%;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #10b981, #34d399, #10b981, transparent);
+  box-shadow: 0 0 14px #10b981, 0 0 6px #34d399;
+  border-radius: 50%;
+  animation: scanLaserSweep 2.2s ease-in-out infinite alternate;
+}
+
+@keyframes scanLaserSweep {
+  0% { top: 8%; opacity: 0.8; }
+  50% { opacity: 1; }
+  100% { top: 90%; opacity: 0.8; }
+}
+
+.scanner-live-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  backdrop-filter: blur(4px);
+}
+
+.scanner-pulse-dot {
+  width: 8px;
+  height: 8px;
+  background: #ef4444;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #ef4444;
+  animation: pulseDot 1s infinite alternate;
+}
+@keyframes pulseDot {
+  from { transform: scale(0.85); opacity: 0.7; }
+  to { transform: scale(1.15); opacity: 1; }
+}
+
+.scanner-error-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.95);
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 20px;
+  z-index: 5;
+}
+
+.scanner-controls-bar {
+  padding: 16px 20px;
+  background: var(--bg-surface);
+}
+
 

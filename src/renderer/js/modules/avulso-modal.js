@@ -42,7 +42,7 @@ async function showDidacticFeedback(data) {
   }
 }
 
-function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense') {
+function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense', prefillData = null) {
   const isEdit = !!tx;
   if (isEdit) {
     const canEdit = (State.user.profile_type === 1 || State.user.profile_type === 2) || (State.permissions && State.permissions.can_edit_all === 1) || (!tx.user_id || tx.user_id === State.user.id);
@@ -52,16 +52,32 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
     }
   }
   const today = new Date().toISOString().split('T')[0];
-  const dateVal = isEdit && tx.date ? tx.date.split(' ')[0] : today;
-  const amountVal = isEdit ? tx.amount : '';
-  const descVal = isEdit ? tx.description : '';
+  const dateVal = isEdit && tx.date ? tx.date.split(' ')[0] : (prefillData && prefillData.date ? prefillData.date : today);
+  const amountVal = isEdit ? tx.amount : (prefillData && prefillData.amount ? prefillData.amount : '');
+  const descVal = isEdit ? tx.description : (prefillData && prefillData.description ? prefillData.description : '');
   const accountVal = isEdit ? tx.account_id : (accounts[0]?.id || '');
-  const categoryVal = isEdit ? (tx.category_id || '') : '';
-  const typeVal = isEdit ? tx.type : defaultType;
+  
+  let categoryVal = isEdit ? (tx.category_id || '') : '';
+  if (!categoryVal && prefillData && prefillData.suggestedCategory) {
+    const matchedCat = categories.find(c => c.name.toLowerCase().includes(prefillData.suggestedCategory.toLowerCase()) || prefillData.suggestedCategory.toLowerCase().includes(c.name.toLowerCase()));
+    if (matchedCat) categoryVal = matchedCat.id;
+  }
+
+  const typeVal = isEdit ? tx.type : (prefillData && prefillData.type ? prefillData.type : defaultType);
   const paidChecked = isEdit ? (tx.is_paid ? 'checked' : '') : 'checked';
+  const competenceVal = isEdit && tx.competence_date ? tx.competence_date.slice(0,7) : (prefillData && prefillData.competence ? prefillData.competence : (dateVal ? dateVal.slice(0,7) : ''));
 
   Modal.open(isEdit ? 'Editar Lançamento Avulso' : 'Novo Lançamento Avulso', `
     <div id="avl-dup-warning" style="display:none; margin-bottom:12px; padding:10px 14px; border-radius:8px; font-size:12px; animation:fadeIn 0.25s ease;"></div>
+    
+    ${!isEdit ? `
+      <div style="margin-bottom: 12px; display: flex; justify-content: flex-end;">
+        <button type="button" class="btn btn-secondary btn-sm" id="avl-btn-scan-qr" style="font-size: 11.5px; display: inline-flex; align-items: center; gap: 6px; border-color: var(--accent); color: var(--accent-light); background: rgba(16,185,129,0.08); padding: 5px 12px; border-radius: 20px; cursor: pointer;">
+          <span>📷</span> Escanear Nota Fiscal (QR Code)
+        </button>
+      </div>
+    ` : ''}
+
     <div class="type-toggle" id="avl-type-toggle">
       <button data-type="expense" class="${typeVal === 'expense' ? 'active-expense' : ''}">💸 Despesa</button>
       <button data-type="income" class="${typeVal === 'income' ? 'active-income' : ''}">💰 Receita</button>
@@ -79,7 +95,7 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
     <div class="form-row">
       <div class="form-group">
         <label title="Mês ao qual este gasto se refere — ex: conta de luz consumida em março, paga em abril">📋 Mês de Referência <span style="font-size:11px;opacity:0.65;font-weight:400">(competência)</span></label>
-        <input type="month" id="avl-competence" value="${isEdit && tx.competence_date ? tx.competence_date.slice(0,7) : (dateVal ? dateVal.slice(0,7) : '')}" title="Mês de consumo/competência. Pode ser anterior ao mês de vencimento.">
+        <input type="month" id="avl-competence" value="${competenceVal}" title="Mês de consumo/competência. Pode ser anterior ao mês de vencimento.">
       </div>
       <div class="form-group">
         <label>Descrição</label>
@@ -197,6 +213,16 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
       if (typeof recheckDup === 'function') recheckDup();
     };
   });
+
+  const scanQrBtn = document.getElementById('avl-btn-scan-qr');
+  if (scanQrBtn) {
+    scanQrBtn.onclick = () => {
+      Modal.close();
+      if (typeof openNFCeScannerModal === 'function') {
+        openNFCeScannerModal();
+      }
+    };
+  }
 
   document.getElementById('avl-cancel').onclick = Modal.close;
   document.getElementById('avl-save').onclick = async () => {

@@ -110,6 +110,13 @@ O sistema implementa rigorosa segurança contra acesso indevido entre famílias 
 - **Regra de Ouro para Receitas**: Contas diferentes de usuários distintos são **100% ignoradas** (rendas legítimas e independentes). O alerta de duplicidade atua se a mesma receita for lançada na **mesma conta bancária** (95-100%) ou em contas diferentes do **mesmo titular** (85-90%).
 - **Alerta de Lançamento Similar em Tempo Real**: Ao digitar um novo lançamento avulso ou fixo, o modal avisa instantaneamente se já existir um registro similar, prevenindo erros operacionais antes mesmo de salvar.
 
+### 9. Leitura de Notas Fiscais (NFC-e / SAT / Pix) via Câmera & QR Code
+- **Câmera ao Vivo com HUD Futurista**: Ao clicar em `📷 Ler Nota Fiscal` (disponível no Dashboard, Planejamento e Modal de Lançamento), o leitor ativa a câmera com mira iluminada (*viewfinder*) e varredura laser animada.
+- **Parser Inteligente da SEFAZ**: Decodifica QR Codes padrão nacional de NFC-e (RS, SP, PR, MG, RJ, SC, etc.), extraindo a **Chave de Acesso (44 dígitos)**, o **Valor Total da Nota (R$)**, a **Data de Emissão**, o **CNPJ do Emitente** e o **Número da Nota**.
+- **Reconhecimento de Estabelecimentos & Auto-Categorização**: Reconhece automaticamente redes de supermercados, farmácias, postos de combustíveis e lojas de departamento, pré-selecionando a categoria correta (*Alimentação, Saúde, Transporte, etc.*).
+- **Entrada Alternativa**: Suporte a upload de foto do cupom fiscal da galeria ou digitação/colagem manual do link da SEFAZ / chave de 44 dígitos.
+- **Integração com o Modal**: Preenche automaticamente todos os campos do formulário para o usuário apenas revisar, selecionar a conta pagadora e salvar com 1 clique.
+
 ---
 
 ## ❓ 5. FAQ — Perguntas Frequentes & Solução de Problemas

@@ -101,6 +101,9 @@ function getManualSidebarHtml() {
           <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-avulsos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
             • Despesas Variáveis (Avulsas)
           </div>
+          <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-nfce-qr" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #10b981; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+            • 📷 Leitor de Nota Fiscal (QR Code) (Novo)
+          </div>
           <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-similares" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #fbbf24; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
             • 🔔 Alerta de Similar em Tempo Real (Novo)
           </div>
@@ -615,6 +618,27 @@ function getManualTopicsPart1Html() {
           <li>⚡ <strong>Verificação Automática:</strong> Conforme você digita o valor, a data, a conta e a descrição, o motor busca se já existe um lançamento com características idênticas ou muito próximas.</li>
           <li>⚠️ <strong>Aviso Visual em Destaque:</strong> Se houver similaridade, surge um banner amarelo no formulário informando: <em>"Atenção: Já existe um lançamento similar [Descrição] no valor de R$ X,XX na conta [Banco]..."</em>.</li>
           <li>🔒 <strong>Segurança e Liberdade:</strong> O aviso não impede você de salvar caso seja uma compra legítima repetida, mas evita que você lance duas vezes a mesma conta por engano.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- TÓPICO 3.3C: LANÇAMENTOS > LEITOR DE NOTA FISCAL (QR CODE) -->
+    <div class="manual-topic-content" id="topic-lanc-nfce-qr" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #10b981; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📷 Leitura de Notas Fiscais (NFC-e / SAT / Pix) via Câmera</span>
+        <span class="badge badge-green">Recurso Inovador</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>Cadastro Instantâneo de Despesas Apontando a Câmera para o Cupom Fiscal:</strong>
+        </div>
+        <p style="margin-bottom: 10px;">Para lançar gastos de supermercado, farmácia, restaurantes e postos de combustível sem precisar digitar nada manualmente:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>🎯 <strong>Como Usar:</strong> Clique no botão <code>📷 Ler Nota Fiscal</code> no Dashboard, no Planejamento ou dentro do formulário de Novo Lançamento.</li>
+          <li>📱 <strong>Câmera ao Vivo:</strong> Aponte o celular ou webcam para o QR Code quadrado impresso no final da sua Nota Fiscal de Consumidor (NFC-e) ou cupom SAT.</li>
+          <li>⚡ <strong>Preenchimento Automático:</strong> O app decodifica a nota junto à SEFAZ e preenche instantaneamente o <strong>Valor Total (R$)</strong>, a <strong>Data de Emissão</strong>, o <strong>Nome do Estabelecimento</strong>, a <strong>Categoria Sugerida</strong> e o <strong>Número da Nota Fiscal</strong>.</li>
+          <li>📁 <strong>Foto da Nota ou Chave de 44 Dígitos:</strong> Se preferir, você também pode carregar uma foto da galeria/arquivo ou colar o link/chave da nota.</li>
+          <li>🛡️ <strong>Anti-Duplicidade Ativa:</strong> O sistema confere em tempo real se aquele cupom fiscal já foi lido antes para proteger contra lançamentos repetidos.</li>
         </ul>
       </div>
     </div>

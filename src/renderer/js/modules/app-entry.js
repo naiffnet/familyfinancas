@@ -10,6 +10,7 @@ import './planning-main-1.js';
 import './planning-main-2.js';
 import './recurring-modal.js';
 import './avulso-modal.js';
+import './nfce-scanner.js';
 import './payment-modal.js';
 import './accounts.js';
 import './deduplication.js';

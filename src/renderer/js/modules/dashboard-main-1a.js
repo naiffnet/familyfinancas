@@ -515,6 +515,13 @@ function bindDashboardEvents(contentDiv, summary, txs, monthly, today) {
     pillDedup.onclick = () => openDeduplicationModal();
   }
 
+  const pillScan = contentDiv.querySelector('#pill-scan-nfce');
+  if (pillScan) {
+    pillScan.onclick = () => {
+      if (typeof openNFCeScannerModal === 'function') openNFCeScannerModal();
+    };
+  }
+
   const pillOverdue = contentDiv.querySelector('#pill-overdue');
   if (pillOverdue && expandedContainer) {
     pillOverdue.onclick = () => {

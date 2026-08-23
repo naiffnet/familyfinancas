@@ -18,7 +18,8 @@ async function renderRecurring() {
   page.innerHTML = `
     <div class="page-header">
       <div><h2 class="page-title">Planejamento Mensal</h2><p class="page-subtitle">Gerencie suas receitas e despesas (Fixas e Variáveis)</p></div>
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" id="btn-scan-nfce-planning" style="background:rgba(16,185,129,0.15);color:var(--accent-light);border:1px solid var(--accent);font-weight:600;padding:8px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px"><span>📷</span> Ler Nota</button>
         <button class="btn" id="btn-new-avulso" style="background:#6366f1;color:#ffffff;border:none;font-weight:600;padding:8px 16px;border-radius:8px;cursor:pointer">+ Nova Variável</button>
         <button class="btn btn-primary" id="btn-new-recurring">+ Nova Fixa</button>
       </div>
@@ -57,6 +58,9 @@ async function renderRecurring() {
     };
   }
 
+  document.getElementById('btn-scan-nfce-planning').onclick = () => {
+    if (typeof openNFCeScannerModal === 'function') openNFCeScannerModal();
+  };
   document.getElementById('btn-new-avulso').onclick = () => openAvulsoModal(accounts, categories, null, State.currentRecurringTab);
   document.getElementById('btn-new-recurring').onclick = () => openRecurringModal(null, accounts, categories, State.currentRecurringTab);
 
