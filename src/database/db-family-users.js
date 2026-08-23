@@ -599,7 +599,9 @@ module.exports = (Base) => class extends Base {
   }
 
   getUserById(id) {
-    const user = this.db.prepare('SELECT id, name, first_name, last_name, email, phone, cpf, birth_date, username, avatar_color, avatar_image, family_id, profile_type, is_system_admin FROM users WHERE id = ?').get(id);
+    const cleanId = (typeof id === 'object' && id !== null) ? (id.id || id.userId || id.user_id) : id;
+    if (!cleanId) return null;
+    const user = this.db.prepare('SELECT id, name, first_name, last_name, email, phone, cpf, birth_date, username, avatar_color, avatar_image, family_id, profile_type, is_system_admin FROM users WHERE id = ?').get(cleanId);
     if (user && user.cpf) {
       user.cpf = decryptField(user.cpf);
     }

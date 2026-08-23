@@ -700,8 +700,10 @@ async function handleNFCeScanResult(parsedData, customCallback = null) {
   }
 
   try {
-    const accounts = await window.api.accounts.getAll({ userId: State.user.id });
-    const categories = await window.api.categories.getAll({ userId: State.user.id });
+    const [accounts, categories] = await Promise.all([
+      window.api.accounts.getAll(State.user.id),
+      window.api.categories.getAll(State.user.id)
+    ]);
 
     // Abre o modal de lançamento avulso pré-preenchido
     openAvulsoModal(accounts, categories, null, 'expense', parsedData);

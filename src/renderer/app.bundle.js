@@ -1,7 +1,7 @@
 /* ============================================
  * app.bundle.js — FamilyFinancas Renderer
  * Gerado por: npm run build:renderer
- * 2026-08-23T15:10:16.487Z
+ * 2026-08-23T15:13:50.093Z
  * Modulos: 22
  * ============================================ */
 
@@ -5075,8 +5075,10 @@ async function handleNFCeScanResult(parsedData, customCallback = null) {
   }
 
   try {
-    const accounts = await window.api.accounts.getAll({ userId: State.user.id });
-    const categories = await window.api.categories.getAll({ userId: State.user.id });
+    const [accounts, categories] = await Promise.all([
+      window.api.accounts.getAll(State.user.id),
+      window.api.categories.getAll(State.user.id)
+    ]);
 
     // Abre o modal de lançamento avulso pré-preenchido
     openAvulsoModal(accounts, categories, null, 'expense', parsedData);

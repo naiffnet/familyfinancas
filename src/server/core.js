@@ -34,17 +34,23 @@ function checkLoginLock(username) {
   return { allowed: true };
 }
 
-function isSameFamilyUser(db, userId, session) {
+function isSameFamilyUser(db, userId, sessionOrFamilyId) {
   if (!userId) return true;
-  if (typeof session === 'object' && session !== null) {
-    if (session.isSystemAdmin === 1 || session.profileType === 1) return true;
-    if (userId === session.userId) return true;
-    const sessionFamilyId = session.familyId;
-    const target = db.getUserById(userId);
-    return !target || !target.family_id || target.family_id === sessionFamilyId;
+  const cleanUserId = (typeof userId === 'object' && userId !== null)
+    ? (userId.userId || userId.user_id || userId.id)
+    : userId;
+  if (!cleanUserId) return true;
+
+  const target = db.getUserById(cleanUserId);
+  if (!target || !target.family_id) return true;
+
+  if (typeof sessionOrFamilyId === 'object' && sessionOrFamilyId !== null) {
+    if (sessionOrFamilyId.isSystemAdmin === 1 || sessionOrFamilyId.profileType === 1) return true;
+    if (cleanUserId === sessionOrFamilyId.userId) return true;
+    return target.family_id === sessionOrFamilyId.familyId;
   }
-  const target = db.getUserById(userId);
-  return !target || !target.family_id || target.family_id === session;
+
+  return target.family_id === sessionOrFamilyId;
 }
 
 const PUBLIC_CHANNELS = new Set([
@@ -89,13 +95,13 @@ function createOwnershipChecks(db) {
     },
     'settings:get': (session, userId) => userId === session.userId,
     'settings:set': (session, d) => d.userId === session.userId,
-    'accounts:getAll': (session, userId) => userId === session.userId || isSameFamilyUser(db, userId, session.familyId),
-    'accounts:create': (session, d) => d.user_id === session.userId || isSameFamilyUser(db, d.user_id, session.familyId),
+    'accounts:getAll': (session, userId) => isSameFamilyUser(db, userId, session),
+    'accounts:create': (session, d) => isSameFamilyUser(db, d ? (d.user_id || d.userId) : null, session),
     'accounts:update': (session, d) => db.checkAccountFamily(d.id, session.familyId),
     'accounts:delete': (session, id) => db.checkAccountFamily(id, session.familyId),
     'accounts:transfer': (session, d) => db.checkAccountFamily(d.fromAccountId || d.from_account_id, session.familyId) && db.checkAccountFamily(d.toAccountId || d.to_account_id, session.familyId),
-    'categories:getAll': (session, userId) => userId === session.userId || isSameFamilyUser(db, userId, session.familyId),
-    'categories:create': (session, d) => d.user_id === session.userId || isSameFamilyUser(db, d.user_id, session.familyId),
+    'categories:getAll': (session, userId) => isSameFamilyUser(db, userId, session),
+    'categories:create': (session, d) => isSameFamilyUser(db, d ? (d.user_id || d.userId) : null, session),
     'categories:update': (session, d) => db.checkCategoryFamily(d.id, session.familyId),
     'categories:delete': (session, id) => db.checkCategoryFamily(id, session.familyId),
     'recurring:getAll': (session, d) => isSameFamilyUser(db, d.userId, session.familyId),
