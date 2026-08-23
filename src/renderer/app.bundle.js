@@ -1,7 +1,7 @@
 /* ============================================
  * app.bundle.js — FamilyFinancas Renderer
  * Gerado por: npm run build:renderer
- * 2026-08-23T22:46:27.854Z
+ * 2026-08-23T22:54:53.173Z
  * Modulos: 22
  * ============================================ */
 
@@ -4461,8 +4461,7 @@ function decodeHexAscii(str) {
       let decoded = '';
       for (let i = 0; i < clean.length; i += 2) {
         const code = parseInt(clean.substring(i, i + 2), 16);
-        if (code >= 32 && code <= 126) decoded += String.fromCharCode(code);
-        else return null;
+        if (code >= 32 && code <= 126) decoded += String.fromCharCode(code); else return null;
       }
       return decoded;
     } catch (e) { return null; }
@@ -4483,12 +4482,7 @@ const KNOWN_CNPJS = [
 function isInvalidMerchantName(str) {
   if (!str) return true;
   const s = str.trim().toUpperCase();
-  const blackList = [
-    'UNIDADE CONSUMIDORA', 'REFERÊNCIA', 'REFERENCIA', 'AGÊNCIA', 'AGENCIA', 'CÓDIGO', 'CODIGO',
-    'NOTA FISCAL', 'DANFE', 'DOCUMENTO AUXILIAR', 'EXTRATO', 'CONSUMIDOR', 'VALOR A PAGAR',
-    'TOTAL A PAGAR', 'FATURA DE ENERGIA', 'VIA DO CONSUMIDOR', 'EMISSÃO', 'EMISSAO', 'CHAVE DE ACESSO',
-    'CHAVE DE CONSULTA', 'PROTOCOLO', 'INFORMAÇÕES FISCAIS', 'ESTADO DO RIO GRANDE DO SUL', 'SECRETARIA DA FAZENDA'
-  ];
+  const blackList = ['UNIDADE CONSUMIDORA', 'REFERÊNCIA', 'REFERENCIA', 'AGÊNCIA', 'AGENCIA', 'CÓDIGO', 'CODIGO', 'NOTA FISCAL', 'DANFE', 'DOCUMENTO AUXILIAR', 'EXTRATO', 'CONSUMIDOR', 'VALOR A PAGAR', 'TOTAL A PAGAR', 'FATURA DE ENERGIA', 'VIA DO CONSUMIDOR', 'EMISSÃO', 'EMISSAO', 'CHAVE DE ACESSO', 'CHAVE DE CONSULTA', 'PROTOCOLO', 'INFORMAÇÕES FISCAIS', 'ESTADO DO RIO GRANDE DO SUL', 'SECRETARIA DA FAZENDA'];
   return blackList.some(b => s.includes(b)) || s.length < 3;
 }
 
@@ -4962,6 +4956,43 @@ const NFCeCameraManager = {
     if (onResultCallback) onResultCallback(parsed);
   },
 
+  async scanPdfPageMasks(page) {
+    const codes = new Set();
+    try {
+      const opList = await page.getOperatorList(), maskPromises = [];
+      for (let i = 0; i < opList.fnArray.length; i++) {
+        const args = opList.argsArray[i];
+        if (!args || !args.length) continue;
+        const objId = typeof args[0] === 'string' ? args[0] : (args[0] && typeof args[0] === 'object' ? args[0].data : null);
+        if (objId && typeof objId === 'string' && (objId.startsWith('mask_') || objId.startsWith('img_'))) {
+          maskPromises.push(new Promise((resolve) => {
+            page.objs.get(objId, (obj) => {
+              if (obj && obj.data && obj.width > 50 && obj.height > 50 && typeof window.jsQR === 'function') {
+                const { width, height, data } = obj, rgba = new Uint8ClampedArray(width * height * 4);
+                if (data.length === width * height) {
+                  for (let p = 0, q = 0; p < data.length; p++, q += 4) { const v = data[p]; rgba[q] = v; rgba[q+1] = v; rgba[q+2] = v; rgba[q+3] = 255; }
+                } else if (data.length === Math.ceil(width / 8) * height || data.length === Math.ceil((width * height) / 8)) {
+                  const rb = Math.ceil(width / 8);
+                  for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                      const v = ((data[y * rb + Math.floor(x / 8)] >> (7 - (x % 8))) & 1) ? 0 : 255, q = (y * width + x) * 4;
+                      rgba[q] = v; rgba[q+1] = v; rgba[q+2] = v; rgba[q+3] = 255;
+                    }
+                  }
+                }
+                const qr = window.jsQR(rgba, width, height, { inversionAttempts: 'attemptBoth' });
+                if (qr && qr.data) codes.add(qr.data);
+              }
+              resolve();
+            });
+          }));
+        }
+      }
+      await Promise.all(maskPromises);
+    } catch(e) {}
+    return Array.from(codes);
+  },
+
   async scanCanvasMultiQR(canvas) {
     const detected = new Set();
     if (this.barcodeDetector) {
@@ -4971,33 +5002,12 @@ const NFCeCameraManager = {
       } catch(e) {}
     }
     if (typeof window.jsQR === 'function') {
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      const w = canvas.width, h = canvas.height;
-      const slices = [
-        { x: 0, y: 0, w, h },
-        { x: 0, y: Math.round(h * 0.6), w: Math.round(w * 0.55), h: Math.round(h * 0.4) },
-        { x: Math.round(w * 0.45), y: Math.round(h * 0.6), w: Math.round(w * 0.55), h: Math.round(h * 0.4) },
-        { x: Math.round(w * 0.2), y: Math.round(h * 0.6), w: Math.round(w * 0.6), h: Math.round(h * 0.4) },
-        { x: 0, y: Math.round(h * 0.7), w, h: Math.round(h * 0.3) },
-        { x: 0, y: Math.round(h * 0.4), w: Math.round(w * 0.55), h: Math.round(h * 0.35) },
-        { x: Math.round(w * 0.45), y: Math.round(h * 0.4), w: Math.round(w * 0.55), h: Math.round(h * 0.35) },
-        { x: 0, y: 0, w: Math.round(w * 0.55), h: Math.round(h * 0.55) },
-        { x: Math.round(w * 0.45), y: 0, w: Math.round(w * 0.55), h: Math.round(h * 0.55) }
-      ];
+      const ctx = canvas.getContext('2d', { willReadFrequently: true }), w = canvas.width, h = canvas.height;
+      const slices = [{ x: 0, y: 0, w, h }, { x: 0, y: Math.round(h * 0.6), w: Math.round(w * 0.55), h: Math.round(h * 0.4) }, { x: Math.round(w * 0.45), y: Math.round(h * 0.6), w: Math.round(w * 0.55), h: Math.round(h * 0.4) }, { x: Math.round(w * 0.2), y: Math.round(h * 0.6), w: Math.round(w * 0.6), h: Math.round(h * 0.4) }, { x: 0, y: Math.round(h * 0.7), w, h: Math.round(h * 0.3) }];
       for (const s of slices) {
         try {
-          const imgData = ctx.getImageData(s.x, s.y, s.w, s.h);
-          const qr = window.jsQR(imgData.data, s.w, s.h, { inversionAttempts: 'attemptBoth' });
+          const qr = window.jsQR(ctx.getImageData(s.x, s.y, s.w, s.h).data, s.w, s.h, { inversionAttempts: 'attemptBoth' });
           if (qr && qr.data) detected.add(qr.data);
-        } catch(e) {}
-      }
-      if (w > 1000) {
-        try {
-          const thumb = document.createElement('canvas'), tw = 800, th = Math.round((h * 800) / w);
-          thumb.width = tw; thumb.height = th;
-          thumb.getContext('2d').drawImage(canvas, 0, 0, tw, th);
-          const tQr = window.jsQR(thumb.getContext('2d').getImageData(0, 0, tw, th).data, tw, th, { inversionAttempts: 'attemptBoth' });
-          if (tQr && tQr.data) detected.add(tQr.data);
         } catch(e) {}
       }
     }
@@ -5011,31 +5021,25 @@ const NFCeCameraManager = {
         if (!window.pdfjsLib) throw new Error('Leitor de PDF não inicializado.');
         toast('Lendo páginas e dados fiscais do PDF...', 'info');
         const arrayBuffer = await file.arrayBuffer();
-        const pdfDoc = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        const allCodes = [];
+        const pdfDoc = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise, allCodes = [];
         let fullPdfText = '';
         for (let pageNum = 1; pageNum <= Math.min(pdfDoc.numPages, 4); pageNum++) {
           const page = await pdfDoc.getPage(pageNum);
-          try {
-            const textContent = await page.getTextContent();
-            fullPdfText += ' ' + textContent.items.map(item => item.str).join(' ');
-          } catch(e) {}
-          const viewport = page.getViewport({ scale: 2.0 });
-          const canvas = document.createElement('canvas');
-          canvas.width = viewport.width; canvas.height = viewport.height;
-          await page.render({ canvasContext: canvas.getContext('2d', { willReadFrequently: true }), viewport }).promise;
+          try { const tc = await page.getTextContent(); fullPdfText += ' ' + tc.items.map(it => it.str).join(' '); } catch(e) {}
+          const maskCodes = await this.scanPdfPageMasks(page);
+          maskCodes.forEach(c => allCodes.push(c));
+          const vp = page.getViewport({ scale: 2.0 }), canvas = document.createElement('canvas');
+          canvas.width = vp.width; canvas.height = vp.height;
+          await page.render({ canvasContext: canvas.getContext('2d', { willReadFrequently: true }), viewport: vp }).promise;
           const pageCodes = await this.scanCanvasMultiQR(canvas);
           pageCodes.forEach(c => allCodes.push(c));
         }
         const textExtracted = extractInfoFromText(fullPdfText);
         const mergedResult = mergeScanResults(allCodes, textExtracted);
         if (mergedResult && (mergedResult.accessKey || mergedResult.pixCode || mergedResult.amount || mergedResult.dueDate || mergedResult.nNF || (mergedResult.description && !mergedResult.description.startsWith('Compra Cupom')))) {
-          this.isScanning = false;
-          playScanBeep(); vibrateDevice(80); this.stop();
+          this.isScanning = false; playScanBeep(); vibrateDevice(80); this.stop();
           if (onResultCallback) onResultCallback(mergedResult);
-        } else {
-          toast('Nenhum dado fiscal ou QR Code legível foi identificado neste PDF.', 'warning');
-        }
+        } else { toast('Nenhum dado fiscal ou QR Code legível foi identificado neste PDF.', 'warning'); }
         return;
       }
 
@@ -5045,21 +5049,15 @@ const NFCeCameraManager = {
       let allFoundCodes = [];
       for (const maxDim of [2000, 1400, 900]) {
         let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
-        if (w > maxDim || h > maxDim) {
-          if (w >= h) { h = Math.round((h * maxDim) / w); w = maxDim; } else { w = Math.round((w * maxDim) / h); h = maxDim; }
-        }
-        canvas.width = w; canvas.height = h;
-        ctx.drawImage(img, 0, 0, w, h);
+        if (w > maxDim || h > maxDim) { if (w >= h) { h = Math.round((h * maxDim) / w); w = maxDim; } else { w = Math.round((w * maxDim) / h); h = maxDim; } }
+        canvas.width = w; canvas.height = h; ctx.drawImage(img, 0, 0, w, h);
         const codes = await this.scanCanvasMultiQR(canvas);
         if (codes.length) { allFoundCodes = codes; break; }
       }
       URL.revokeObjectURL(objectUrl);
       if (allFoundCodes.length) this.handleDetectedCodes(allFoundCodes, onResultCallback);
       else toast('Nenhum QR Code legível encontrado nesta imagem.', 'warning');
-    } catch (err) {
-      console.error(err);
-      toast('Erro ao processar arquivo da nota: ' + err.message, 'error');
-    }
+    } catch (err) { console.error(err); toast('Erro ao processar arquivo da nota: ' + err.message, 'error'); }
   },
 
   async toggleTorch() {
