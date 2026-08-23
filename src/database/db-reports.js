@@ -26,17 +26,53 @@ module.exports = (Base) => class extends Base {
 
     if (profileType === 1) {
       // ADM Geral
-      income = this.db.prepare(`SELECT COALESCE(SUM(amount),0) as v FROM transactions WHERE type='income' AND is_paid=1 AND strftime('%m',COALESCE(payment_date, date))=? AND strftime('%Y',COALESCE(payment_date, date))=?`).get(m, y).v;
-      expense = this.db.prepare(`SELECT COALESCE(SUM(amount),0) as v FROM transactions WHERE type='expense' AND is_paid=1 AND strftime('%m',COALESCE(payment_date, date))=? AND strftime('%Y',COALESCE(payment_date, date))=?`).get(m, y).v;
+      income = this.db.prepare(`SELECT COALESCE(SUM(amount),0) as v FROM transactions WHERE type='income' AND is_paid=1 AND strftime('%m',date)=? AND strftime('%Y',date)=?`).get(m, y).v;
+      expense = this.db.prepare(`SELECT COALESCE(SUM(amount),0) as v FROM transactions WHERE type='expense' AND is_paid=1 AND strftime('%m',date)=? AND strftime('%Y',date)=?`).get(m, y).v;
       pending = this.db.prepare(`SELECT COALESCE(SUM(amount),0) as v FROM transactions WHERE type='expense' AND is_paid=0 AND strftime('%m',date)=? AND strftime('%Y',date)=?`).get(m, y).v;
     } else if (perm.can_view_all === 1) {
-      income = this.db.prepare(`SELECT COALESCE(SUM(t.amount),0) as v FROM transactions t JOIN users u ON t.user_id = u.id WHERE u.family_id=? AND t.type='income' AND t.is_paid=1 AND strftime('%m',COALESCE(t.payment_date, t.date))=? AND strftime('%Y',COALESCE(t.payment_date, t.date))=?`).get(familyId, m, y).v;
-      expense = this.db.prepare(`SELECT COALESCE(SUM(t.amount),0) as v FROM transactions t JOIN users u ON t.user_id = u.id WHERE u.family_id=? AND t.type='expense' AND t.is_paid=1 AND strftime('%m',COALESCE(t.payment_date, t.date))=? AND strftime('%Y',COALESCE(t.payment_date, t.date))=?`).get(familyId, m, y).v;
-      pending = this.db.prepare(`SELECT COALESCE(SUM(t.amount),0) as v FROM transactions t JOIN users u ON t.user_id = u.id WHERE u.family_id=? AND t.type='expense' AND t.is_paid=0 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?`).get(familyId, m, y).v;
+      income = this.db.prepare(`
+        SELECT COALESCE(SUM(t.amount),0) as v 
+        FROM transactions t 
+        LEFT JOIN accounts a ON t.account_id = a.id
+        LEFT JOIN users u_tx ON t.user_id = u_tx.id
+        LEFT JOIN users u_acc ON a.user_id = u_acc.id
+        WHERE (u_tx.family_id=? OR u_acc.family_id=?) AND t.type='income' AND t.is_paid=1 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
+      `).get(familyId, familyId, m, y).v;
+      expense = this.db.prepare(`
+        SELECT COALESCE(SUM(t.amount),0) as v 
+        FROM transactions t 
+        LEFT JOIN accounts a ON t.account_id = a.id
+        LEFT JOIN users u_tx ON t.user_id = u_tx.id
+        LEFT JOIN users u_acc ON a.user_id = u_acc.id
+        WHERE (u_tx.family_id=? OR u_acc.family_id=?) AND t.type='expense' AND t.is_paid=1 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
+      `).get(familyId, familyId, m, y).v;
+      pending = this.db.prepare(`
+        SELECT COALESCE(SUM(t.amount),0) as v 
+        FROM transactions t 
+        LEFT JOIN accounts a ON t.account_id = a.id
+        LEFT JOIN users u_tx ON t.user_id = u_tx.id
+        LEFT JOIN users u_acc ON a.user_id = u_acc.id
+        WHERE (u_tx.family_id=? OR u_acc.family_id=?) AND t.type='expense' AND t.is_paid=0 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
+      `).get(familyId, familyId, m, y).v;
     } else {
-      income = this.db.prepare(`SELECT COALESCE(SUM(amount),0) as v FROM transactions WHERE user_id=? AND type='income' AND is_paid=1 AND strftime('%m',COALESCE(payment_date, date))=? AND strftime('%Y',COALESCE(payment_date, date))=?`).get(userId, m, y).v;
-      expense = this.db.prepare(`SELECT COALESCE(SUM(amount),0) as v FROM transactions WHERE user_id=? AND type='expense' AND is_paid=1 AND strftime('%m',COALESCE(payment_date, date))=? AND strftime('%Y',COALESCE(payment_date, date))=?`).get(userId, m, y).v;
-      pending = this.db.prepare(`SELECT COALESCE(SUM(amount),0) as v FROM transactions WHERE user_id=? AND type='expense' AND is_paid=0 AND strftime('%m',date)=? AND strftime('%Y',date)=?`).get(userId, m, y).v;
+      income = this.db.prepare(`
+        SELECT COALESCE(SUM(t.amount),0) as v 
+        FROM transactions t 
+        LEFT JOIN accounts a ON t.account_id = a.id
+        WHERE (t.user_id=? OR a.user_id=?) AND t.type='income' AND t.is_paid=1 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
+      `).get(userId, userId, m, y).v;
+      expense = this.db.prepare(`
+        SELECT COALESCE(SUM(t.amount),0) as v 
+        FROM transactions t 
+        LEFT JOIN accounts a ON t.account_id = a.id
+        WHERE (t.user_id=? OR a.user_id=?) AND t.type='expense' AND t.is_paid=1 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
+      `).get(userId, userId, m, y).v;
+      pending = this.db.prepare(`
+        SELECT COALESCE(SUM(t.amount),0) as v 
+        FROM transactions t 
+        LEFT JOIN accounts a ON t.account_id = a.id
+        WHERE (t.user_id=? OR a.user_id=?) AND t.type='expense' AND t.is_paid=0 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
+      `).get(userId, userId, m, y).v;
     }
 
     const accounts = this.getAccounts(userId);
@@ -225,16 +261,40 @@ module.exports = (Base) => class extends Base {
       });
     }
 
-    // Recurring progress
+    // Recurring progress (despesas do mês)
     if (profileType === 1) {
-      totalRecurring = this.db.prepare(`SELECT COUNT(*) as c FROM transactions WHERE is_avulso=0 AND strftime('%m',date)=? AND strftime('%Y',date)=?`).get(m, y).c;
-      paidRecurring = this.db.prepare(`SELECT COUNT(*) as c FROM transactions WHERE is_avulso=0 AND is_paid=1 AND strftime('%m',date)=? AND strftime('%Y',date)=?`).get(m, y).c;
+      totalRecurring = this.db.prepare(`SELECT COUNT(*) as c FROM transactions WHERE type='expense' AND strftime('%m',date)=? AND strftime('%Y',date)=?`).get(m, y).c;
+      paidRecurring = this.db.prepare(`SELECT COUNT(*) as c FROM transactions WHERE type='expense' AND is_paid=1 AND strftime('%m',date)=? AND strftime('%Y',date)=?`).get(m, y).c;
     } else if (perm.can_view_all === 1) {
-      totalRecurring = this.db.prepare(`SELECT COUNT(*) as c FROM transactions t JOIN users u ON t.user_id = u.id WHERE u.family_id=? AND t.is_avulso=0 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?`).get(familyId, m, y).c;
-      paidRecurring = this.db.prepare(`SELECT COUNT(*) as c FROM transactions t JOIN users u ON t.user_id = u.id WHERE u.family_id=? AND t.is_avulso=0 AND t.is_paid=1 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?`).get(familyId, m, y).c;
+      totalRecurring = this.db.prepare(`
+        SELECT COUNT(*) as c 
+        FROM transactions t 
+        LEFT JOIN accounts a ON t.account_id = a.id
+        LEFT JOIN users u_tx ON t.user_id = u_tx.id
+        LEFT JOIN users u_acc ON a.user_id = u_acc.id
+        WHERE (u_tx.family_id=? OR u_acc.family_id=?) AND t.type='expense' AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
+      `).get(familyId, familyId, m, y).c;
+      paidRecurring = this.db.prepare(`
+        SELECT COUNT(*) as c 
+        FROM transactions t 
+        LEFT JOIN accounts a ON t.account_id = a.id
+        LEFT JOIN users u_tx ON t.user_id = u_tx.id
+        LEFT JOIN users u_acc ON a.user_id = u_acc.id
+        WHERE (u_tx.family_id=? OR u_acc.family_id=?) AND t.type='expense' AND t.is_paid=1 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
+      `).get(familyId, familyId, m, y).c;
     } else {
-      totalRecurring = this.db.prepare(`SELECT COUNT(*) as c FROM transactions WHERE user_id=? AND is_avulso=0 AND strftime('%m',date)=? AND strftime('%Y',date)=?`).get(userId, m, y).c;
-      paidRecurring = this.db.prepare(`SELECT COUNT(*) as c FROM transactions WHERE user_id=? AND is_avulso=0 AND is_paid=1 AND strftime('%m',date)=? AND strftime('%Y',date)=?`).get(userId, m, y).c;
+      totalRecurring = this.db.prepare(`
+        SELECT COUNT(*) as c 
+        FROM transactions t 
+        LEFT JOIN accounts a ON t.account_id = a.id
+        WHERE (t.user_id=? OR a.user_id=?) AND t.type='expense' AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
+      `).get(userId, userId, m, y).c;
+      paidRecurring = this.db.prepare(`
+        SELECT COUNT(*) as c 
+        FROM transactions t 
+        LEFT JOIN accounts a ON t.account_id = a.id
+        WHERE (t.user_id=? OR a.user_id=?) AND t.type='expense' AND t.is_paid=1 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
+      `).get(userId, userId, m, y).c;
     }
 
     // Overdue items from previous months (prior to current month/year)

@@ -153,16 +153,17 @@ function renderDashboardActionPills(summary, potentialDuplicates, today) {
 /**
  * Renderiza a Grade de Cartões e Contas (já filtrados)
  */
-function renderDashboardCardsGrid(summary) {
+function renderDashboardCardsGrid(summary, showTitle = true) {
   const creditAccounts = summary.accounts.filter(a => a.type === 'credit');
   const debitAccounts  = summary.accounts.filter(a => a.type !== 'credit' && a.type !== 'investment');
   const hasAny = creditAccounts.length > 0 || debitAccounts.length > 0;
 
   return `
     <div style="margin-bottom: 20px;">
-      <div style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-        <span>🏦</span> Previsibilidade de Contas e Cartões
-      </div>
+      ${showTitle ? `
+        <div style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+          <span>🏦</span> Previsibilidade de Contas e Cartões
+        </div>` : ''}
 
       ${hasAny ? `
         <div class="cards-widget-grid" id="cards-widget-grid">

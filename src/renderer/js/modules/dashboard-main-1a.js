@@ -117,14 +117,6 @@ async function renderDashboard() {
     let effectiveDuplicates = potentialDuplicates || [];
     let activeMemberName = null;
 
-    let income = summary.income;
-    let expense = summary.expense;
-    let pending = summary.pending;
-    let balance = summary.balance;
-    let paidRecurring = summary.paidRecurring;
-    let totalRecurring = summary.totalRecurring;
-    let recurringPct = totalRecurring > 0 ? Math.round((paidRecurring / totalRecurring) * 100) : 0;
-
     if (activeMemberFilter !== 'all') {
       const activeMember = members.find(m => String(m.id) === String(activeMemberFilter));
       activeMemberName = activeMember ? activeMember.name : null;
@@ -135,19 +127,21 @@ async function renderDashboard() {
       effectiveAlerts = (summary.alertItems || []).filter(item => String(item.user_id) === String(activeMemberFilter));
       effectiveOverdue = (summary.overduePreviousItems || []).filter(item => String(item.user_id) === String(activeMemberFilter));
       effectiveDuplicates = (potentialDuplicates || []).filter(d => String(d.user_id_1) === String(activeMemberFilter) || String(d.user_id_2) === String(activeMemberFilter));
-
-      // Recalcular índices / KPIs para o membro selecionado
-      income = effectiveTxs.filter(t => t.type === 'income' && (t.is_paid === 1 || t.is_paid === true)).reduce((acc, t) => acc + (t.amount || 0), 0);
-      expense = effectiveTxs.filter(t => t.type === 'expense' && (t.is_paid === 1 || t.is_paid === true)).reduce((acc, t) => acc + (t.amount || 0), 0);
-      pending = effectiveTxs.filter(t => t.type === 'expense' && (t.is_paid === 0 || t.is_paid === false)).reduce((acc, t) => acc + (t.amount || 0), 0);
-      balance = income - expense;
-
-      const memberPaidBills = effectiveTxs.filter(t => t.type === 'expense' && (t.is_paid === 1 || t.is_paid === true));
-      const memberUnpaidBills = effectiveTxs.filter(t => t.type === 'expense' && (t.is_paid === 0 || t.is_paid === false));
-      paidRecurring = memberPaidBills.length;
-      totalRecurring = memberPaidBills.length + memberUnpaidBills.length;
-      recurringPct = totalRecurring > 0 ? Math.round((paidRecurring / totalRecurring) * 100) : 0;
     }
+
+    // Calcular índices / KPIs com base estrita no effectiveTxs (despesas vs receitas)
+    const effectivePaidExpenses = effectiveTxs.filter(t => t.type === 'expense' && (t.is_paid === 1 || t.is_paid === true));
+    const effectiveUnpaidExpenses = effectiveTxs.filter(t => t.type === 'expense' && (t.is_paid === 0 || t.is_paid === false));
+    const effectivePaidIncomes = effectiveTxs.filter(t => t.type === 'income' && (t.is_paid === 1 || t.is_paid === true));
+
+    const income = effectivePaidIncomes.reduce((acc, t) => acc + (t.amount || 0), 0);
+    const expense = effectivePaidExpenses.reduce((acc, t) => acc + (t.amount || 0), 0);
+    const pending = effectiveUnpaidExpenses.reduce((acc, t) => acc + (t.amount || 0), 0);
+    const balance = income - expense;
+
+    const paidRecurring = effectivePaidExpenses.length;
+    const totalRecurring = effectivePaidExpenses.length + effectiveUnpaidExpenses.length;
+    const recurringPct = totalRecurring > 0 ? Math.round((paidRecurring / totalRecurring) * 100) : 0;
 
     // 3. Aplicar Filtro de Tipo de Conta
     if (activeTypeFilter === 'credit') {
@@ -156,8 +150,8 @@ async function renderDashboard() {
       effectiveAccounts = effectiveAccounts.filter(a => a.type !== 'credit');
     }
 
-    const effectivePaidBills = effectiveTxs.filter(t => t.type === 'expense' && (t.is_paid === 1 || t.is_paid === true));
-    const effectiveUnpaidBills = effectiveTxs.filter(t => t.type === 'expense' && (t.is_paid === 0 || t.is_paid === false));
+    const effectivePaidBills = effectivePaidExpenses;
+    const effectiveUnpaidBills = effectiveUnpaidExpenses;
 
     const effectiveSummary = {
       ...summary,
@@ -314,23 +308,25 @@ function renderCockpitLayout(contentDiv, members, activeMemberFilter, activeType
           ${renderDashboardKanbanColumns(summary, paidBills, unpaidBills)}
         </div>
 
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
-          <div class="chart-card" id="dashboard-category-interactive-card" style="display: flex; flex-direction: column;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px;">
+          <div class="chart-card" id="dashboard-category-interactive-card" style="display: flex; flex-direction: column; min-height: 380px;">
             <div class="card-title">Despesas por categoria</div>
           </div>
-          <div class="chart-card">
-            <div class="card-title">Evolução 6 meses</div>
-            <canvas id="chart-monthly" style="max-height:220px"></canvas>
+          <div class="chart-card" style="min-height: 380px; display: flex; flex-direction: column;">
+            <div class="card-title">Receitas × Despesas — últimos 6 meses</div>
+            <div style="flex: 1; display: flex; align-items: center; justify-content: center; position: relative;">
+              <canvas id="chart-monthly" style="max-height:280px; width: 100%;"></canvas>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- COLUNA DIREITA (32%): CARDS & SALDOS FIXOS DO FILTRO -->
       <div class="dash-cockpit-sidebar">
-        <div style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
+        <div style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
           <span>💳</span> Carteira & Cartões
         </div>
-        ${renderDashboardCardsGrid(summary)}
+        ${renderDashboardCardsGrid(summary, false)}
       </div>
 
     </div>
