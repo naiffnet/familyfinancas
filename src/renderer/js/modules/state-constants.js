@@ -27,6 +27,10 @@ const State = {
   highlightAccountId: null,
   highlightAccountColor: null,
   highlightAccountName: null,
+  dashboardLayoutMode: localStorage.getItem('dashboard_layout_mode') || 'executive',
+  activeDashSubTab: 'operation',
+  dashboardCardMemberFilter: 'all',
+  dashboardCardTypeFilter: 'all',
 };
 
 // ── Formatters ─────────────────────────

@@ -689,3 +689,200 @@
   border: 1px solid rgba(245, 158, 11, 0.4);
 }
 
+/* ===================================================
+ * 🎛️ DASHBOARD 3 LAYOUT MODES & UX ENHANCEMENTS
+ * =================================================== */
+
+/* Quick layout switcher in header */
+.dash-layout-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.dash-layout-switcher:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-light);
+}
+
+/* Action Pills Bar (Horizontal Compact Alert Hub) */
+.dash-action-pills-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.dash-action-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 50px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
+  user-select: none;
+}
+.dash-action-pill:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+.dash-action-pill-dedup {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(99, 102, 241, 0.1));
+  color: #c084fc;
+  border-color: rgba(139, 92, 246, 0.35);
+}
+.dash-action-pill-income {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(5, 150, 105, 0.1));
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.35);
+}
+.dash-action-pill-expense {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.1));
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.35);
+}
+.dash-action-pill-overdue {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(217, 119, 6, 0.1));
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+/* Member & Type Filter Pills for Cards */
+.dash-filter-pills-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  margin-bottom: 12px;
+  scrollbar-width: thin;
+}
+.dash-filter-chip {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 600;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+.dash-filter-chip:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+.dash-filter-chip.active {
+  background: var(--accent-dim);
+  color: var(--accent-light);
+  border-color: var(--accent);
+  font-weight: 700;
+}
+
+/* 3-Column Kanban Operational Grid */
+.dash-kanban-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+@media (max-width: 1100px) {
+  .dash-kanban-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.dash-kanban-col {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  height: 380px;
+}
+.dash-kanban-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+.dash-kanban-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 4px;
+  scrollbar-width: thin;
+}
+
+/* Cockpit Split 2:1 Layout */
+.dash-cockpit-container {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+@media (max-width: 1200px) {
+  .dash-cockpit-container {
+    grid-template-columns: 1fr;
+  }
+}
+.dash-cockpit-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Sub-tabs header for Tabbed Layout */
+.dash-subtabs-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+}
+.dash-subtab-btn {
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.dash-subtab-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+.dash-subtab-btn.active {
+  background: var(--bg-surface);
+  color: var(--accent-light);
+  border-color: var(--border);
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+

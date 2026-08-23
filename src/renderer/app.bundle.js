@@ -1,7 +1,7 @@
 /* ============================================
  * app.bundle.js — FamilyFinancas Renderer
  * Gerado por: npm run build:renderer
- * 2026-08-23T13:27:49.379Z
+ * 2026-08-23T13:45:33.238Z
  * Modulos: 21
  * ============================================ */
 
@@ -219,6 +219,10 @@ const State = {
   highlightAccountId: null,
   highlightAccountColor: null,
   highlightAccountName: null,
+  dashboardLayoutMode: localStorage.getItem('dashboard_layout_mode') || 'executive',
+  activeDashSubTab: 'operation',
+  dashboardCardMemberFilter: 'all',
+  dashboardCardTypeFilter: 'all',
 };
 
 // ── Formatters ─────────────────────────
@@ -738,12 +742,7 @@ function buildCreditDonut(spent, limit, size = 110) {
 
 /* ==== dashboard-main-1a.js ==== */
 /* === dashboard-main-1a.js (parte 1/2 de dashboard-main-1.js) ===
- * Linhas 1–807
- */
-
-/* ===
- * dashboard-main-1.js — Parte 1 de dashboard-main
- * Linhas 719–1756 do app.js
+ * Layout, KPIs e Orquestração dos 3 Modos do Dashboard
  */
 
 async function renderDashboard() {
@@ -753,14 +752,26 @@ async function renderDashboard() {
     await renderCaculaDashboard(page);
     return;
   }
+
+  const currentMode = State.dashboardLayoutMode || 'executive';
+  const modeLabels = {
+    executive: '🌟 Executivo',
+    tabbed: '📑 Sub-Abas',
+    cockpit: '🎛️ Cockpit'
+  };
   
-  // Basic layout with tabs
+  // Header principal com Seletor Rápido de Layout
   let headerHtml = `
     <div class="page-header">
       <div>
-        <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
           <h2 class="page-title">Dashboard</h2>
           ${State.familyName ? `<span class="badge" style="background: rgba(139, 92, 246, 0.12); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 50px; padding: 4px 12px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; letter-spacing: 0.02em;">🏠 ${State.familyName}</span>` : ''}
+          <button class="dash-layout-switcher" id="dash-quick-layout-btn" title="Alterar modo de organização do Dashboard">
+            <span>🎛️</span>
+            <span>Layout: <strong>${modeLabels[currentMode] || 'Executivo'}</strong></span>
+            <span style="opacity:0.6;font-size:10px;">▾</span>
+          </button>
         </div>
         <p class="page-subtitle" id="dash-subtitle">Carregando...</p>
       </div>
@@ -776,6 +787,18 @@ async function renderDashboard() {
   `;
   
   page.innerHTML = headerHtml;
+
+  // Bind Quick Layout Switcher Button
+  const layoutBtn = document.getElementById('dash-quick-layout-btn');
+  if (layoutBtn) {
+    layoutBtn.onclick = () => {
+      const nextMode = currentMode === 'executive' ? 'tabbed' : currentMode === 'tabbed' ? 'cockpit' : 'executive';
+      State.dashboardLayoutMode = nextMode;
+      localStorage.setItem('dashboard_layout_mode', nextMode);
+      toast(`Modo do Dashboard alterado para: ${modeLabels[nextMode]}`);
+      renderDashboard();
+    };
+  }
   
   // Set up tab click handlers
   const tabButtons = document.querySelectorAll('#dashboard-tabs .report-tab');
@@ -810,149 +833,585 @@ async function renderDashboard() {
     ]);
 
     const today = new Date().getDate();
-    const creditAccounts = summary.accounts.filter(a => a.type === 'credit');
-    const debitAccounts  = summary.accounts.filter(a => a.type !== 'credit' && a.type !== 'investment');
-    const recurringPct   = summary.totalRecurring > 0 ? Math.round((summary.paidRecurring / summary.totalRecurring) * 100) : 0;
-
+    const recurringPct = summary.totalRecurring > 0 ? Math.round((summary.paidRecurring / summary.totalRecurring) * 100) : 0;
     const paidBills = (txs || []).filter(t => t.type === 'expense' && (t.is_paid === 1 || t.is_paid === true));
     const unpaidBills = (txs || []).filter(t => t.type === 'expense' && (t.is_paid === 0 || t.is_paid === false));
-    const totalPaidAmount = paidBills.reduce((acc, t) => acc + (t.amount || 0), 0);
-    const totalUnpaidAmount = unpaidBills.reduce((acc, t) => acc + (t.amount || 0), 0);
-
-    const incomeAlerts = (summary.alertItems || []).filter(a => a.type === 'income');
-    const expenseAlerts = (summary.alertItems || []).filter(a => a.type !== 'income');
 
     const contentDiv = document.getElementById('dashboard-tab-content');
-    contentDiv.innerHTML = `
-      ${(potentialDuplicates && potentialDuplicates.length > 0) ? `
-      <div class="alert-banner" style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(59, 130, 246, 0.1)); border: 1px solid rgba(139, 92, 246, 0.35); margin-bottom: 16px; padding: 12px 18px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <span style="font-size: 22px;">🛡️</span>
-          <div>
-            <div style="font-size: 13px; font-weight: 700; color: #a78bfa;">Anti-Duplicidade: ${potentialDuplicates.length} potencial(is) lançamento(s) duplicado(s) detectado(s)</div>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Membros da família podem ter lançado o mesmo gasto na Web e no Desktop.</div>
+
+    // Render based on selected layout mode
+    if (currentMode === 'tabbed') {
+      renderTabbedLayout(contentDiv, summary, monthly, txs, potentialDuplicates, today, paidBills, unpaidBills, recurringPct);
+    } else if (currentMode === 'cockpit') {
+      renderCockpitLayout(contentDiv, summary, monthly, txs, potentialDuplicates, today, paidBills, unpaidBills, recurringPct);
+    } else {
+      // Default: Executive
+      renderExecutiveLayout(contentDiv, summary, monthly, txs, potentialDuplicates, today, paidBills, unpaidBills, recurringPct);
+    }
+
+    bindDashboardEvents(contentDiv, summary, txs, monthly, today);
+
+  } else {
+    // 🌐 VISÃO GERAL
+    await renderGeneralDashboardTab();
+  }
+}
+
+/**
+ * Modo 1: Executivo por Zonas (Padrão Completo)
+ */
+function renderExecutiveLayout(contentDiv, summary, monthly, txs, potentialDuplicates, today, paidBills, unpaidBills, recurringPct) {
+  contentDiv.innerHTML = `
+    <!-- 1. HERO KPIS -->
+    ${renderDashboardHeroKpis(summary, recurringPct)}
+
+    <!-- 2. ACTION PILLS HUB -->
+    ${renderDashboardActionPills(summary, potentialDuplicates, today)}
+
+    <!-- 3. CARDS & CONTAS COM FILTRO POR MEMBRO -->
+    ${renderDashboardCardsGrid(summary, State.dashboardCardMemberFilter, State.dashboardCardTypeFilter)}
+
+    <!-- 4. PAINEL OPERACIONAL KANBAN 3 COLUNAS -->
+    <div style="margin-bottom: 20px;">
+      <div style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+        <span>📋</span> Fluxo e Andamento das Contas do Mês
+      </div>
+      ${renderDashboardKanbanColumns(summary, paidBills, unpaidBills)}
+    </div>
+
+    <!-- 5. GRÁFICOS LADO A LADO -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 16px; margin-bottom: 16px;">
+      <div class="chart-card" id="dashboard-category-interactive-card" style="display: flex; flex-direction: column;">
+        <div class="card-title">Despesas por categoria</div>
+      </div>
+      <div class="chart-card">
+        <div class="card-title">Receitas × Despesas — últimos 6 meses</div>
+        <canvas id="chart-monthly" style="max-height:240px"></canvas>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Modo 2: Sub-Abas Operacionais (Foco por Contexto)
+ */
+function renderTabbedLayout(contentDiv, summary, monthly, txs, potentialDuplicates, today, paidBills, unpaidBills, recurringPct) {
+  const activeSubTab = State.activeDashSubTab || 'operation';
+
+  contentDiv.innerHTML = `
+    <!-- 1. HERO KPIS -->
+    ${renderDashboardHeroKpis(summary, recurringPct)}
+
+    <!-- 2. ACTION PILLS HUB -->
+    ${renderDashboardActionPills(summary, potentialDuplicates, today)}
+
+    <!-- 3. SUB-ABAS NAVEGAÇÃO -->
+    <div class="dash-subtabs-nav" id="dash-subtabs-nav">
+      <button class="dash-subtab-btn ${activeSubTab === 'operation' ? 'active' : ''}" data-subtab="operation">
+        <span>📋</span> Operação & Contas (${paidBills.length + unpaidBills.length})
+      </button>
+      <button class="dash-subtab-btn ${activeSubTab === 'cards' ? 'active' : ''}" data-subtab="cards">
+        <span>💳</span> Cartões & Bancos (${summary.accounts.length})
+      </button>
+      <button class="dash-subtab-btn ${activeSubTab === 'charts' ? 'active' : ''}" data-subtab="charts">
+        <span>📈</span> Gráficos & Categorias
+      </button>
+    </div>
+
+    <!-- 4. CONTEÚDO DA SUB-ABA ATIVA -->
+    <div id="dash-subtab-content">
+      ${activeSubTab === 'operation' ? `
+        <div class="dashboard-view-fade">
+          <div style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+            <span>📋</span> Painel Operacional de Contas
+          </div>
+          ${renderDashboardKanbanColumns(summary, paidBills, unpaidBills)}
+        </div>
+      ` : activeSubTab === 'cards' ? `
+        <div class="dashboard-view-fade">
+          ${renderDashboardCardsGrid(summary, State.dashboardCardMemberFilter, State.dashboardCardTypeFilter)}
+        </div>
+      ` : `
+        <div class="dashboard-view-fade" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 16px;">
+          <div class="chart-card" id="dashboard-category-interactive-card" style="display: flex; flex-direction: column;">
+            <div class="card-title">Despesas por categoria</div>
+          </div>
+          <div class="chart-card">
+            <div class="card-title">Receitas × Despesas — últimos 6 meses</div>
+            <canvas id="chart-monthly" style="max-height:240px"></canvas>
           </div>
         </div>
-        <button type="button" class="btn btn-primary btn-sm" id="btn-open-dedup-banner" style="background: #8b5cf6; border: none; font-size: 11.5px; padding: 6px 14px; white-space: nowrap; font-weight: 700;">
-          🔍 Conciliar Agora ➔
-        </button>
-      </div>` : ''}
+      `}
+    </div>
+  `;
+}
 
-      ${incomeAlerts.length > 0 ? `
-      <div class="alert-banner alert-banner-income">
-        <span class="alert-banner-icon">💰</span>
-        <div style="flex:1">
-          <div class="alert-banner-title">Recebimentos próximos (próximos ${summary.alertDays} dias)</div>
-          <div class="alert-banner-items">
-            ${incomeAlerts.map(a => {
-              const daysLeft = a.due_day - today;
-              return `<button type="button" class="alert-chip alert-chip-income btn-alert-link" data-rec-id="${a.recurring_item_id || ''}" data-tx-id="${a.id || ''}" data-type="income" title="Clique para abrir este recebimento no Planejamento">${a.rec_icon || '💼'} ${a.rec_name} — ${daysLeft === 0 ? 'Hoje!' : `em ${daysLeft} dia${daysLeft > 1 ? 's' : ''}`} • ${fmt.currency(a.amount)} <span style="font-size:10px;margin-left:2px;opacity:0.8">➔</span></button>`;
-            }).join('')}
+/**
+ * Modo 3: Cockpit Split (2:1)
+ */
+function renderCockpitLayout(contentDiv, summary, monthly, txs, potentialDuplicates, today, paidBills, unpaidBills, recurringPct) {
+  contentDiv.innerHTML = `
+    <!-- 1. HERO KPIS -->
+    ${renderDashboardHeroKpis(summary, recurringPct)}
+
+    <!-- 2. ACTION PILLS HUB -->
+    ${renderDashboardActionPills(summary, potentialDuplicates, today)}
+
+    <!-- 3. CONTAINER COCKPIT SPLIT 2:1 -->
+    <div class="dash-cockpit-container">
+      
+      <!-- COLUNA ESQUERDA: OPERACIONAL + GRÁFICOS -->
+      <div style="display: flex; flex-direction: column; gap: 20px; min-width: 0;">
+        <div>
+          <div style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+            <span>📋</span> Painel de Contas
+          </div>
+          ${renderDashboardKanbanColumns(summary, paidBills, unpaidBills)}
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
+          <div class="chart-card" id="dashboard-category-interactive-card" style="display: flex; flex-direction: column;">
+            <div class="card-title">Despesas por categoria</div>
+          </div>
+          <div class="chart-card">
+            <div class="card-title">Evolução 6 meses</div>
+            <canvas id="chart-monthly" style="max-height:220px"></canvas>
           </div>
         </div>
-      </div>` : ''}
+      </div>
 
-      ${expenseAlerts.length > 0 ? `
-      <div class="alert-banner alert-banner-expense">
-        <span class="alert-banner-icon">🚨</span>
-        <div style="flex:1">
-          <div class="alert-banner-title">Vencimentos próximos (próximos ${summary.alertDays} dias)</div>
-          <div class="alert-banner-items">
-            ${expenseAlerts.map(a => {
-              const daysLeft = a.due_day - today;
-              return `<button type="button" class="alert-chip alert-chip-expense btn-alert-link" data-rec-id="${a.recurring_item_id || ''}" data-tx-id="${a.id || ''}" data-type="expense" title="Clique para abrir esta despesa no Planejamento">${a.rec_icon || '📋'} ${a.rec_name} — ${daysLeft === 0 ? 'Hoje!' : `em ${daysLeft} dia${daysLeft > 1 ? 's' : ''}`} • ${fmt.currency(a.amount)} <span style="font-size:10px;margin-left:2px;opacity:0.8">➔</span></button>`;
-            }).join('')}
-          </div>
+      <!-- COLUNA DIREITA: CARDS & SALDOS FIXOS -->
+      <div class="dash-cockpit-sidebar">
+        <div style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
+          <span>💳</span> Carteira & Cartões
         </div>
-      </div>` : ''}
+        ${renderDashboardCardsGrid(summary, State.dashboardCardMemberFilter, State.dashboardCardTypeFilter)}
+      </div>
 
-      ${(summary.overduePreviousItems && summary.overduePreviousItems.length > 0) ? `
-      <!-- ⚠️ CONTAINER DE LANÇAMENTOS NÃO PAGOS DE MESES ANTERIORES -->
-      <div class="card overdue-container" style="border: 1px solid rgba(245, 158, 11, 0.4); background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(239, 68, 68, 0.05)); margin-bottom: 20px; padding: 18px 20px; border-radius: var(--radius); box-shadow: 0 4px 16px rgba(0,0,0,0.15);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(245, 158, 11, 0.18); border: 1px solid rgba(245, 158, 11, 0.35); display: flex; align-items: center; justify-content: center; font-size: 18px;">
-              ⚠️
+    </div>
+  `;
+}
+
+/**
+ * Renderiza a Aba de Visão Geral (Patrimônio e Saldos Reais)
+ */
+async function renderGeneralDashboardTab() {
+  document.getElementById('dash-subtitle').innerText = 'Consolidado — Patrimônio e Saldos Reais';
+  document.getElementById('dash-period-wrapper').innerHTML = '';
+
+  const [summaryGeral, monthly, patrimony] = await Promise.all([
+    window.api.dashboard.getGeneralSummary({ userId: State.user.id }),
+    window.api.dashboard.getMonthlyChart({ userId: State.user.id, months: 6 }),
+    window.api.reports.getPatrimony({ userId: State.user.id }),
+  ]);
+
+  const creditAccounts = summaryGeral.accounts.filter(a => a.type === 'credit');
+  const debitAccounts  = summaryGeral.accounts.filter(a => a.type !== 'credit');
+
+  const contentDiv = document.getElementById('dashboard-tab-content');
+  contentDiv.innerHTML = `
+    <!-- Top summary cards for General View -->
+    <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 20px">
+      <div class="kpi-card kpi-balance">
+        <div class="kpi-label">Patrimônio Líquido Total</div>
+        <div class="kpi-value" style="color:var(--accent-light)">${fmt.currency(summaryGeral.totalNet)}</div>
+        <div class="kpi-sub">saldo ativo − faturas abertas</div>
+        <div class="kpi-icon">🏛️</div>
+      </div>
+      <div class="kpi-card kpi-income">
+        <div class="kpi-label">Saldo em Contas e Carteiras</div>
+        <div class="kpi-value">${fmt.currency(summaryGeral.totalAssets)}</div>
+        <div class="kpi-sub">${debitAccounts.length} conta(s) ativas</div>
+        <div class="kpi-icon">💰</div>
+      </div>
+      <div class="kpi-card kpi-expense">
+        <div class="kpi-label">Comprometido em Cartões</div>
+        <div class="kpi-value" style="color:#f87171">${fmt.currency(summaryGeral.totalCardSpent)}</div>
+        <div class="kpi-sub">${creditAccounts.length} cartão(ões)</div>
+        <div class="kpi-icon">💳</div>
+      </div>
+      <div class="kpi-card kpi-pending">
+        <div class="kpi-label">Total Guardado em Cofrinhos</div>
+        <div class="kpi-value" style="color:#c084fc">${fmt.currency(summaryGeral.goals.reduce((acc, g) => acc + (g.current_amount || 0), 0))}</div>
+        <div class="kpi-sub">${summaryGeral.goals.length} meta(s) ativas</div>
+        <div class="kpi-icon">🎯</div>
+      </div>
+    </div>
+
+    <!-- Cards and Accounts -->
+    ${(creditAccounts.length > 0 || debitAccounts.length > 0) ? `
+    <div style="margin-bottom:24px">
+      <div style="font-size:13px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px">🏦 Todas as Contas e Cartões da Família</div>
+      <div class="cards-widget-grid" id="cards-widget-grid-general">
+        ${creditAccounts.map(acc => renderCreditCardWidget(acc, summaryGeral.cardSpending[acc.id] || 0, null)).join('')}
+        ${debitAccounts.map(acc => renderDebitAccountStaticWidget(acc)).join('')}
+      </div>
+    </div>` : ''}
+
+    <!-- Goals and Graphs -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(380px, 1fr));gap:16px;margin-bottom:16px">
+      <div class="card">
+        <div class="card-title">🎯 Objetivos & Cofrinhos</div>
+        <div style="display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;padding-right:4px">
+          ${summaryGeral.goals.length === 0
+            ? `<div class="no-data">Nenhum cofrinho ativo cadastrado.<br><small>Defina metas em Objetivos.</small></div>`
+            : summaryGeral.goals.map(goal => renderDashboardGoalItem(goal)).join('')
+          }
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="card-title">Receitas × Despesas (Últimos 6 meses)</div>
+        <canvas id="chart-monthly-general" style="max-height:220px"></canvas>
+      </div>
+    </div>
+
+    <!-- Historical Net Worth Evolution -->
+    <div class="chart-card" style="margin-bottom:16px">
+      <div class="card-title">Evolução Patrimonial Mensal (Últimos 12 meses)</div>
+      <canvas id="chart-patrimony" style="max-height:220px"></canvas>
+    </div>
+  `;
+
+  // Render general charts
+  if (document.getElementById('chart-monthly-general')) {
+    State.charts.monthly = new Chart(document.getElementById('chart-monthly-general'), {
+      type: 'bar',
+      data: {
+        labels: monthly.map(m => m.month),
+        datasets: [
+          { label: 'Receitas', data: monthly.map(m => m.income), backgroundColor: 'rgba(16,185,129,0.75)', borderRadius: 6 },
+          { label: 'Despesas', data: monthly.map(m => m.expense), backgroundColor: 'rgba(239,68,68,0.75)', borderRadius: 6 },
+        ]
+      },
+      options: chartOptions('bar')
+    });
+  }
+
+  if (document.getElementById('chart-patrimony')) {
+    const ctxPat = document.getElementById('chart-patrimony').getContext('2d');
+    const gradPat = ctxPat.createLinearGradient(0, 0, 0, 200);
+    gradPat.addColorStop(0, 'rgba(59, 130, 246, 0.4)');
+    gradPat.addColorStop(1, 'rgba(59, 130, 246, 0.0)');
+
+    State.charts.patrimony = new Chart(ctxPat, {
+      type: 'line',
+      data: {
+        labels: patrimony.map(p => p.month),
+        datasets: [{
+          label: 'Patrimônio Líquido',
+          data: patrimony.map(p => p.net),
+          borderColor: '#3b82f6',
+          backgroundColor: gradPat,
+          fill: true,
+          tension: 0.35,
+          borderWidth: 3,
+          pointBackgroundColor: '#3b82f6',
+          pointBorderColor: '#1e293b',
+          pointBorderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6
+        }]
+      },
+      options: chartOptions('line')
+    });
+  }
+
+  // Bind clickable cards in General tab
+  contentDiv.querySelectorAll('.bank-card-credit').forEach(cardWidget => {
+    cardWidget.onclick = () => {
+      const cardId = parseInt(cardWidget.dataset.cardId);
+      const cardColor = cardWidget.dataset.bankColor;
+      const cardName = cardWidget.dataset.cardName;
+      State.highlightCardId = cardId;
+      State.highlightCardColor = cardColor;
+      State.highlightCardName = cardName;
+      State.highlightAccountId = null;
+      State.highlightAccountColor = null;
+      State.highlightAccountName = null;
+      State.currentRecurringTab = 'expense';
+      navigate('recurring');
+    };
+  });
+
+  contentDiv.querySelectorAll('.bank-card-debit').forEach(debitWidget => {
+    debitWidget.onclick = () => {
+      const accId = parseInt(debitWidget.dataset.accountId);
+      const accColor = debitWidget.dataset.bankColor;
+      const accName = debitWidget.dataset.accountName;
+      State.highlightAccountId = accId;
+      State.highlightAccountColor = accColor;
+      State.highlightAccountName = accName;
+      State.highlightCardId = null;
+      State.highlightCardColor = null;
+      State.highlightCardName = null;
+      State.currentRecurringTab = 'income';
+      navigate('recurring');
+    };
+  });
+}
+
+/**
+ * Registra todos os Event Listeners dos componentes do Dashboard Mensal
+ */
+function bindDashboardEvents(contentDiv, summary, txs, monthly, today) {
+  // 1. Sub-Tabs Switcher (para Layout Tabbed)
+  contentDiv.querySelectorAll('.dash-subtab-btn').forEach(btn => {
+    btn.onclick = () => {
+      const sub = btn.dataset.subtab;
+      State.activeDashSubTab = sub;
+      renderDashboard();
+    };
+  });
+
+  // 2. Member & Type Filters nos Cards
+  contentDiv.querySelectorAll('.dash-filter-chip').forEach(chip => {
+    chip.onclick = () => {
+      if (chip.dataset.memberFilter !== undefined) {
+        State.dashboardCardMemberFilter = chip.dataset.memberFilter;
+      }
+      if (chip.dataset.typeFilter !== undefined) {
+        State.dashboardCardTypeFilter = chip.dataset.typeFilter;
+      }
+      renderDashboard();
+    };
+  });
+
+  // 3. Action Pills Clicks & Details Toggles
+  const expandedContainer = contentDiv.querySelector('#dash-alerts-expanded-container');
+
+  const pillDedup = contentDiv.querySelector('#pill-dedup');
+  if (pillDedup) {
+    pillDedup.onclick = () => openDeduplicationModal();
+  }
+
+  const pillOverdue = contentDiv.querySelector('#pill-overdue');
+  if (pillOverdue && expandedContainer) {
+    pillOverdue.onclick = () => {
+      const isVisible = expandedContainer.style.display === 'block' && expandedContainer.dataset.activeType === 'overdue';
+      if (isVisible) {
+        expandedContainer.style.display = 'none';
+        expandedContainer.innerHTML = '';
+        expandedContainer.dataset.activeType = '';
+      } else {
+        expandedContainer.style.display = 'block';
+        expandedContainer.dataset.activeType = 'overdue';
+        expandedContainer.innerHTML = `
+          <div class="card overdue-container" style="border: 1px solid rgba(245, 158, 11, 0.4); background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(239, 68, 68, 0.05)); padding: 16px; border-radius: var(--radius);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <div style="font-size: 13px; font-weight: 800; color: #fbbf24;">⚠️ Pendências de Meses Anteriores Não Pagas (${summary.overduePreviousItems.length})</div>
+              <button class="btn btn-secondary btn-sm" id="btn-close-expanded-alerts" style="padding: 2px 8px; font-size: 11px;">✕ Fechar</button>
             </div>
-            <div>
-              <div style="font-size: 14px; font-weight: 800; color: #fbbf24; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px;">
-                Pendências de Meses Anteriores Não Pagas
-                <span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px;">
-                  ${summary.overduePreviousItems.length} pendência${summary.overduePreviousItems.length > 1 ? 's' : ''}
-                </span>
-              </div>
-              <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
-                Lançamentos anteriores a <strong>${fmt.monthYear(State.currentMonth, State.currentYear)}</strong> em aberto. Clique no item para abrir direto no mês correspondente.
-              </div>
-            </div>
-          </div>
-          <div style="text-align: right;">
-            <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Total Acumulado</div>
-            <div style="font-size: 18px; font-weight: 900; color: #f87171;">
-              ${fmt.currency(summary.overduePreviousItems.reduce((acc, t) => acc + (t.type === 'expense' ? t.amount : -t.amount), 0))}
-            </div>
-          </div>
-        </div>
-
-        <div class="overdue-items-list" style="max-height: 290px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
-          ${summary.overduePreviousItems.map(item => {
-            const parts = (item.date || '').split('-');
-            const itemYear = parts[0];
-            const itemMonth = parseInt(parts[1], 10);
-            const formattedDate = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : item.date;
-            const isExpense = item.type === 'expense';
-            const userBadge = item.user_name ? `<span class="profile-badge" style="background:${item.user_avatar_color || '#10b981'}22;color:${item.user_avatar_color || '#10b981'};border:1px solid ${item.user_avatar_color || '#10b981'}44;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600;">${item.user_name}</span>` : '';
-            const accountBadge = item.account_name ? `<span style="font-size: 10px; color: var(--text-muted); font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">🏦 ${item.account_name}</span>` : '';
-
-            return `
-              <div class="overdue-item-row" 
-                   data-tx-id="${item.id}" 
-                   data-rec-id="${item.recurring_item_id || ''}" 
-                   data-type="${item.type}" 
-                   data-month="${itemMonth}" 
-                   data-year="${itemYear}"
-                   title="Clique para ir até '${item.description || item.rec_name || 'este lançamento'}' em ${fmt.monthYear(itemMonth, itemYear)}"
-                   style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; transition: all 0.2s ease;">
-                
-                <div style="display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1;">
-                  <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 10px; font-weight: 700; padding: 4px 8px; border-radius: 6px; white-space: nowrap;">
-                    📅 ${fmt.monthYear(itemMonth, itemYear)}
-                  </span>
-                  
-                  <div style="font-size: 18px; line-height: 1;">${item.category_icon || item.rec_icon || (isExpense ? '📋' : '💰')}</div>
-
-                  <div style="min-width: 0; flex: 1;">
-                    <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px;">
-                      ${item.description || item.rec_name || 'Lançamento sem descrição'}
-                      ${userBadge}
+            <div class="overdue-items-list" style="max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+              ${summary.overduePreviousItems.map(item => {
+                const parts = (item.date || '').split('-');
+                const itemYear = parts[0];
+                const itemMonth = parseInt(parts[1], 10);
+                const isExpense = item.type === 'expense';
+                return `
+                  <div class="overdue-item-row" data-tx-id="${item.id}" data-rec-id="${item.recurring_item_id || ''}" data-type="${item.type}" data-month="${itemMonth}" data-year="${itemYear}" style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;">
+                    <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+                      <span class="badge" style="font-size: 9px; padding: 2px 6px;">📅 ${fmt.monthYear(itemMonth, itemYear)}</span>
+                      <span style="font-size: 12px; font-weight: 700; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.description || item.rec_name}</span>
                     </div>
-                    <div style="font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 8px; margin-top: 2px;">
-                      <span>Vencimento: <strong>${formattedDate}</strong></span>
-                      ${accountBadge}
+                    <div style="font-size: 12.5px; font-weight: 800; color: ${isExpense ? '#f87171' : 'var(--accent-light)'};">
+                      ${isExpense ? '− ' : '+ '}${fmt.currency(item.amount)} ➔
                     </div>
                   </div>
-                </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+        bindOverdueClickEvents(expandedContainer);
+      }
+    };
+  }
 
-                <div style="display: flex; align-items: center; gap: 14px; flex-shrink: 0;">
-                  <div style="text-align: right;">
-                    <div style="font-size: 14px; font-weight: 800; color: ${isExpense ? '#f87171' : 'var(--accent-light)'};">
-                      ${isExpense ? '− ' : '+ '}${fmt.currency(item.amount)}
-                    </div>
-                    <div style="font-size: 10px; color: #f87171; font-weight: 600;">Não pago</div>
-                  </div>
-                  
-                  <div class="overdue-go-btn" style="width: 28px; height: 28px; border-radius: 50%; background: var(--bg-hover); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: #fbbf24; font-size: 12px; transition: transform 0.2s;">
-                    ➔
-                  </div>
-                </div>
+  const pillExpense = contentDiv.querySelector('#pill-expense-alerts');
+  if (pillExpense && expandedContainer) {
+    pillExpense.onclick = () => {
+      const isVisible = expandedContainer.style.display === 'block' && expandedContainer.dataset.activeType === 'expense';
+      if (isVisible) {
+        expandedContainer.style.display = 'none';
+        expandedContainer.innerHTML = '';
+        expandedContainer.dataset.activeType = '';
+      } else {
+        expandedContainer.style.display = 'block';
+        expandedContainer.dataset.activeType = 'expense';
+        const expenseAlerts = (summary.alertItems || []).filter(a => a.type !== 'income');
+        expandedContainer.innerHTML = `
+          <div class="card" style="border: 1px solid rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.06); padding: 14px; border-radius: var(--radius);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <div style="font-size: 13px; font-weight: 800; color: #f87171;">🚨 Vencimentos nos Próximos ${summary.alertDays} Dias</div>
+              <button class="btn btn-secondary btn-sm" id="btn-close-expanded-alerts" style="padding: 2px 8px; font-size: 11px;">✕ Fechar</button>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              ${expenseAlerts.map(a => {
+                const daysLeft = a.due_day - today;
+                return `<button type="button" class="alert-chip alert-chip-expense btn-alert-link" data-rec-id="${a.recurring_item_id || ''}" data-tx-id="${a.id || ''}" data-type="expense">${a.rec_icon || '📋'} ${a.rec_name} — ${daysLeft === 0 ? 'Hoje!' : `em ${daysLeft}d`} • ${fmt.currency(a.amount)} ➔</button>`;
+              }).join('')}
+            </div>
+          </div>
+        `;
+        bindAlertChipEvents(expandedContainer);
+      }
+    };
+  }
 
-              </div>
-            `;
-          }).join('')}
-        </div>
-      </div>` : ''}
+  const pillIncome = contentDiv.querySelector('#pill-income-alerts');
+  if (pillIncome && expandedContainer) {
+    pillIncome.onclick = () => {
+      const isVisible = expandedContainer.style.display === 'block' && expandedContainer.dataset.activeType === 'income';
+      if (isVisible) {
+        expandedContainer.style.display = 'none';
+        expandedContainer.innerHTML = '';
+        expandedContainer.dataset.activeType = '';
+      } else {
+        expandedContainer.style.display = 'block';
+        expandedContainer.dataset.activeType = 'income';
+        const incomeAlerts = (summary.alertItems || []).filter(a => a.type === 'income');
+        expandedContainer.innerHTML = `
+          <div class="card" style="border: 1px solid rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.06); padding: 14px; border-radius: var(--radius);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <div style="font-size: 13px; font-weight: 800; color: var(--accent-light);">💰 Recebimentos nos Próximos ${summary.alertDays} Dias</div>
+              <button class="btn btn-secondary btn-sm" id="btn-close-expanded-alerts" style="padding: 2px 8px; font-size: 11px;">✕ Fechar</button>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              ${incomeAlerts.map(a => {
+                const daysLeft = a.due_day - today;
+                return `<button type="button" class="alert-chip alert-chip-income btn-alert-link" data-rec-id="${a.recurring_item_id || ''}" data-tx-id="${a.id || ''}" data-type="income">${a.rec_icon || '💼'} ${a.rec_name} — ${daysLeft === 0 ? 'Hoje!' : `em ${daysLeft}d`} • ${fmt.currency(a.amount)} ➔</button>`;
+              }).join('')}
+            </div>
+          </div>
+        `;
+        bindAlertChipEvents(expandedContainer);
+      }
+    };
+  }
 
-      <!-- KPI Cards -->
+  // 4. Clickable priority and transaction items
+  contentDiv.querySelectorAll('.btn-alert-link, .priority-item-clickable').forEach(btn => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      const recId = btn.dataset.recId;
+      const txId = btn.dataset.txId;
+      const type = btn.dataset.type || 'expense';
+      goToTransaction({ recurringId: recId, txId, type, month: State.currentMonth, year: State.currentYear });
+    };
+  });
+
+  // 5. Clickable credit card widgets to open Planejamento > Despesas and highlight its installments
+  contentDiv.querySelectorAll('.bank-card-credit').forEach(cardWidget => {
+    cardWidget.onclick = () => {
+      const cardId = parseInt(cardWidget.dataset.cardId);
+      const cardColor = cardWidget.dataset.bankColor;
+      const cardName = cardWidget.dataset.cardName;
+      State.highlightCardId = cardId;
+      State.highlightCardColor = cardColor;
+      State.highlightCardName = cardName;
+      State.highlightAccountId = null;
+      State.highlightAccountColor = null;
+      State.highlightAccountName = null;
+      State.currentRecurringTab = 'expense';
+      navigate('recurring');
+    };
+  });
+
+  // 6. Clickable debit account widgets
+  contentDiv.querySelectorAll('.bank-card-debit').forEach(debitWidget => {
+    debitWidget.onclick = () => {
+      const accId = parseInt(debitWidget.dataset.accountId);
+      const accColor = debitWidget.dataset.bankColor;
+      const accName = debitWidget.dataset.accountName;
+      State.highlightAccountId = accId;
+      State.highlightAccountColor = accColor;
+      State.highlightAccountName = accName;
+      State.highlightCardId = null;
+      State.highlightCardColor = null;
+      State.highlightCardName = null;
+      State.currentRecurringTab = 'income';
+      navigate('recurring');
+    };
+  });
+
+  // 7. Render Charts
+  if (document.getElementById('chart-monthly')) {
+    State.charts.monthly = new Chart(document.getElementById('chart-monthly'), {
+      type: 'bar',
+      data: {
+        labels: monthly.map(m => m.month),
+        datasets: [
+          { label: 'Receitas', data: monthly.map(m => m.income), backgroundColor: 'rgba(16,185,129,0.75)', borderRadius: 6 },
+          { label: 'Despesas', data: monthly.map(m => m.expense), backgroundColor: 'rgba(239,68,68,0.75)', borderRadius: 6 },
+        ]
+      },
+      options: chartOptions('bar')
+    });
+  }
+
+  if (document.getElementById('dashboard-category-interactive-card')) {
+    setupCategoryInteractiveChart('dashboard-category-interactive-card', 'category', txs);
+  }
+}
+
+function bindAlertChipEvents(container) {
+  const closeBtn = container.querySelector('#btn-close-expanded-alerts');
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      container.style.display = 'none';
+      container.innerHTML = '';
+      container.dataset.activeType = '';
+    };
+  }
+  container.querySelectorAll('.btn-alert-link').forEach(btn => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      const recId = btn.dataset.recId;
+      const txId = btn.dataset.txId;
+      const type = btn.dataset.type || 'expense';
+      goToTransaction({ recurringId: recId, txId, type, month: State.currentMonth, year: State.currentYear });
+    };
+  });
+}
+
+function bindOverdueClickEvents(container) {
+  const closeBtn = container.querySelector('#btn-close-expanded-alerts');
+  if (closeBtn) {
+    closeBtn.onclick = () => {
+      container.style.display = 'none';
+      container.innerHTML = '';
+      container.dataset.activeType = '';
+    };
+  }
+  container.querySelectorAll('.overdue-item-row').forEach(row => {
+    row.onclick = (e) => {
+      e.preventDefault();
+      const txId = row.dataset.txId;
+      const recId = row.dataset.recId;
+      const type = row.dataset.type || 'expense';
+      const month = parseInt(row.dataset.month, 10);
+      const year = parseInt(row.dataset.year, 10);
+      goToTransaction({ recurringId: recId, txId, type, month, year });
+    };
+  });
+}
+
+
+/* ==== dashboard-main-1b.js ==== */
+/* === dashboard-main-1b.js (parte 2/2 de dashboard-main-1.js) ===
+ * Componentes Modulares e Widgets do Dashboard
+ */
+
+/**
+ * Renderiza a Hero Section com KPIs Consolidados e Barra de Progresso Integrada
+ */
+function renderDashboardHeroKpis(summary, recurringPct) {
+  const pendingCount = (summary.totalRecurring || 0) - (summary.paidRecurring || 0);
+  const forecastedBalance = (summary.income || 0) - (summary.expense || 0) - (summary.pending || 0);
+
+  return `
+    <div class="dash-hero-section" style="margin-bottom: 16px;">
       <div class="kpi-grid">
         <div class="kpi-card kpi-income">
           <div class="kpi-label">Receitas</div>
@@ -975,377 +1434,255 @@ async function renderDashboard() {
         <div class="kpi-card kpi-pending">
           <div class="kpi-label">À Pagar</div>
           <div class="kpi-value">${fmt.currency(summary.pending)}</div>
-          <div class="kpi-sub">${summary.totalRecurring - summary.paidRecurring} item(s) pendente(s)</div>
+          <div class="kpi-sub">${pendingCount} item(s) pendente(s)</div>
           <div class="kpi-icon">⏳</div>
         </div>
       </div>
 
-      <!-- Progress bar recorrências -->
-      <div class="card" style="margin-bottom:16px;padding:16px 20px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <div style="font-size:13px;font-weight:600">Recorrências do mês — ${summary.paidRecurring} de ${summary.totalRecurring} pagas</div>
-          <div style="font-size:13px;font-weight:700;color:${recurringPct >= 100 ? 'var(--accent-light)' : 'var(--text-secondary)'}">${recurringPct}%</div>
+      <!-- Barra de Progresso Integrada e Previsão -->
+      <div class="card" style="margin-top: 10px; padding: 12px 18px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 10px; flex: 1; min-width: 240px;">
+          <span style="font-size: 16px;">🎯</span>
+          <div style="flex: 1;">
+            <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; margin-bottom: 4px;">
+              <span>Progresso de Contas: <strong>${summary.paidRecurring} de ${summary.totalRecurring} pagas</strong></span>
+              <span style="color: ${recurringPct >= 100 ? 'var(--accent-light)' : 'var(--text-secondary)'}; font-weight: 700;">${recurringPct}%</span>
+            </div>
+            <div class="progress-bar" style="height: 7px; margin: 0;">
+              <div class="progress-fill ${recurringPct >= 100 ? 'progress-ok' : recurringPct >= 60 ? 'progress-warn' : 'progress-ok'}" style="width: ${recurringPct}%"></div>
+            </div>
+          </div>
         </div>
-        <div class="progress-bar" style="height:10px">
-          <div class="progress-fill ${recurringPct >= 100 ? 'progress-ok' : recurringPct >= 60 ? 'progress-warn' : 'progress-ok'}" style="width:${recurringPct}%"></div>
+        <div style="font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+          <span>Previsão de Fechamento:</span>
+          <strong style="color: ${forecastedBalance >= 0 ? 'var(--accent-light)' : '#f87171'}; font-size: 12.5px;">
+            ${fmt.currency(forecastedBalance)}
+          </strong>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Renderiza o Hub de Alertas em Formato de Action Pills Horizontais Compactas
+ */
+function renderDashboardActionPills(summary, potentialDuplicates, today) {
+  const incomeAlerts = (summary.alertItems || []).filter(a => a.type === 'income');
+  const expenseAlerts = (summary.alertItems || []).filter(a => a.type !== 'income');
+  const overdueCount = summary.overduePreviousItems ? summary.overduePreviousItems.length : 0;
+  const overdueTotal = summary.overduePreviousItems ? summary.overduePreviousItems.reduce((acc, t) => acc + (t.type === 'expense' ? t.amount : -t.amount), 0) : 0;
+  const dupCount = potentialDuplicates ? potentialDuplicates.length : 0;
+
+  if (dupCount === 0 && incomeAlerts.length === 0 && expenseAlerts.length === 0 && overdueCount === 0) {
+    return '<div id="dash-alerts-expanded-container" style="display: none;"></div>';
+  }
+
+  return `
+    <div class="dash-action-pills-bar">
+      ${dupCount > 0 ? `
+        <div class="dash-action-pill dash-action-pill-dedup" id="pill-dedup" title="Clique para conciliar lançamentos duplicados">
+          <span>🛡️</span>
+          <span>${dupCount} duplicidade${dupCount > 1 ? 's' : ''}</span>
+          <span style="opacity: 0.8; font-size: 10px;">➔</span>
+        </div>` : ''}
+
+      ${overdueCount > 0 ? `
+        <div class="dash-action-pill dash-action-pill-overdue" id="pill-overdue" title="Clique para ver pendências de meses anteriores">
+          <span>⚠️</span>
+          <span>${overdueCount} atrasada${overdueCount > 1 ? 's' : ''} (${fmt.currency(overdueTotal)})</span>
+          <span class="pill-arrow" id="pill-overdue-arrow" style="opacity: 0.8; font-size: 10px;">▾</span>
+        </div>` : ''}
+
+      ${expenseAlerts.length > 0 ? `
+        <div class="dash-action-pill dash-action-pill-expense" id="pill-expense-alerts" title="Próximos vencimentos nos próximos ${summary.alertDays} dias">
+          <span>🚨</span>
+          <span>${expenseAlerts.length} vencimento${expenseAlerts.length > 1 ? 's' : ''}</span>
+          <span class="pill-arrow" id="pill-expense-arrow" style="opacity: 0.8; font-size: 10px;">▾</span>
+        </div>` : ''}
+
+      ${incomeAlerts.length > 0 ? `
+        <div class="dash-action-pill dash-action-pill-income" id="pill-income-alerts" title="Recebimentos nos próximos ${summary.alertDays} dias">
+          <span>💰</span>
+          <span>${incomeAlerts.length} recebimento${incomeAlerts.length > 1 ? 's' : ''}</span>
+          <span class="pill-arrow" id="pill-income-arrow" style="opacity: 0.8; font-size: 10px;">▾</span>
+        </div>` : ''}
+    </div>
+
+    <!-- Dropdown / Container expansível de detalhes dos alertas se aberto -->
+    <div id="dash-alerts-expanded-container" style="display: none; margin-bottom: 16px;"></div>
+  `;
+}
+
+/**
+ * Renderiza a Grade de Cartões e Contas com Filtros por Membro e Tipo
+ */
+function renderDashboardCardsGrid(summary, filterUser = 'all', filterType = 'all') {
+  let creditAccounts = summary.accounts.filter(a => a.type === 'credit');
+  let debitAccounts  = summary.accounts.filter(a => a.type !== 'credit' && a.type !== 'investment');
+
+  // Extract unique family members from accounts
+  const membersMap = new Map();
+  summary.accounts.forEach(a => {
+    if (a.user_name && a.user_id) {
+      membersMap.set(a.user_id, { id: a.user_id, name: a.user_name, color: a.user_avatar_color || '#10b981' });
+    }
+  });
+  const members = Array.from(membersMap.values());
+
+  // Filter accounts if applied
+  if (filterUser && filterUser !== 'all') {
+    creditAccounts = creditAccounts.filter(a => String(a.user_id) === String(filterUser));
+    debitAccounts = debitAccounts.filter(a => String(a.user_id) === String(filterUser));
+  }
+
+  if (filterType === 'credit') {
+    debitAccounts = [];
+  } else if (filterType === 'debit') {
+    creditAccounts = [];
+  }
+
+  const hasAny = creditAccounts.length > 0 || debitAccounts.length > 0;
+
+  return `
+    <div style="margin-bottom: 20px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+        <div style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
+          <span>🏦</span> Previsibilidade de Contas e Cartões
+        </div>
+
+        <!-- Filter Chips -->
+        <div class="dash-filter-pills-wrap" style="margin-bottom: 0;">
+          <button class="dash-filter-chip ${State.dashboardCardMemberFilter === 'all' ? 'active' : ''}" data-member-filter="all">Todos</button>
+          ${members.map(m => `
+            <button class="dash-filter-chip ${String(State.dashboardCardMemberFilter) === String(m.id) ? 'active' : ''}" data-member-filter="${m.id}" style="display: flex; align-items: center; gap: 4px;">
+              <span style="width: 8px; height: 8px; border-radius: 50%; background: ${m.color};"></span>
+              ${m.name}
+            </button>
+          `).join('')}
+          <span style="color: var(--border); margin: 0 2px;">|</span>
+          <button class="dash-filter-chip ${State.dashboardCardTypeFilter === 'all' ? 'active' : ''}" data-type-filter="all">Tudo</button>
+          <button class="dash-filter-chip ${State.dashboardCardTypeFilter === 'credit' ? 'active' : ''}" data-type-filter="credit">💳 Cartões</button>
+          <button class="dash-filter-chip ${State.dashboardCardTypeFilter === 'debit' ? 'active' : ''}" data-type-filter="debit">🏦 Contas</button>
         </div>
       </div>
 
-      <!-- Cards e Contas -->
-      ${(creditAccounts.length > 0 || debitAccounts.length > 0) ? `
-      <div style="margin-bottom:24px">
-        <div style="font-size:13px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px">🏦 Previsibilidade de Contas e Cartões</div>
+      ${hasAny ? `
         <div class="cards-widget-grid" id="cards-widget-grid">
           ${creditAccounts.map(acc => renderCreditCardWidget(acc, summary.cardSpending[acc.id] || 0, (summary.cardMonthlyInvoices && summary.cardMonthlyInvoices[acc.id]) !== undefined ? summary.cardMonthlyInvoices[acc.id] : null)).join('')}
           ${debitAccounts.map(acc => renderDebitAccountWidget(acc)).join('')}
         </div>
-      </div>` : `
-      <div class="card" style="margin-bottom:24px;text-align:center;padding:24px">
-        <div style="font-size:32px;margin-bottom:8px">🏦</div>
-        <div style="font-size:13px;color:var(--text-muted)">Nenhuma conta cadastrada ainda.</div>
-        <button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="navigate('accounts')">+ Adicionar conta</button>
-      </div>`}
-
-      <!-- Priority + Charts -->
-      <div class="dashboard-middle-grid" style="margin-bottom:16px;">
-        <!-- Prioridades -->
-        <div class="card">
-          <div class="card-title">⭐ Lançamentos prioritários</div>
-          <div style="display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;padding-right:4px">
-            ${summary.priorityItems.length === 0
-              ? `<div class="no-data">Nenhum item marcado como prioritário.<br><small>Marque itens como ⭐ em Planejamento.</small></div>`
-              : summary.priorityItems.map(item => `
-                <div class="priority-item priority-item-clickable ${item.is_paid ? 'priority-paid' : 'priority-pending'}" data-rec-id="${item.recurring_item_id || item.id || ''}" data-tx-id="${item.id || ''}" data-type="${item.type || 'expense'}" style="margin-bottom:0" title="Clique para abrir no Planejamento">
-                  <div style="font-size:18px">${item.rec_icon || '📋'}</div>
-                  <div style="flex:1;min-width:0">
-                    <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.rec_name || item.description}</div>
-                    <div style="font-size:11px;color:var(--text-muted)">${item.account_name || '—'} • dia ${item.due_day || '?'}</div>
-                  </div>
-                  <div style="text-align:right;flex-shrink:0">
-                    <div style="font-weight:700;font-size:14px;color:${item.type === 'income' ? 'var(--accent-light)' : '#f87171'}">${item.type === 'income' ? '+' : '-'}${fmt.currency(item.amount)}</div>
-                    <span class="transaction-status ${item.is_paid ? 'status-paid' : 'status-pending'}">${item.is_paid ? '✓ Pago' : '⏳ Pendente'}</span>
-                  </div>
-                </div>`).join('')
-            }
-          </div>
+      ` : `
+        <div class="card" style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 13px;">
+          Nenhuma conta ou cartão cadastrado para os filtros selecionados.
         </div>
-
-        <!-- Category Chart -->
-        <div class="chart-card" id="dashboard-category-interactive-card" style="display: flex; flex-direction: column;">
-          <div class="card-title">Despesas por categoria</div>
-        </div>
-      </div>
-
-      <!-- Quadros: Contas Pagas e Contas a Pagar (Acima do gráfico de 6 meses) -->
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 16px;">
-        
-        <!-- Quadro Contas Pagas -->
-        <div class="card" style="display: flex; flex-direction: column;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border);">
-            <div class="card-title" style="margin-bottom:0; display:flex; align-items:center; gap:6px;">
-              <span>✅</span> Contas Pagas <span class="badge" style="background:var(--accent-dim); color:var(--accent-light); margin-left:4px;">${paidBills.length}</span>
-            </div>
-            <div style="font-size: 14px; font-weight: 700; color: var(--accent-light);">${fmt.currency(totalPaidAmount)}</div>
-          </div>
-          <div style="display: flex; flex-direction: column; gap: 8px; max-height: 240px; overflow-y: auto; padding-right: 4px;">
-            ${paidBills.length === 0
-              ? `<div class="no-data">Nenhuma conta paga neste mês.</div>`
-              : paidBills.map(item => `
-                <div class="priority-item priority-item-clickable priority-paid" data-rec-id="${item.recurring_item_id || ''}" data-tx-id="${item.id || ''}" data-type="${item.type || 'expense'}" style="margin-bottom:0" title="Clique para abrir no Planejamento">
-                  <div style="font-size:18px">${item.category_icon || '💸'}</div>
-                  <div style="flex:1;min-width:0">
-                    <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.description}</div>
-                    <div style="font-size:11px;color:var(--text-muted)">${item.account_name || 'Geral'} • ${fmt.date(item.date)}${item.is_paid && item.payment_date && item.payment_date !== item.date ? ` • <span style="color:var(--accent-light)">pago em ${fmt.date(item.payment_date)}</span>` : ''}</div>
-                  </div>
-                  <div style="text-align:right;flex-shrink:0">
-                    <div style="font-weight:700;font-size:14px;color:var(--accent-light)">-${fmt.currency(item.amount)}</div>
-                    <span class="transaction-status status-paid">✓ Pago</span>
-                  </div>
-                </div>`).join('')
-            }
-          </div>
-        </div>
-
-        <!-- Quadro Contas a Pagar -->
-        <div class="card" style="display: flex; flex-direction: column;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border);">
-            <div class="card-title" style="margin-bottom:0; display:flex; align-items:center; gap:6px;">
-              <span>⏳</span> Contas a Pagar <span class="badge" style="background:var(--danger-dim); color:#f87171; margin-left:4px;">${unpaidBills.length}</span>
-            </div>
-            <div style="font-size: 14px; font-weight: 700; color: #f87171;">${fmt.currency(totalUnpaidAmount)}</div>
-          </div>
-          <div style="display: flex; flex-direction: column; gap: 8px; max-height: 240px; overflow-y: auto; padding-right: 4px;">
-            ${unpaidBills.length === 0
-              ? `<div class="no-data">Nenhuma conta a pagar pendente neste mês.</div>`
-              : unpaidBills.map(item => `
-                <div class="priority-item priority-item-clickable priority-pending" data-rec-id="${item.recurring_item_id || ''}" data-tx-id="${item.id || ''}" data-type="${item.type || 'expense'}" style="margin-bottom:0" title="Clique para abrir no Planejamento">
-                  <div style="font-size:18px">${item.category_icon || '📋'}</div>
-                  <div style="flex:1;min-width:0">
-                    <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.description}</div>
-                    <div style="font-size:11px;color:var(--text-muted)">${item.account_name || 'Geral'} • ${fmt.date(item.date)}</div>
-                  </div>
-                  <div style="text-align:right;flex-shrink:0">
-                    <div style="font-weight:700;font-size:14px;color:#f87171">-${fmt.currency(item.amount)}</div>
-                    <span class="transaction-status status-pending">⏳ Pendente</span>
-                  </div>
-                </div>`).join('')
-            }
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Monthly Chart -->
-      <div class="chart-card">
-        <div class="card-title">Receitas × Despesas — últimos 6 meses</div>
-        <canvas id="chart-monthly" style="max-height:200px"></canvas>
-      </div>
-    `;
-
-    // Bind Anti-Duplication Banner Click
-    const dedupBannerBtn = contentDiv.querySelector('#btn-open-dedup-banner');
-    if (dedupBannerBtn) {
-      dedupBannerBtn.onclick = () => openDeduplicationModal();
-    }
-
-    // Bind clickable alert chips and priority items to navigate directly to Planejamento
-    contentDiv.querySelectorAll('.btn-alert-link, .priority-item-clickable').forEach(btn => {
-      btn.onclick = (e) => {
-        e.preventDefault();
-        const recId = btn.dataset.recId;
-        const txId = btn.dataset.txId;
-        const type = btn.dataset.type || 'expense';
-        goToTransaction({ recurringId: recId, txId, type, month: State.currentMonth, year: State.currentYear });
-      };
-    });
-
-    // Bind clickable overdue previous items to navigate directly to the specific month/year and highlight transaction
-    contentDiv.querySelectorAll('.overdue-item-row').forEach(row => {
-      row.onclick = (e) => {
-        e.preventDefault();
-        const txId = row.dataset.txId;
-        const recId = row.dataset.recId;
-        const type = row.dataset.type || 'expense';
-        const month = parseInt(row.dataset.month, 10);
-        const year = parseInt(row.dataset.year, 10);
-        goToTransaction({ recurringId: recId, txId, type, month, year });
-      };
-    });
-
-    // Bind clickable credit card widgets to open Planejamento > Despesas and highlight its installments
-    contentDiv.querySelectorAll('.bank-card-credit').forEach(cardWidget => {
-      cardWidget.onclick = () => {
-        const cardId = parseInt(cardWidget.dataset.cardId);
-        const cardColor = cardWidget.dataset.bankColor;
-        const cardName = cardWidget.dataset.cardName;
-        State.highlightCardId = cardId;
-        State.highlightCardColor = cardColor;
-        State.highlightCardName = cardName;
-        State.highlightAccountId = null;
-        State.highlightAccountColor = null;
-        State.highlightAccountName = null;
-        State.currentRecurringTab = 'expense';
-        navigate('recurring');
-      };
-    });
-
-    // Bind clickable debit/checking account widgets to open Planejamento > Receitas and highlight its income transactions
-    contentDiv.querySelectorAll('.bank-card-debit').forEach(debitWidget => {
-      debitWidget.onclick = () => {
-        const accId = parseInt(debitWidget.dataset.accountId);
-        const accColor = debitWidget.dataset.bankColor;
-        const accName = debitWidget.dataset.accountName;
-        State.highlightAccountId = accId;
-        State.highlightAccountColor = accColor;
-        State.highlightAccountName = accName;
-        State.highlightCardId = null;
-        State.highlightCardColor = null;
-        State.highlightCardName = null;
-        State.currentRecurringTab = 'income';
-        navigate('recurring');
-      };
-    });
-
-    // Render monthly charts
-    if (document.getElementById('chart-monthly')) {
-      State.charts.monthly = new Chart(document.getElementById('chart-monthly'), {
-        type: 'bar',
-        data: {
-          labels: monthly.map(m => m.month),
-          datasets: [
-            { label: 'Receitas', data: monthly.map(m => m.income), backgroundColor: 'rgba(16,185,129,0.75)', borderRadius: 6 },
-            { label: 'Despesas', data: monthly.map(m => m.expense), backgroundColor: 'rgba(239,68,68,0.75)', borderRadius: 6 },
-          ]
-        },
-        options: chartOptions('bar')
-      });
-    }
-
-    setupCategoryInteractiveChart('dashboard-category-interactive-card', 'category', txs);
-    
-  } else {
-    // 🌐 VISÃO GERAL
-    document.getElementById('dash-subtitle').innerText = 'Consolidado — Patrimônio e Saldos Reais';
-    document.getElementById('dash-period-wrapper').innerHTML = ''; // No period selector for general tab
-
-    const [summaryGeral, monthly, patrimony] = await Promise.all([
-      window.api.dashboard.getGeneralSummary({ userId: State.user.id }),
-      window.api.dashboard.getMonthlyChart({ userId: State.user.id, months: 6 }),
-      window.api.reports.getPatrimony({ userId: State.user.id }),
-    ]);
-
-    const creditAccounts = summaryGeral.accounts.filter(a => a.type === 'credit');
-    const debitAccounts  = summaryGeral.accounts.filter(a => a.type !== 'credit');
-
-    const totalDebit = debitAccounts.reduce((sum, a) => sum + a.balance, 0);
-
-    const contentDiv = document.getElementById('dashboard-tab-content');
-    contentDiv.innerHTML = `
-      <!-- KPI Cards Geral -->
-      <div class="kpi-grid">
-        <div class="kpi-card kpi-balance">
-          <div class="kpi-label">Patrimônio Líquido</div>
-          <div class="kpi-value" style="color:${summaryGeral.netWorth >= 0 ? 'var(--accent-light)' : '#f87171'}">${fmt.currency(summaryGeral.netWorth)}</div>
-          <div class="kpi-sub">Saldos − faturas de cartões</div>
-          <div class="kpi-icon">💰</div>
-        </div>
-        <div class="kpi-card kpi-income">
-          <div class="kpi-label">Saldo em Contas</div>
-          <div class="kpi-value">${fmt.currency(totalDebit)}</div>
-          <div class="kpi-sub">soma de todas as contas</div>
-          <div class="kpi-icon">🏦</div>
-        </div>
-        <div class="kpi-card kpi-expense">
-          <div class="kpi-label">Dívida em Cartões</div>
-          <div class="kpi-value">${fmt.currency(summaryGeral.creditCardBalance)}</div>
-          <div class="kpi-sub">limites totais comprometidos</div>
-          <div class="kpi-icon">💳</div>
-        </div>
-        <div class="kpi-card kpi-pending">
-          <div class="kpi-label">À Pagar Total</div>
-          <div class="kpi-value">${fmt.currency(summaryGeral.totalPending)}</div>
-          <div class="kpi-sub">despesas não pagas no BD</div>
-          <div class="kpi-icon">⏳</div>
-        </div>
-      </div>
-
-      <!-- Real Accounts -->
-      ${summaryGeral.accounts.length > 0 ? `
-      <div style="margin-bottom:24px">
-        <div style="font-size:13px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px">🏦 Saldos e Faturas Atuais (Reais)</div>
-        <div class="cards-widget-grid">
-          ${creditAccounts.map(acc => renderCreditCardWidget(acc, acc.credit_used !== undefined ? acc.credit_used : (acc.balance < 0 ? -acc.balance : 0))).join('')}
-          ${debitAccounts.map(acc => renderDebitAccountStaticWidget(acc)).join('')}
-        </div>
-      </div>` : ''}
-
-      <!-- Goals and Graphs -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-        <!-- Savings Goals -->
-        <div class="card">
-          <div class="card-title">🎯 Objetivos & Cofrinhos</div>
-          <div style="display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;padding-right:4px">
-            ${summaryGeral.goals.length === 0
-              ? `<div class="no-data">Nenhum cofrinho ativo cadastrado.<br><small>Defina metas em Objetivos.</small></div>`
-              : summaryGeral.goals.map(goal => renderDashboardGoalItem(goal)).join('')
-            }
-          </div>
-        </div>
-
-        <!-- 6 Month revenues vs expenses bar chart -->
-        <div class="chart-card">
-          <div class="card-title">Receitas × Despesas (Últimos 6 meses)</div>
-          <canvas id="chart-monthly-general" style="max-height:220px"></canvas>
-        </div>
-      </div>
-
-      <!-- Historical Net Worth Evolution -->
-      <div class="chart-card" style="margin-bottom:16px">
-        <div class="card-title">Evolução Patrimonial Mensal (Últimos 12 meses)</div>
-        <canvas id="chart-patrimony" style="max-height:220px"></canvas>
-      </div>
-    `;
-
-    // Render general charts
-    if (document.getElementById('chart-monthly-general')) {
-      State.charts.monthly = new Chart(document.getElementById('chart-monthly-general'), {
-        type: 'bar',
-        data: {
-          labels: monthly.map(m => m.month),
-          datasets: [
-            { label: 'Receitas', data: monthly.map(m => m.income), backgroundColor: 'rgba(16,185,129,0.75)', borderRadius: 6 },
-            { label: 'Despesas', data: monthly.map(m => m.expense), backgroundColor: 'rgba(239,68,68,0.75)', borderRadius: 6 },
-          ]
-        },
-        options: chartOptions('bar')
-      });
-    }
-
-    if (document.getElementById('chart-patrimony')) {
-      const ctxPat = document.getElementById('chart-patrimony').getContext('2d');
-      const gradPat = ctxPat.createLinearGradient(0, 0, 0, 200);
-      gradPat.addColorStop(0, 'rgba(59, 130, 246, 0.4)');
-      gradPat.addColorStop(1, 'rgba(59, 130, 246, 0.0)');
-
-      State.charts.patrimony = new Chart(ctxPat, {
-        type: 'line',
-        data: {
-          labels: patrimony.map(p => p.month),
-          datasets: [{
-            label: 'Patrimônio Líquido',
-            data: patrimony.map(p => p.net),
-            borderColor: '#3b82f6',
-            backgroundColor: gradPat,
-            fill: true,
-            tension: 0.35,
-            borderWidth: 3,
-            pointBackgroundColor: '#3b82f6',
-            pointBorderColor: '#1e293b',
-            pointBorderWidth: 2,
-            pointRadius: 4,
-            pointHoverRadius: 6
-          }]
-        },
-        options: chartOptions('line')
-      });
-    }
-
-    // Bind clickable credit card widgets in General tab
-    contentDiv.querySelectorAll('.bank-card-credit').forEach(cardWidget => {
-      cardWidget.onclick = () => {
-        const cardId = parseInt(cardWidget.dataset.cardId);
-        const cardColor = cardWidget.dataset.bankColor;
-        const cardName = cardWidget.dataset.cardName;
-        State.highlightCardId = cardId;
-        State.highlightCardColor = cardColor;
-        State.highlightCardName = cardName;
-        State.highlightAccountId = null;
-        State.highlightAccountColor = null;
-        State.highlightAccountName = null;
-        State.currentRecurringTab = 'expense';
-        navigate('recurring');
-      };
-    });
-
-    // Bind clickable debit account widgets in General tab
-    contentDiv.querySelectorAll('.bank-card-debit').forEach(debitWidget => {
-      debitWidget.onclick = () => {
-        const accId = parseInt(debitWidget.dataset.accountId);
-        const accColor = debitWidget.dataset.bankColor;
-        const accName = debitWidget.dataset.accountName;
-        State.highlightAccountId = accId;
-        State.highlightAccountColor = accColor;
-        State.highlightAccountName = accName;
-        State.highlightCardId = null;
-        State.highlightCardColor = null;
-        State.highlightCardName = null;
-        State.currentRecurringTab = 'income';
-        navigate('recurring');
-      };
-    });
-  }
+      `}
+    </div>
+  `;
 }
 
+/**
+ * Renderiza o Painel Operacional Unificado em 3 Colunas (⭐ Prioritários | ⏳ A Pagar | ✅ Pagas)
+ */
+function renderDashboardKanbanColumns(summary, paidBills, unpaidBills) {
+  const totalPaidAmount = paidBills.reduce((acc, t) => acc + (t.amount || 0), 0);
+  const totalUnpaidAmount = unpaidBills.reduce((acc, t) => acc + (t.amount || 0), 0);
+  const priorityItems = summary.priorityItems || [];
+
+  return `
+    <div class="dash-kanban-grid">
+      
+      <!-- COLUNA 1: ⭐ PRIORITÁRIOS -->
+      <div class="dash-kanban-col">
+        <div class="dash-kanban-header">
+          <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+            <span>⭐</span> Prioritários
+            <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 10px;">${priorityItems.length}</span>
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted);">Essenciais do Mês</div>
+        </div>
+        <div class="dash-kanban-list">
+          ${priorityItems.length === 0
+            ? `<div class="no-data" style="font-size: 12px; padding: 20px 10px;">Nenhum item marcado como prioritário.<br><small>Marque com ⭐ no Planejamento.</small></div>`
+            : priorityItems.map(item => `
+              <div class="priority-item priority-item-clickable ${item.is_paid ? 'priority-paid' : 'priority-pending'}" data-rec-id="${item.recurring_item_id || item.id || ''}" data-tx-id="${item.id || ''}" data-type="${item.type || 'expense'}" style="margin-bottom:0" title="Clique para abrir no Planejamento">
+                <div style="font-size:18px">${item.rec_icon || '📋'}</div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.rec_name || item.description}</div>
+                  <div style="font-size:10.5px;color:var(--text-muted)">${item.account_name || '—'} • dia ${item.due_day || '?'}</div>
+                </div>
+                <div style="text-align:right;flex-shrink:0">
+                  <div style="font-weight:700;font-size:13px;color:${item.type === 'income' ? 'var(--accent-light)' : '#f87171'}">${item.type === 'income' ? '+' : '-'}${fmt.currency(item.amount)}</div>
+                  <span class="transaction-status ${item.is_paid ? 'status-paid' : 'status-pending'}" style="font-size: 9px; padding: 1px 6px;">${item.is_paid ? '✓ Pago' : '⏳ Pendente'}</span>
+                </div>
+              </div>
+            `).join('')}
+        </div>
+      </div>
+
+      <!-- COLUNA 2: ⏳ A PAGAR (PENDENTES) -->
+      <div class="dash-kanban-col">
+        <div class="dash-kanban-header">
+          <div style="font-size: 13px; font-weight: 700; color: #f87171; display: flex; align-items: center; gap: 6px;">
+            <span>⏳</span> A Pagar
+            <span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); font-size: 10px;">${unpaidBills.length}</span>
+          </div>
+          <div style="font-size: 13px; font-weight: 800; color: #f87171;">${fmt.currency(totalUnpaidAmount)}</div>
+        </div>
+        <div class="dash-kanban-list">
+          ${unpaidBills.length === 0
+            ? `<div class="no-data" style="font-size: 12px; padding: 20px 10px;">Tudo quitado! Nenhuma conta pendente.</div>`
+            : unpaidBills.map(item => `
+              <div class="priority-item priority-item-clickable priority-pending" data-rec-id="${item.recurring_item_id || ''}" data-tx-id="${item.id || ''}" data-type="${item.type || 'expense'}" style="margin-bottom:0" title="Clique para abrir no Planejamento">
+                <div style="font-size:18px">${item.category_icon || '📋'}</div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.description}</div>
+                  <div style="font-size:10.5px;color:var(--text-muted)">${item.account_name || 'Geral'} • ${fmt.date(item.date)}</div>
+                </div>
+                <div style="text-align:right;flex-shrink:0">
+                  <div style="font-weight:700;font-size:13px;color:#f87171">-${fmt.currency(item.amount)}</div>
+                  <span class="transaction-status status-pending" style="font-size: 9px; padding: 1px 6px;">⏳ Pendente</span>
+                </div>
+              </div>
+            `).join('')}
+        </div>
+      </div>
+
+      <!-- COLUNA 3: ✅ CONTAS PAGAS -->
+      <div class="dash-kanban-col">
+        <div class="dash-kanban-header">
+          <div style="font-size: 13px; font-weight: 700; color: var(--accent-light); display: flex; align-items: center; gap: 6px;">
+            <span>✅</span> Contas Pagas
+            <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: var(--accent-light); border: 1px solid rgba(16, 185, 129, 0.3); font-size: 10px;">${paidBills.length}</span>
+          </div>
+          <div style="font-size: 13px; font-weight: 800; color: var(--accent-light);">${fmt.currency(totalPaidAmount)}</div>
+        </div>
+        <div class="dash-kanban-list">
+          ${paidBills.length === 0
+            ? `<div class="no-data" style="font-size: 12px; padding: 20px 10px;">Nenhuma conta paga registrada.</div>`
+            : paidBills.map(item => `
+              <div class="priority-item priority-item-clickable priority-paid" data-rec-id="${item.recurring_item_id || ''}" data-tx-id="${item.id || ''}" data-type="${item.type || 'expense'}" style="margin-bottom:0" title="Clique para abrir no Planejamento">
+                <div style="font-size:18px">${item.category_icon || '💸'}</div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.description}</div>
+                  <div style="font-size:10.5px;color:var(--text-muted)">${item.account_name || 'Geral'} • ${fmt.date(item.date)}</div>
+                </div>
+                <div style="text-align:right;flex-shrink:0">
+                  <div style="font-weight:700;font-size:13px;color:var(--accent-light)">-${fmt.currency(item.amount)}</div>
+                  <span class="transaction-status status-paid" style="font-size: 9px; padding: 1px 6px;">✓ Pago</span>
+                </div>
+              </div>
+            `).join('')}
+        </div>
+      </div>
+
+    </div>
+  `;
+}
+
+/**
+ * Renderiza um Card de Cartão de Crédito
+ */
 function renderCreditCardWidget(acc, spent, monthInvoice) {
   const b = BANKS[acc.bank] || BANKS.outro;
   const limit     = acc.credit_limit || 0;
@@ -1362,7 +1699,6 @@ function renderCreditCardWidget(acc, spent, monthInvoice) {
 
   return `
     <div class="bank-card-widget bank-card-credit ${isExceeded ? 'card-limit-exceeded' : ''}" data-card-id="${acc.id}" data-bank-color="${b.color}" data-card-name="${acc.name}" title="Clique para ver fatura e destacar parcelas no Planejamento" style="cursor:pointer;${isExceeded ? 'border: 1px solid rgba(239, 68, 68, 0.45); box-shadow: 0 0 16px rgba(239, 68, 68, 0.15);' : ''}">
-      <!-- Header -->
       <div class="bank-card-header">
         ${bankLogo(acc.bank, 40)}
         <div style="flex:1;min-width:0">
@@ -1375,29 +1711,23 @@ function renderCreditCardWidget(acc, spent, monthInvoice) {
         <div class="bank-card-tag" style="background:${b.color}22;color:${b.color}">${b.name}</div>
       </div>
 
-      <!-- Body: donut + info -->
       <div class="bank-card-body">
-        <!-- Two-tone donut: used vs free -->
         <div class="bank-card-donut" style="position:relative">
           ${buildCreditDonut(spent, limit, 108)}
         </div>
 
-        <!-- Values -->
         <div class="bank-card-values" style="gap:0">
-          <!-- Limite total -->
           <div style="margin-bottom:8px">
             <div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:2px">Limite total</div>
             <div style="font-size:17px;font-weight:900;color:var(--text-primary);letter-spacing:-0.02em">${fmt.currency(limit)}</div>
           </div>
 
           ${invoiceAmount !== null ? `
-          <!-- Fatura do Mês -->
           <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-top:1px solid var(--border)">
             <span style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em">Fatura do Mês</span>
             <span style="font-size:13px;font-weight:800;color:#f87171">${fmt.currency(invoiceAmount)}</span>
           </div>` : ''}
 
-          <!-- Comprometido -->
           <div style="display:flex;flex-direction:column;gap:2px;padding:6px 0;border-top:1px solid var(--border)">
             <div style="display:flex;align-items:center;gap:5px">
               <div style="width:8px;height:8px;border-radius:50%;background:${isExceeded || pctReal > 80 ? '#ef4444' : pctReal > 60 ? '#f59e0b' : '#f97316'};flex-shrink:0"></div>
@@ -1406,7 +1736,6 @@ function renderCreditCardWidget(acc, spent, monthInvoice) {
             <div style="font-size:16px;font-weight:800;color:${isExceeded || pctReal > 80 ? '#f87171' : pctReal > 60 ? '#fbbf24' : '#fb923c'}">${fmt.currency(spent)}</div>
           </div>
 
-          <!-- Disponível -->
           <div style="display:flex;flex-direction:column;gap:2px;padding:6px 0;border-top:1px solid var(--border)">
             <div style="display:flex;align-items:center;gap:5px">
               <div style="width:8px;height:8px;border-radius:50%;background:${availableColor};flex-shrink:0"></div>
@@ -1440,6 +1769,9 @@ function renderCreditCardWidget(acc, spent, monthInvoice) {
     </div>`;
 }
 
+/**
+ * Renderiza um Card de Conta Débito ou Voucher
+ */
 function renderDebitAccountWidget(acc) {
   const b = BANKS[acc.bank] || BANKS.outro;
   const balance = acc.balance || 0;
@@ -1482,6 +1814,9 @@ function renderDebitAccountWidget(acc) {
     </div>`;
 }
 
+/**
+ * Renderiza um Card de Conta Débito Estático (para aba Geral)
+ */
 function renderDebitAccountStaticWidget(acc) {
   const b = BANKS[acc.bank] || BANKS.outro;
   const balance = acc.balance || 0;
@@ -1524,6 +1859,9 @@ function renderDebitAccountStaticWidget(acc) {
     </div>`;
 }
 
+/**
+ * Renderiza um Item de Objetivo / Cofrinho
+ */
 function renderDashboardGoalItem(goal) {
   const pct = goal.target_amount > 0 ? Math.min(100, Math.round((goal.current_amount / goal.target_amount) * 100)) : 0;
   const remaining = Math.max(0, goal.target_amount - goal.current_amount);
@@ -1548,12 +1886,9 @@ function renderDashboardGoalItem(goal) {
     </div>`;
 }
 
-
-/* ==== dashboard-main-1b.js ==== */
-/* === dashboard-main-1b.js (parte 2/2 de dashboard-main-1.js) ===
- * Linhas 808–1043
+/**
+ * Configura o Gráfico Interativo de Categorias
  */
-
 function setupCategoryInteractiveChart(wrapperElementId, chartStateKey, txs) {
   const wrapper = document.getElementById(wrapperElementId);
   if (!wrapper) return;
@@ -1650,126 +1985,97 @@ function setupCategoryInteractiveChart(wrapperElementId, chartStateKey, txs) {
       const activeChartType = document.getElementById(filterChartTypeId).value;
 
       const checkedBoxes = Array.from(document.querySelectorAll(`.${prefix}-cat-check:checked`)).map(cb => cb.value);
-      const allBoxes = Array.from(document.querySelectorAll(`.${prefix}-cat-check`)).map(cb => cb.value);
       cbContainer.dataset.checkedCats = JSON.stringify(checkedBoxes);
 
-      let filtered = txs.filter(t => t.type === activeTxType);
-
-      if (activePaymentStatus === 'paid') {
-        filtered = filtered.filter(t => t.is_paid === 1);
-      } else if (activePaymentStatus === 'pending') {
-        filtered = filtered.filter(t => t.is_paid === 0);
-      }
-
-      if (checkedBoxes.length > 0) {
-        filtered = filtered.filter(t => checkedBoxes.includes(t.category_name || 'Sem Categoria'));
-      } else if (allBoxes.length > 0) {
-        filtered = [];
-      }
-
-      const agg = {};
-      filtered.forEach(t => {
-        const key = t.category_name || 'Sem Categoria';
-        if (!agg[key]) {
-          agg[key] = {
-            name: key,
-            icon: t.category_icon || '📋',
-            color: t.category_color || '#64748b',
-            total: 0,
-            count: 0
-          };
-        }
-        agg[key].total += t.amount;
-        agg[key].count += 1;
+      const filtered = txs.filter(t => {
+        if (t.type !== activeTxType) return false;
+        if (activePaymentStatus === 'paid' && !t.is_paid) return false;
+        if (activePaymentStatus === 'pending' && t.is_paid) return false;
+        const catName = t.category_name || 'Sem Categoria';
+        if (!checkedBoxes.includes(catName)) return false;
+        return true;
       });
 
-      const dataList = Object.values(agg).sort((a, b) => b.total - a.total);
+      const catMap = {};
+      filtered.forEach(t => {
+        const name = t.category_name || 'Sem Categoria';
+        const color = t.category_color || '#94a3b8';
+        const icon = t.category_icon || '📋';
+        if (!catMap[name]) {
+          catMap[name] = { name, color, icon, amount: 0, count: 0 };
+        }
+        catMap[name].amount += (t.amount || 0);
+        catMap[name].count += 1;
+      });
 
-      const listContainer = document.getElementById(listContainerId);
-      if (dataList.length === 0) {
-        listContainer.innerHTML = '<div style="color:var(--text-muted); font-size: 11px; padding: 10px; text-align: center;">Nenhum lançamento.</div>';
-      } else {
-        listContainer.innerHTML = dataList.map(c => `
-          <div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border)">
-            <div style="width:8px;height:8px;border-radius:50%;background:${c.color}"></div>
-            <div style="flex:1;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${c.name}">${c.icon} ${c.name}</div>
-            <div style="font-weight:700;font-size:11px;color:${activeTxType === 'expense' ? '#f87171' : 'var(--accent-light)'}">
-              ${activeMetricType === 'amount' ? fmt.currency(c.total) : `${c.count}x`}
+      const catList = Object.values(catMap).sort((a, b) => b[activeMetricType] - a[activeMetricType]);
+      const labels = catList.map(c => `${c.icon} ${c.name}`);
+      const dataValues = catList.map(c => activeMetricType === 'amount' ? c.amount : c.count);
+      const colors = catList.map(c => c.color);
+
+      const listEl = document.getElementById(listContainerId);
+      const totalSum = catList.reduce((acc, c) => acc + (activeMetricType === 'amount' ? c.amount : c.count), 0);
+
+      listEl.innerHTML = catList.length === 0
+        ? `<div class="no-data" style="font-size: 12px;">Nenhum lançamento no filtro.</div>`
+        : catList.map(c => {
+          const val = activeMetricType === 'amount' ? c.amount : c.count;
+          const pct = totalSum > 0 ? ((val / totalSum) * 100).toFixed(1) : '0';
+          return `
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-bottom: 1px solid var(--border); font-size: 12px;">
+              <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                <div style="width: 8px; height: 8px; border-radius: 50%; background: ${c.color}; flex-shrink: 0;"></div>
+                <span style="font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${c.icon} ${c.name}</span>
+              </div>
+              <div style="text-align: right; flex-shrink: 0;">
+                <span style="font-weight: 700; color: var(--text-primary);">${activeMetricType === 'amount' ? fmt.currency(c.amount) : c.count + ' un.'}</span>
+                <span style="color: var(--text-muted); font-size: 10px; margin-left: 4px;">(${pct}%)</span>
+              </div>
             </div>
-          </div>
-        `).join('');
-      }
+          `;
+        }).join('');
 
       if (State.charts[chartStateKey]) {
         State.charts[chartStateKey].destroy();
-        State.charts[chartStateKey] = null;
+        delete State.charts[chartStateKey];
       }
 
-      const chartContainer = document.getElementById(chartContainerId);
-      if (dataList.length === 0) {
-        chartContainer.innerHTML = '<div style="color:var(--text-muted); font-size: 12px;">Sem dados</div>';
-      } else {
-        chartContainer.innerHTML = `<canvas id="${chartCanvasId}" style="max-height: 220px; max-width: 100%;"></canvas>`;
-        
-        let type = 'doughnut';
-        let chartData = {
-          labels: dataList.map(c => `${c.icon} ${c.name}`),
+      const canvas = document.getElementById(chartCanvasId);
+      if (!canvas) return;
+
+      let cType = activeChartType;
+      let chartOpts = chartOptions(cType);
+
+      if (activeChartType === 'horizontalBar') {
+        cType = 'bar';
+        chartOpts = {
+          ...chartOptions('bar'),
+          indexAxis: 'y',
+          plugins: { ...chartOptions('bar').plugins, legend: { display: false } }
+        };
+      }
+
+      if (activeMetricType === 'count' && chartOpts.scales && chartOpts.scales.y) {
+        chartOpts.scales.y.ticks.callback = (v) => `${v} un`;
+      }
+      if (activeMetricType === 'count' && activeChartType === 'horizontalBar' && chartOpts.scales && chartOpts.scales.x) {
+        chartOpts.scales.x.ticks.callback = (v) => `${v} un`;
+      }
+
+      State.charts[chartStateKey] = new Chart(canvas, {
+        type: cType,
+        data: {
+          labels: labels,
           datasets: [{
-            data: dataList.map(c => activeMetricType === 'amount' ? c.total : c.count),
-            backgroundColor: dataList.map(c => c.color),
-            borderWidth: 2,
-            borderColor: '#111520'
+            data: dataValues,
+            backgroundColor: colors,
+            borderWidth: cType === 'doughnut' ? 2 : 1,
+            borderColor: cType === 'doughnut' ? 'var(--bg-card)' : colors,
+            borderRadius: cType === 'bar' ? 4 : 0
           }]
-        };
-
-        let options = {
-          responsive: true,
-          maintainAspectRatio: true,
-          plugins: {
-            legend: { 
-              display: activeChartType !== 'horizontalBar', 
-              position: 'bottom', 
-              labels: { color: '#94a3b8', font: { size: 10 }, padding: 6, boxWidth: 8 } 
-            },
-            tooltip: {
-              callbacks: {
-                label: (ctx) => {
-                  const val = ctx.raw;
-                  return activeMetricType === 'amount' ? ' ' + fmt.currency(val) : ` ${val} lançamento(s)`;
-                }
-              },
-              backgroundColor: '#1e2535', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
-              titleColor: '#f1f5f9', bodyColor: '#94a3b8'
-            }
-          }
-        };
-
-        if (activeChartType === 'polarArea') {
-          type = 'polarArea';
-          options.scales = {
-            r: {
-              grid: { color: 'rgba(255,255,255,0.03)' },
-              ticks: { display: false }
-            }
-          };
-        } else if (activeChartType === 'horizontalBar') {
-          type = 'bar';
-          options.indexAxis = 'y';
-          options.scales = {
-            x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#64748b', font: { size: 10 } } },
-            y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
-          };
-          options.plugins.legend.display = false;
-        } else {
-          options.cutout = '60%';
-        }
-
-        State.charts[chartStateKey] = new Chart(document.getElementById(chartCanvasId), {
-          type,
-          data: chartData,
-          options
-        });
-      }
+        },
+        options: chartOpts
+      });
     }
 
     document.querySelectorAll(`.${prefix}-cat-check`).forEach(cb => {
@@ -1779,13 +2085,19 @@ function setupCategoryInteractiveChart(wrapperElementId, chartStateKey, txs) {
     updateChart();
   }
 
-  document.getElementById(filterTxTypeId).onchange = () => {
-    document.getElementById(filterCheckboxesId).dataset.checkedCats = '';
-    renderCheckboxesAndDraw();
+  document.getElementById(filterTxTypeId).onchange = renderCheckboxesAndDraw;
+  document.getElementById(filterPaymentId).onchange = () => {
+    const cb = document.querySelector(`.${prefix}-cat-check`);
+    if (cb) cb.dispatchEvent(new Event('change'));
   };
-  document.getElementById(filterPaymentId).onchange = renderCheckboxesAndDraw;
-  document.getElementById(filterMetricId).onchange = renderCheckboxesAndDraw;
-  document.getElementById(filterChartTypeId).onchange = renderCheckboxesAndDraw;
+  document.getElementById(filterMetricId).onchange = () => {
+    const cb = document.querySelector(`.${prefix}-cat-check`);
+    if (cb) cb.dispatchEvent(new Event('change'));
+  };
+  document.getElementById(filterChartTypeId).onchange = () => {
+    const cb = document.querySelector(`.${prefix}-cat-check`);
+    if (cb) cb.dispatchEvent(new Event('change'));
+  };
 
   renderCheckboxesAndDraw();
 }
@@ -6843,6 +7155,63 @@ async function openSettingsModal(activeTab = 'profile') {
           </div>
 
         </div>
+
+        <!-- SEÇÃO: LAYOUT E ORGANIZAÇÃO DO DASHBOARD -->
+        <h4 style="margin: 28px 0 10px 0; font-size: 15px; font-weight: 700; color: var(--text-primary); border-top: 1px solid var(--border); padding-top: 20px; display: flex; align-items: center; gap: 8px;">
+          <span>🎛️</span> Organização e Layout do Dashboard
+        </h4>
+        <p style="font-size:12.5px; color:var(--text-muted); margin-bottom:16px">
+          Escolha como prefere visualizar e interagir com o resumo financeiro da família no Dashboard:
+        </p>
+
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px" id="settings-dash-layout-container">
+          
+          <!-- MODO 1: EXECUTIVO POR ZONAS -->
+          <div class="dash-layout-option ${State.dashboardLayoutMode === 'executive' ? 'active' : ''}" data-layout-val="executive" style="padding:16px; border-radius:var(--radius-md); border:2px solid ${State.dashboardLayoutMode === 'executive' ? 'var(--accent)' : 'var(--border)'}; background:var(--bg-raised); cursor:pointer; transition:all 0.2s; display:flex; flex-direction:column; justify-content:space-between; gap:12px; position:relative;">
+            ${State.dashboardLayoutMode === 'executive' ? `<span class="badge badge-green" style="position:absolute; top:12px; right:12px; font-size:10px; padding:2px 8px;">Ativo</span>` : ''}
+            <div>
+              <div style="font-size:24px; margin-bottom:8px">🌟</div>
+              <div style="font-weight:700; font-size:14px; color:var(--text-primary)">Executivo por Zonas</div>
+              <div style="font-size:11.5px; color:var(--text-muted); margin-top:4px; line-height:1.4">
+                Visão 360° com KPIs consolidados, pílulas de ação rápida, cartões com filtro por membro e painel Kanban 3 colunas.
+              </div>
+            </div>
+            <div style="font-size:10.5px; font-weight:600; color:var(--accent-light); background:rgba(16,185,129,0.1); padding:4px 8px; border-radius:4px; text-align:center;">
+              Recomendado / Visão Completa
+            </div>
+          </div>
+
+          <!-- MODO 2: SUB-ABAS OPERACIONAIS -->
+          <div class="dash-layout-option ${State.dashboardLayoutMode === 'tabbed' ? 'active' : ''}" data-layout-val="tabbed" style="padding:16px; border-radius:var(--radius-md); border:2px solid ${State.dashboardLayoutMode === 'tabbed' ? 'var(--accent)' : 'var(--border)'}; background:var(--bg-raised); cursor:pointer; transition:all 0.2s; display:flex; flex-direction:column; justify-content:space-between; gap:12px; position:relative;">
+            ${State.dashboardLayoutMode === 'tabbed' ? `<span class="badge badge-green" style="position:absolute; top:12px; right:12px; font-size:10px; padding:2px 8px;">Ativo</span>` : ''}
+            <div>
+              <div style="font-size:24px; margin-bottom:8px">📑</div>
+              <div style="font-weight:700; font-size:14px; color:var(--text-primary)">Sub-Abas Operacionais</div>
+              <div style="font-size:11.5px; color:var(--text-muted); margin-top:4px; line-height:1.4">
+                Reduz a rolagem vertical agrupando os dados em 3 abas focadas: <em>📋 Operação</em>, <em>💳 Cartões & Bancos</em> e <em>📈 Gráficos</em>.
+              </div>
+            </div>
+            <div style="font-size:10.5px; font-weight:600; color:#60a5fa; background:rgba(59,130,246,0.1); padding:4px 8px; border-radius:4px; text-align:center;">
+              Ideal para Foco por Contexto
+            </div>
+          </div>
+
+          <!-- MODO 3: COCKPIT SPLIT 2:1 -->
+          <div class="dash-layout-option ${State.dashboardLayoutMode === 'cockpit' ? 'active' : ''}" data-layout-val="cockpit" style="padding:16px; border-radius:var(--radius-md); border:2px solid ${State.dashboardLayoutMode === 'cockpit' ? 'var(--accent)' : 'var(--border)'}; background:var(--bg-raised); cursor:pointer; transition:all 0.2s; display:flex; flex-direction:column; justify-content:space-between; gap:12px; position:relative;">
+            ${State.dashboardLayoutMode === 'cockpit' ? `<span class="badge badge-green" style="position:absolute; top:12px; right:12px; font-size:10px; padding:2px 8px;">Ativo</span>` : ''}
+            <div>
+              <div style="font-size:24px; margin-bottom:8px">🎛️</div>
+              <div style="font-weight:700; font-size:14px; color:var(--text-primary)">Cockpit Split (2:1)</div>
+              <div style="font-size:11.5px; color:var(--text-muted); margin-top:4px; line-height:1.4">
+                Painel duplo: Contas e gráficos à esquerda (68%) com cartões de crédito e saldos bancários fixos à direita (32%).
+              </div>
+            </div>
+            <div style="font-size:10.5px; font-weight:600; color:#c084fc; background:rgba(139,92,246,0.1); padding:4px 8px; border-radius:4px; text-align:center;">
+              Visual Moderno & Acesso Rápido a Saldos
+            </div>
+          </div>
+
+        </div>
       `;
 
       document.querySelectorAll('#settings-theme-container .theme-card-option').forEach(card => {
@@ -6852,6 +7221,19 @@ async function openSettingsModal(activeTab = 'profile') {
             setAppTheme(tVal);
           }
           openSettingsModal('appearance');
+        };
+      });
+
+      document.querySelectorAll('#settings-dash-layout-container .dash-layout-option').forEach(card => {
+        card.onclick = () => {
+          const lVal = card.dataset.layoutVal;
+          State.dashboardLayoutMode = lVal;
+          localStorage.setItem('dashboard_layout_mode', lVal);
+          toast(`Layout do Dashboard alterado para: ${lVal === 'executive' ? 'Executivo por Zonas' : lVal === 'tabbed' ? 'Sub-Abas Operacionais' : 'Cockpit Split 2:1'}`);
+          openSettingsModal('appearance');
+          if (State.currentPage === 'dashboard' && typeof renderDashboard === 'function') {
+            renderDashboard();
+          }
         };
       });
 

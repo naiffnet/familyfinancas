@@ -307,6 +307,63 @@ async function openSettingsModal(activeTab = 'profile') {
           </div>
 
         </div>
+
+        <!-- SEÇÃO: LAYOUT E ORGANIZAÇÃO DO DASHBOARD -->
+        <h4 style="margin: 28px 0 10px 0; font-size: 15px; font-weight: 700; color: var(--text-primary); border-top: 1px solid var(--border); padding-top: 20px; display: flex; align-items: center; gap: 8px;">
+          <span>🎛️</span> Organização e Layout do Dashboard
+        </h4>
+        <p style="font-size:12.5px; color:var(--text-muted); margin-bottom:16px">
+          Escolha como prefere visualizar e interagir com o resumo financeiro da família no Dashboard:
+        </p>
+
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px" id="settings-dash-layout-container">
+          
+          <!-- MODO 1: EXECUTIVO POR ZONAS -->
+          <div class="dash-layout-option ${State.dashboardLayoutMode === 'executive' ? 'active' : ''}" data-layout-val="executive" style="padding:16px; border-radius:var(--radius-md); border:2px solid ${State.dashboardLayoutMode === 'executive' ? 'var(--accent)' : 'var(--border)'}; background:var(--bg-raised); cursor:pointer; transition:all 0.2s; display:flex; flex-direction:column; justify-content:space-between; gap:12px; position:relative;">
+            ${State.dashboardLayoutMode === 'executive' ? `<span class="badge badge-green" style="position:absolute; top:12px; right:12px; font-size:10px; padding:2px 8px;">Ativo</span>` : ''}
+            <div>
+              <div style="font-size:24px; margin-bottom:8px">🌟</div>
+              <div style="font-weight:700; font-size:14px; color:var(--text-primary)">Executivo por Zonas</div>
+              <div style="font-size:11.5px; color:var(--text-muted); margin-top:4px; line-height:1.4">
+                Visão 360° com KPIs consolidados, pílulas de ação rápida, cartões com filtro por membro e painel Kanban 3 colunas.
+              </div>
+            </div>
+            <div style="font-size:10.5px; font-weight:600; color:var(--accent-light); background:rgba(16,185,129,0.1); padding:4px 8px; border-radius:4px; text-align:center;">
+              Recomendado / Visão Completa
+            </div>
+          </div>
+
+          <!-- MODO 2: SUB-ABAS OPERACIONAIS -->
+          <div class="dash-layout-option ${State.dashboardLayoutMode === 'tabbed' ? 'active' : ''}" data-layout-val="tabbed" style="padding:16px; border-radius:var(--radius-md); border:2px solid ${State.dashboardLayoutMode === 'tabbed' ? 'var(--accent)' : 'var(--border)'}; background:var(--bg-raised); cursor:pointer; transition:all 0.2s; display:flex; flex-direction:column; justify-content:space-between; gap:12px; position:relative;">
+            ${State.dashboardLayoutMode === 'tabbed' ? `<span class="badge badge-green" style="position:absolute; top:12px; right:12px; font-size:10px; padding:2px 8px;">Ativo</span>` : ''}
+            <div>
+              <div style="font-size:24px; margin-bottom:8px">📑</div>
+              <div style="font-weight:700; font-size:14px; color:var(--text-primary)">Sub-Abas Operacionais</div>
+              <div style="font-size:11.5px; color:var(--text-muted); margin-top:4px; line-height:1.4">
+                Reduz a rolagem vertical agrupando os dados em 3 abas focadas: <em>📋 Operação</em>, <em>💳 Cartões & Bancos</em> e <em>📈 Gráficos</em>.
+              </div>
+            </div>
+            <div style="font-size:10.5px; font-weight:600; color:#60a5fa; background:rgba(59,130,246,0.1); padding:4px 8px; border-radius:4px; text-align:center;">
+              Ideal para Foco por Contexto
+            </div>
+          </div>
+
+          <!-- MODO 3: COCKPIT SPLIT 2:1 -->
+          <div class="dash-layout-option ${State.dashboardLayoutMode === 'cockpit' ? 'active' : ''}" data-layout-val="cockpit" style="padding:16px; border-radius:var(--radius-md); border:2px solid ${State.dashboardLayoutMode === 'cockpit' ? 'var(--accent)' : 'var(--border)'}; background:var(--bg-raised); cursor:pointer; transition:all 0.2s; display:flex; flex-direction:column; justify-content:space-between; gap:12px; position:relative;">
+            ${State.dashboardLayoutMode === 'cockpit' ? `<span class="badge badge-green" style="position:absolute; top:12px; right:12px; font-size:10px; padding:2px 8px;">Ativo</span>` : ''}
+            <div>
+              <div style="font-size:24px; margin-bottom:8px">🎛️</div>
+              <div style="font-weight:700; font-size:14px; color:var(--text-primary)">Cockpit Split (2:1)</div>
+              <div style="font-size:11.5px; color:var(--text-muted); margin-top:4px; line-height:1.4">
+                Painel duplo: Contas e gráficos à esquerda (68%) com cartões de crédito e saldos bancários fixos à direita (32%).
+              </div>
+            </div>
+            <div style="font-size:10.5px; font-weight:600; color:#c084fc; background:rgba(139,92,246,0.1); padding:4px 8px; border-radius:4px; text-align:center;">
+              Visual Moderno & Acesso Rápido a Saldos
+            </div>
+          </div>
+
+        </div>
       `;
 
       document.querySelectorAll('#settings-theme-container .theme-card-option').forEach(card => {
@@ -316,6 +373,19 @@ async function openSettingsModal(activeTab = 'profile') {
             setAppTheme(tVal);
           }
           openSettingsModal('appearance');
+        };
+      });
+
+      document.querySelectorAll('#settings-dash-layout-container .dash-layout-option').forEach(card => {
+        card.onclick = () => {
+          const lVal = card.dataset.layoutVal;
+          State.dashboardLayoutMode = lVal;
+          localStorage.setItem('dashboard_layout_mode', lVal);
+          toast(`Layout do Dashboard alterado para: ${lVal === 'executive' ? 'Executivo por Zonas' : lVal === 'tabbed' ? 'Sub-Abas Operacionais' : 'Cockpit Split 2:1'}`);
+          openSettingsModal('appearance');
+          if (State.currentPage === 'dashboard' && typeof renderDashboard === 'function') {
+            renderDashboard();
+          }
         };
       });
 
