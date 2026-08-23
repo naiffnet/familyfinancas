@@ -3,14 +3,51 @@
  */
 
 /**
+ * Renderiza a Barra Superior de Filtros em Linha (Toda a Família / Membros / Tipo de Conta)
+ */
+function renderDashboardTopFilterBar(members, activeMemberFilter = 'all', activeTypeFilter = 'all') {
+  return `
+    <div class="dash-top-filter-bar">
+      <div class="dash-filter-chips-group">
+        <span style="font-size: 11.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px; margin-right: 4px;">
+          <span>👥</span> Filtrar por Membro:
+        </span>
+        <button class="dash-filter-chip ${activeMemberFilter === 'all' ? 'active' : ''}" data-member-filter="all">
+          <span>🏠</span> Toda a Família
+        </button>
+        ${members.map(m => `
+          <button class="dash-filter-chip ${String(activeMemberFilter) === String(m.id) ? 'active' : ''}" data-member-filter="${m.id}">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background: ${m.color}; flex-shrink: 0;"></span>
+            <span>${m.name}</span>
+          </button>
+        `).join('')}
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">Exibir:</span>
+        <button class="dash-filter-chip ${activeTypeFilter === 'all' ? 'active' : ''}" data-type-filter="all" style="padding: 4px 10px; font-size: 11px;">Tudo</button>
+        <button class="dash-filter-chip ${activeTypeFilter === 'credit' ? 'active' : ''}" data-type-filter="credit" style="padding: 4px 10px; font-size: 11px;">💳 Cartões</button>
+        <button class="dash-filter-chip ${activeTypeFilter === 'debit' ? 'active' : ''}" data-type-filter="debit" style="padding: 4px 10px; font-size: 11px;">🏦 Contas</button>
+      </div>
+    </div>
+  `;
+}
+
+/**
  * Renderiza a Hero Section com KPIs Consolidados e Barra de Progresso Integrada
  */
-function renderDashboardHeroKpis(summary, recurringPct) {
+function renderDashboardHeroKpis(summary, recurringPct, activeMemberName = null) {
   const pendingCount = (summary.totalRecurring || 0) - (summary.paidRecurring || 0);
   const forecastedBalance = (summary.income || 0) - (summary.expense || 0) - (summary.pending || 0);
 
   return `
     <div class="dash-hero-section" style="margin-bottom: 16px;">
+      ${activeMemberName ? `
+        <div style="font-size: 12px; font-weight: 600; color: var(--accent-light); background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); padding: 6px 14px; border-radius: var(--radius-sm); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+          <span>👤 Exibindo índices e lançamentos exclusivos de: <strong>${activeMemberName}</strong></span>
+          <span style="font-size: 11px; color: var(--text-muted); cursor: pointer;" onclick="State.dashboardCardMemberFilter='all'; renderDashboard();">✕ Limpar Filtro</span>
+        </div>` : ''}
+
       <div class="kpi-grid">
         <div class="kpi-card kpi-income">
           <div class="kpi-label">Receitas</div>
@@ -114,56 +151,17 @@ function renderDashboardActionPills(summary, potentialDuplicates, today) {
 }
 
 /**
- * Renderiza a Grade de Cartões e Contas com Filtros por Membro e Tipo
+ * Renderiza a Grade de Cartões e Contas (já filtrados)
  */
-function renderDashboardCardsGrid(summary, filterUser = 'all', filterType = 'all') {
-  let creditAccounts = summary.accounts.filter(a => a.type === 'credit');
-  let debitAccounts  = summary.accounts.filter(a => a.type !== 'credit' && a.type !== 'investment');
-
-  // Extract unique family members from accounts
-  const membersMap = new Map();
-  summary.accounts.forEach(a => {
-    if (a.user_name && a.user_id) {
-      membersMap.set(a.user_id, { id: a.user_id, name: a.user_name, color: a.user_avatar_color || '#10b981' });
-    }
-  });
-  const members = Array.from(membersMap.values());
-
-  // Filter accounts if applied
-  if (filterUser && filterUser !== 'all') {
-    creditAccounts = creditAccounts.filter(a => String(a.user_id) === String(filterUser));
-    debitAccounts = debitAccounts.filter(a => String(a.user_id) === String(filterUser));
-  }
-
-  if (filterType === 'credit') {
-    debitAccounts = [];
-  } else if (filterType === 'debit') {
-    creditAccounts = [];
-  }
-
+function renderDashboardCardsGrid(summary) {
+  const creditAccounts = summary.accounts.filter(a => a.type === 'credit');
+  const debitAccounts  = summary.accounts.filter(a => a.type !== 'credit' && a.type !== 'investment');
   const hasAny = creditAccounts.length > 0 || debitAccounts.length > 0;
 
   return `
     <div style="margin-bottom: 20px;">
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
-        <div style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 6px;">
-          <span>🏦</span> Previsibilidade de Contas e Cartões
-        </div>
-
-        <!-- Filter Chips -->
-        <div class="dash-filter-pills-wrap" style="margin-bottom: 0;">
-          <button class="dash-filter-chip ${State.dashboardCardMemberFilter === 'all' ? 'active' : ''}" data-member-filter="all">Todos</button>
-          ${members.map(m => `
-            <button class="dash-filter-chip ${String(State.dashboardCardMemberFilter) === String(m.id) ? 'active' : ''}" data-member-filter="${m.id}" style="display: flex; align-items: center; gap: 4px;">
-              <span style="width: 8px; height: 8px; border-radius: 50%; background: ${m.color};"></span>
-              ${m.name}
-            </button>
-          `).join('')}
-          <span style="color: var(--border); margin: 0 2px;">|</span>
-          <button class="dash-filter-chip ${State.dashboardCardTypeFilter === 'all' ? 'active' : ''}" data-type-filter="all">Tudo</button>
-          <button class="dash-filter-chip ${State.dashboardCardTypeFilter === 'credit' ? 'active' : ''}" data-type-filter="credit">💳 Cartões</button>
-          <button class="dash-filter-chip ${State.dashboardCardTypeFilter === 'debit' ? 'active' : ''}" data-type-filter="debit">🏦 Contas</button>
-        </div>
+      <div style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+        <span>🏦</span> Previsibilidade de Contas e Cartões
       </div>
 
       ${hasAny ? `
@@ -173,7 +171,7 @@ function renderDashboardCardsGrid(summary, filterUser = 'all', filterType = 'all
         </div>
       ` : `
         <div class="card" style="text-align: center; padding: 20px; color: var(--text-muted); font-size: 13px;">
-          Nenhuma conta ou cartão cadastrado para os filtros selecionados.
+          Nenhuma conta ou cartão encontrado para os filtros selecionados.
         </div>
       `}
     </div>
@@ -198,24 +196,30 @@ function renderDashboardKanbanColumns(summary, paidBills, unpaidBills) {
             <span>⭐</span> Prioritários
             <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 10px;">${priorityItems.length}</span>
           </div>
-          <div style="font-size: 11px; color: var(--text-muted);">Essenciais do Mês</div>
+          <div style="font-size: 11px; color: var(--text-muted);">Essenciais</div>
         </div>
         <div class="dash-kanban-list">
           ${priorityItems.length === 0
             ? `<div class="no-data" style="font-size: 12px; padding: 20px 10px;">Nenhum item marcado como prioritário.<br><small>Marque com ⭐ no Planejamento.</small></div>`
-            : priorityItems.map(item => `
-              <div class="priority-item priority-item-clickable ${item.is_paid ? 'priority-paid' : 'priority-pending'}" data-rec-id="${item.recurring_item_id || item.id || ''}" data-tx-id="${item.id || ''}" data-type="${item.type || 'expense'}" style="margin-bottom:0" title="Clique para abrir no Planejamento">
-                <div style="font-size:18px">${item.rec_icon || '📋'}</div>
-                <div style="flex:1;min-width:0">
-                  <div style="font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.rec_name || item.description}</div>
-                  <div style="font-size:10.5px;color:var(--text-muted)">${item.account_name || '—'} • dia ${item.due_day || '?'}</div>
+            : priorityItems.map(item => {
+              const userBadge = item.user_name ? `<span class="profile-badge" style="background:${item.user_avatar_color || '#10b981'}22;color:${item.user_avatar_color || '#10b981'};border:1px solid ${item.user_avatar_color || '#10b981'}44;padding:1px 5px;border-radius:8px;font-size:9px;font-weight:600;">${item.user_name}</span>` : '';
+              return `
+                <div class="priority-item priority-item-clickable ${item.is_paid ? 'priority-paid' : 'priority-pending'}" data-rec-id="${item.recurring_item_id || item.id || ''}" data-tx-id="${item.id || ''}" data-type="${item.type || 'expense'}" style="margin-bottom:0" title="Clique para abrir no Planejamento">
+                  <div style="font-size:18px">${item.rec_icon || '📋'}</div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:4px">
+                      ${item.rec_name || item.description}
+                      ${userBadge}
+                    </div>
+                    <div style="font-size:10.5px;color:var(--text-muted)">${item.account_name || '—'} • dia ${item.due_day || '?'}</div>
+                  </div>
+                  <div style="text-align:right;flex-shrink:0">
+                    <div style="font-weight:700;font-size:13px;color:${item.type === 'income' ? 'var(--accent-light)' : '#f87171'}">${item.type === 'income' ? '+' : '-'}${fmt.currency(item.amount)}</div>
+                    <span class="transaction-status ${item.is_paid ? 'status-paid' : 'status-pending'}" style="font-size: 9px; padding: 1px 6px;">${item.is_paid ? '✓ Pago' : '⏳ Pendente'}</span>
+                  </div>
                 </div>
-                <div style="text-align:right;flex-shrink:0">
-                  <div style="font-weight:700;font-size:13px;color:${item.type === 'income' ? 'var(--accent-light)' : '#f87171'}">${item.type === 'income' ? '+' : '-'}${fmt.currency(item.amount)}</div>
-                  <span class="transaction-status ${item.is_paid ? 'status-paid' : 'status-pending'}" style="font-size: 9px; padding: 1px 6px;">${item.is_paid ? '✓ Pago' : '⏳ Pendente'}</span>
-                </div>
-              </div>
-            `).join('')}
+              `;
+            }).join('')}
         </div>
       </div>
 
@@ -231,19 +235,25 @@ function renderDashboardKanbanColumns(summary, paidBills, unpaidBills) {
         <div class="dash-kanban-list">
           ${unpaidBills.length === 0
             ? `<div class="no-data" style="font-size: 12px; padding: 20px 10px;">Tudo quitado! Nenhuma conta pendente.</div>`
-            : unpaidBills.map(item => `
-              <div class="priority-item priority-item-clickable priority-pending" data-rec-id="${item.recurring_item_id || ''}" data-tx-id="${item.id || ''}" data-type="${item.type || 'expense'}" style="margin-bottom:0" title="Clique para abrir no Planejamento">
-                <div style="font-size:18px">${item.category_icon || '📋'}</div>
-                <div style="flex:1;min-width:0">
-                  <div style="font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.description}</div>
-                  <div style="font-size:10.5px;color:var(--text-muted)">${item.account_name || 'Geral'} • ${fmt.date(item.date)}</div>
+            : unpaidBills.map(item => {
+              const userBadge = item.user_name ? `<span class="profile-badge" style="background:${item.user_avatar_color || '#10b981'}22;color:${item.user_avatar_color || '#10b981'};border:1px solid ${item.user_avatar_color || '#10b981'}44;padding:1px 5px;border-radius:8px;font-size:9px;font-weight:600;">${item.user_name}</span>` : '';
+              return `
+                <div class="priority-item priority-item-clickable priority-pending" data-rec-id="${item.recurring_item_id || ''}" data-tx-id="${item.id || ''}" data-type="${item.type || 'expense'}" style="margin-bottom:0" title="Clique para abrir no Planejamento">
+                  <div style="font-size:18px">${item.category_icon || '📋'}</div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:4px">
+                      ${item.description}
+                      ${userBadge}
+                    </div>
+                    <div style="font-size:10.5px;color:var(--text-muted)">${item.account_name || 'Geral'} • ${fmt.date(item.date)}</div>
+                  </div>
+                  <div style="text-align:right;flex-shrink:0">
+                    <div style="font-weight:700;font-size:13px;color:#f87171">-${fmt.currency(item.amount)}</div>
+                    <span class="transaction-status status-pending" style="font-size: 9px; padding: 1px 6px;">⏳ Pendente</span>
+                  </div>
                 </div>
-                <div style="text-align:right;flex-shrink:0">
-                  <div style="font-weight:700;font-size:13px;color:#f87171">-${fmt.currency(item.amount)}</div>
-                  <span class="transaction-status status-pending" style="font-size: 9px; padding: 1px 6px;">⏳ Pendente</span>
-                </div>
-              </div>
-            `).join('')}
+              `;
+            }).join('')}
         </div>
       </div>
 
@@ -259,19 +269,25 @@ function renderDashboardKanbanColumns(summary, paidBills, unpaidBills) {
         <div class="dash-kanban-list">
           ${paidBills.length === 0
             ? `<div class="no-data" style="font-size: 12px; padding: 20px 10px;">Nenhuma conta paga registrada.</div>`
-            : paidBills.map(item => `
-              <div class="priority-item priority-item-clickable priority-paid" data-rec-id="${item.recurring_item_id || ''}" data-tx-id="${item.id || ''}" data-type="${item.type || 'expense'}" style="margin-bottom:0" title="Clique para abrir no Planejamento">
-                <div style="font-size:18px">${item.category_icon || '💸'}</div>
-                <div style="flex:1;min-width:0">
-                  <div style="font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.description}</div>
-                  <div style="font-size:10.5px;color:var(--text-muted)">${item.account_name || 'Geral'} • ${fmt.date(item.date)}</div>
+            : paidBills.map(item => {
+              const userBadge = item.user_name ? `<span class="profile-badge" style="background:${item.user_avatar_color || '#10b981'}22;color:${item.user_avatar_color || '#10b981'};border:1px solid ${item.user_avatar_color || '#10b981'}44;padding:1px 5px;border-radius:8px;font-size:9px;font-weight:600;">${item.user_name}</span>` : '';
+              return `
+                <div class="priority-item priority-item-clickable priority-paid" data-rec-id="${item.recurring_item_id || ''}" data-tx-id="${item.id || ''}" data-type="${item.type || 'expense'}" style="margin-bottom:0" title="Clique para abrir no Planejamento">
+                  <div style="font-size:18px">${item.category_icon || '💸'}</div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:4px">
+                      ${item.description}
+                      ${userBadge}
+                    </div>
+                    <div style="font-size:10.5px;color:var(--text-muted)">${item.account_name || 'Geral'} • ${fmt.date(item.date)}</div>
+                  </div>
+                  <div style="text-align:right;flex-shrink:0">
+                    <div style="font-weight:700;font-size:13px;color:var(--accent-light)">-${fmt.currency(item.amount)}</div>
+                    <span class="transaction-status status-paid" style="font-size: 9px; padding: 1px 6px;">✓ Pago</span>
+                  </div>
                 </div>
-                <div style="text-align:right;flex-shrink:0">
-                  <div style="font-weight:700;font-size:13px;color:var(--accent-light)">-${fmt.currency(item.amount)}</div>
-                  <span class="transaction-status status-paid" style="font-size: 9px; padding: 1px 6px;">✓ Pago</span>
-                </div>
-              </div>
-            `).join('')}
+              `;
+            }).join('')}
         </div>
       </div>
 

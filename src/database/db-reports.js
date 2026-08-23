@@ -424,13 +424,50 @@ module.exports = (Base) => class extends Base {
     if (month && year) {
       this.generateMonthlyRecurrences(month, year);
     }
+    const user = this.db.prepare('SELECT family_id, profile_type FROM users WHERE id = ?').get(userId);
+    const familyId = user ? user.family_id : null;
+    const profileType = user ? user.profile_type : 2;
+    const perm = this.getUserPermissions(userId);
+
+    const m = String(month).padStart(2,'0');
+    const y = String(year);
+
+    if (profileType === 1) {
+      return this.db.prepare(`
+        SELECT t.*, c.name as category_name, c.color as category_color, c.icon as category_icon,
+               a.name as account_name, u.name as user_name, u.avatar_color as user_avatar_color
+        FROM transactions t 
+        JOIN users u ON t.user_id = u.id
+        LEFT JOIN categories c ON t.category_id=c.id 
+        LEFT JOIN accounts a ON t.account_id=a.id
+        WHERE strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
+        ORDER BY t.date DESC
+      `).all(m, y);
+    }
+
+    if (perm.can_view_all === 1) {
+      return this.db.prepare(`
+        SELECT t.*, c.name as category_name, c.color as category_color, c.icon as category_icon,
+               a.name as account_name, u.name as user_name, u.avatar_color as user_avatar_color
+        FROM transactions t 
+        JOIN users u ON t.user_id = u.id
+        LEFT JOIN categories c ON t.category_id=c.id 
+        LEFT JOIN accounts a ON t.account_id=a.id
+        WHERE u.family_id=? AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
+        ORDER BY t.date DESC
+      `).all(familyId, m, y);
+    }
+
     return this.db.prepare(`
       SELECT t.*, c.name as category_name, c.color as category_color, c.icon as category_icon,
-             a.name as account_name
-      FROM transactions t LEFT JOIN categories c ON t.category_id=c.id LEFT JOIN accounts a ON t.account_id=a.id
+             a.name as account_name, u.name as user_name, u.avatar_color as user_avatar_color
+      FROM transactions t 
+      JOIN users u ON t.user_id = u.id
+      LEFT JOIN categories c ON t.category_id=c.id 
+      LEFT JOIN accounts a ON t.account_id=a.id
       WHERE t.user_id=? AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
       ORDER BY t.date DESC
-    `).all(userId, String(month).padStart(2,'0'), String(year));
+    `).all(userId, m, y);
   }
 
   getPatrimony(userId) {
