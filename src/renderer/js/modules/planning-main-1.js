@@ -334,6 +334,7 @@ function renderRecurringList(container, items, monthlyTxs, type, accounts, categ
           ${statusBadge}
         </div>
         <div class="transaction-actions">
+          ${((tx && (tx.pix_code || (tx.notes && tx.notes.includes('000201')))) || (item.pix_code || (item.notes && item.notes.includes('000201')))) ? `<button class="btn btn-secondary btn-sm rec-pix" data-id="${tx ? tx.id : item.id}" title="Pagar com PIX (QR Code)" style="background:rgba(6,182,212,0.14);color:#38bdf8;border-color:rgba(6,182,212,0.4);font-size:11px;padding:2px 7px;border-radius:6px;font-weight:700">⚡ PIX</button>` : ''}
           ${canEdit ? `<button class="btn btn-ghost btn-sm btn-icon rec-priority" data-id="${item.id}" title="${item.is_priority ? 'Remover prioridade' : 'Marcar como prioritário'}">${item.is_priority ? '★' : '☆'}</button>` : ''}
           ${canEdit ? `<button class="btn btn-ghost btn-sm btn-icon rec-edit" data-id="${item.id}" title="Editar">✏️</button>` : ''}
           ${canEdit ? `<button class="btn btn-danger btn-sm btn-icon rec-delete" data-id="${item.id}" title="Excluir">🗑</button>` : ''}
@@ -341,6 +342,15 @@ function renderRecurringList(container, items, monthlyTxs, type, accounts, categ
         </div>
       </div>`;
   }).join('');
+
+  list.querySelectorAll('.rec-pix').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const targetId = parseInt(btn.dataset.id);
+      const tx = monthlyTxs.find(t => t.id == targetId || t.recurring_item_id == targetId);
+      if (tx && typeof openPixPaymentModal === 'function') openPixPaymentModal(tx, () => renderRecurring());
+    };
+  });
 
   list.querySelectorAll('.rec-toggle-paid').forEach(btn => {
     btn.onclick = async (e) => {
@@ -592,12 +602,21 @@ function renderAvulsosList(container, txs, accounts, categories, tabType) {
         ${statusBadge}
       </div>
       <div class="transaction-actions">
+        ${(t.pix_code || (t.notes && t.notes.includes('000201'))) ? `<button class="btn btn-secondary btn-sm avl-pix" data-id="${t.id}" title="Pagar com PIX (QR Code)" style="background:rgba(6,182,212,0.14);color:#38bdf8;border-color:rgba(6,182,212,0.4);font-size:11px;padding:2px 7px;border-radius:6px;font-weight:700">⚡ PIX</button>` : ''}
         ${canEdit ? `<button class="btn btn-ghost btn-sm btn-icon avl-edit" data-id="${t.id}" title="Editar">✏️</button>` : ''}
         ${canEdit ? `<button class="btn btn-danger btn-sm btn-icon avl-delete" data-id="${t.id}" title="Excluir">🗑</button>` : ''}
         ${!canEdit ? `<span title="Apenas Leitura" style="font-size:12px;opacity:0.6;margin-right:8px">🔒 Apenas Leitura</span>` : ''}
       </div>
     </div>`;
   }).join('');
+
+  list.querySelectorAll('.avl-pix').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const tx = txs.find(t => t.id == parseInt(btn.dataset.id));
+      if (tx && typeof openPixPaymentModal === 'function') openPixPaymentModal(tx, () => renderRecurring());
+    };
+  });
 
   list.querySelectorAll('.avl-toggle').forEach(btn => {
     btn.onclick = async () => {
@@ -608,16 +627,13 @@ function renderAvulsosList(container, txs, accounts, categories, tabType) {
         toast('Status atualizado');
         renderRecurring();
       } else {
-        openPaymentDateModal(txId, tx ? tx.date : null, () => {
-          renderRecurring();
-        });
+        openPaymentDateModal(txId, tx ? tx.date : null, () => renderRecurring());
       }
     };
   });
   list.querySelectorAll('.avl-edit').forEach(btn => {
     btn.onclick = () => {
-      const transactionId = parseInt(btn.dataset.id);
-      const tx = txs.find(t => t.id == transactionId);
+      const tx = txs.find(t => t.id == parseInt(btn.dataset.id));
       openAvulsoModal(accounts, categories, tx);
     };
   });
@@ -630,32 +646,23 @@ function renderAvulsosList(container, txs, accounts, categories, tabType) {
       const amountStr = tx ? fmt.currency(tx.amount) : '';
 
       Modal.open('Excluir Lançamento Variável', `
-        <div style="padding: 16px; text-align: center;">
-          <p style="margin-bottom: 20px; font-size: 15px; color: var(--text-primary); line-height: 1.5;">
-            Tem certeza que deseja excluir permanentemente a despesa variável <strong>${desc}</strong>${amountStr ? ' no valor de <strong style="color:var(--danger)">' + amountStr + '</strong>' : ''}?
+        <div style="padding:16px;text-align:center">
+          <p style="margin-bottom:20px;font-size:15px;color:var(--text-primary);line-height:1.5">
+            Tem certeza que deseja excluir permanentemente a despesa <strong>${desc}</strong>${amountStr ? ' no valor de <strong style="color:var(--danger)">' + amountStr + '</strong>' : ''}?
           </p>
-          <div style="display: flex; flex-direction: column; gap: 12px;">
-            <button class="btn btn-danger" id="btn-confirm-delete-avl" style="font-weight: 600; padding: 10px; background:#ef4444; border-color:#ef4444; color:#ffffff; border-radius:8px; cursor:pointer;">
-              🗑️ Sim, Excluir Definitivamente
-            </button>
-            <button class="btn btn-secondary" id="btn-cancel-delete-avl" style="margin-top: 4px; padding: 8px;">
-              Cancelar
-            </button>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <button class="btn btn-danger" id="btn-confirm-delete-avl" style="font-weight:600;padding:10px;background:#ef4444;border-color:#ef4444;color:#fff;border-radius:8px">🗑️ Sim, Excluir Definitivamente</button>
+            <button class="btn btn-secondary" id="btn-cancel-delete-avl" style="padding:8px">Cancelar</button>
           </div>
         </div>
       `);
 
       document.getElementById('btn-cancel-delete-avl').onclick = Modal.close;
-
       document.getElementById('btn-confirm-delete-avl').onclick = async () => {
         Modal.close();
         const res = await window.api.transactions.delete(txId);
-        if (res && res.error) {
-          toast(res.error, 'error');
-        } else {
-          toast('Despesa variável excluída com sucesso!', 'success');
-          renderRecurring();
-        }
+        if (res && res.error) toast(res.error, 'error');
+        else { toast('Despesa variável excluída com sucesso!', 'success'); renderRecurring(); }
       };
     };
   });

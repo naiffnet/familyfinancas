@@ -70,13 +70,17 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
   Modal.open(isEdit ? 'Editar Lançamento Avulso' : 'Novo Lançamento Avulso', `
     <div id="avl-dup-warning" style="display:none; margin-bottom:12px; padding:10px 14px; border-radius:8px; font-size:12px; animation:fadeIn 0.25s ease;"></div>
     
-    ${!isEdit ? `
-      <div style="margin-bottom: 12px; display: flex; justify-content: flex-end;">
+    <div style="margin-bottom: 12px; display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;">
+      ${!isEdit ? `
         <button type="button" class="btn btn-secondary btn-sm" id="avl-btn-scan-qr" style="font-size: 11.5px; display: inline-flex; align-items: center; gap: 6px; border-color: var(--accent); color: var(--accent-light); background: rgba(16,185,129,0.08); padding: 5px 12px; border-radius: 20px; cursor: pointer;">
-          <span>📷</span> Escanear Nota Fiscal (QR Code)
+          <span>📷</span> Escanear Nota Fiscal / PDF
         </button>
-      </div>
-    ` : ''}
+      ` : (tx && (tx.pix_code || (tx.notes && tx.notes.includes('000201')))) ? `
+        <button type="button" class="btn btn-secondary btn-sm" id="avl-btn-open-pix" style="font-size: 11.5px; display: inline-flex; align-items: center; gap: 6px; border-color: rgba(6,182,212,0.4); color: #38bdf8; background: rgba(6,182,212,0.12); padding: 5px 12px; border-radius: 20px; cursor: pointer; font-weight: 700;">
+          <span>⚡</span> Pagar com PIX (Ver QR Code)
+        </button>
+      ` : ''}
+    </div>
 
     <div class="type-toggle" id="avl-type-toggle">
       <button data-type="expense" class="${typeVal === 'expense' ? 'active-expense' : ''}">💸 Despesa</button>
@@ -218,9 +222,15 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
   if (scanQrBtn) {
     scanQrBtn.onclick = () => {
       Modal.close();
-      if (typeof openNFCeScannerModal === 'function') {
-        openNFCeScannerModal();
-      }
+      if (typeof openNFCeScannerModal === 'function') openNFCeScannerModal();
+    };
+  }
+
+  const openPixBtn = document.getElementById('avl-btn-open-pix');
+  if (openPixBtn && tx) {
+    openPixBtn.onclick = () => {
+      Modal.close();
+      if (typeof openPixPaymentModal === 'function') openPixPaymentModal(tx);
     };
   }
 

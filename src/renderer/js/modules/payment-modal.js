@@ -198,6 +198,95 @@ async function openPaymentDateModal(txId, currentDate, onComplete) {
   };
 }
 
+/**
+ * Abre o Modal Dedicado de Pagamento via PIX com exibição do QR Code e confirmação direta (OK Já Pago)
+ */
+async function openPixPaymentModal(txOrId, onComplete) {
+  let tx = typeof txOrId === 'object' && txOrId !== null ? txOrId : null;
+  if (!tx && txOrId) {
+    try {
+      const allTxs = await window.api.transactions.getAll({ userId: State.user.id });
+      tx = allTxs.find(t => t.id == txOrId);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  if (!tx) {
+    toast('Lançamento não encontrado.', 'error');
+    return;
+  }
+
+  const pixCode = tx.pix_code || (tx.notes ? (tx.notes.match(/000201[0-9A-Za-z.=-]+/) || [])[0] : null);
+  if (!pixCode) {
+    toast('Este lançamento não possui código PIX associado.', 'warning');
+    return;
+  }
+
+  const desc = tx.description || 'Pagamento PIX';
+  const amt = tx.amount || 0;
+  const today = new Date().toISOString().split('T')[0];
+
+  Modal.open('⚡ Pagar com PIX', `
+    <div style="padding: 14px 16px; text-align: center;">
+      <div style="background: linear-gradient(135deg, rgba(6,182,212,0.14), rgba(16,185,129,0.08)); border: 1px solid rgba(6,182,212,0.35); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.15);">
+        <div style="font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 2px;">${desc}</div>
+        <div style="font-size: 32px; font-weight: 900; color: var(--accent-light); letter-spacing: -0.02em; margin: 4px 0;">${fmt.currency(amt)}</div>
+        <div style="font-size: 11.5px; color: var(--text-muted);">Aponte o aplicativo do seu banco para o QR Code abaixo:</div>
+
+        <div style="display: flex; justify-content: center; margin: 12px 0;">
+          <img id="pix-direct-qrcode-img" alt="QR Code PIX" style="width: 190px; height: 190px; border-radius: 12px; background: white; padding: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.2);">
+        </div>
+
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-pix-direct-copy" style="font-size: 12px; font-weight: 600; padding: 6px 14px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; margin: 0 auto;">
+          <span>📋</span> Copiar Código PIX (Copia e Cola)
+        </button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <button type="button" class="btn btn-primary" id="btn-pix-direct-confirm-paid" style="font-weight: 700; font-size: 14px; padding: 11px 20px; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(135deg, #10b981, #059669); border: none; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);">
+          <span>✅</span> Confirmar Pagamento Realizado (OK Já Pago)
+        </button>
+        <button type="button" class="btn btn-secondary" id="btn-pix-direct-close" style="padding: 8px; font-size: 12.5px;">
+          Fechar (Pagar Mais Tarde)
+        </button>
+      </div>
+    </div>
+  `);
+
+  const qrcodeImg = document.getElementById('pix-direct-qrcode-img');
+  if (qrcodeImg && typeof QRCode !== 'undefined' && QRCode.toDataURL) {
+    QRCode.toDataURL(pixCode, { width: 400, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
+      .then(url => { qrcodeImg.src = url; })
+      .catch(err => console.error('[Pix QR] Erro ao renderizar QR code:', err));
+  }
+
+  document.getElementById('btn-pix-direct-copy').onclick = () => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(pixCode);
+    }
+    toast('📋 Código PIX copiado com sucesso! Cole no app do seu banco.', 'success');
+  };
+
+  document.getElementById('btn-pix-direct-close').onclick = Modal.close;
+
+  document.getElementById('btn-pix-direct-confirm-paid').onclick = async () => {
+    try {
+      await window.api.transactions.togglePaidWithDate(tx.id, today, {});
+      if (typeof playScanBeep === 'function') playScanBeep();
+      toast(`✅ Pagamento de ${fmt.currency(amt)} confirmado com sucesso!`, 'success');
+      Modal.close();
+      if (onComplete) onComplete();
+      else {
+        if (typeof renderRecurring === 'function' && State.currentPage === 'recurring') renderRecurring();
+        if (typeof renderDashboard === 'function' && (State.currentPage === 'dashboard' || !State.currentPage)) renderDashboard();
+      }
+    } catch (err) {
+      console.error(err);
+      toast('Erro ao confirmar pagamento: ' + err.message, 'error');
+    }
+  };
+}
+
 // ════════════════════════════════════════
 // ACCOUNTS
 // ════════════════════════════════════════

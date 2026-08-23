@@ -250,6 +250,7 @@ function renderDashboardKanbanColumns(summary, paidBills, unpaidBills) {
                     <div style="font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:4px">
                       ${item.description}
                       ${userBadge}
+                      ${(item.pix_code || (item.notes && item.notes.includes('000201'))) ? `<button type="button" class="btn-dash-pix" data-id="${item.id}" title="Pagar com PIX (Abrir QR Code)" style="background:rgba(6,182,212,0.18);color:#38bdf8;border:1px solid rgba(6,182,212,0.4);font-size:9px;padding:1px 6px;border-radius:4px;cursor:pointer;font-weight:800;display:inline-flex;align-items:center;gap:2px">⚡ PIX</button>` : ''}
                     </div>
                     <div style="font-size:10.5px;color:var(--text-muted)">${item.account_name || 'Geral'} • ${fmt.date(item.date)}</div>
                   </div>

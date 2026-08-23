@@ -1,7 +1,7 @@
 /* ============================================
  * app.bundle.js — FamilyFinancas Renderer
  * Gerado por: npm run build:renderer
- * 2026-08-23T20:59:21.529Z
+ * 2026-08-23T21:08:03.262Z
  * Modulos: 22
  * ============================================ */
 
@@ -1371,6 +1371,17 @@ function bindDashboardEvents(contentDiv, summary, txs, monthly, today) {
   }
 
   // 4. Clickable priority and transaction items
+  contentDiv.querySelectorAll('.btn-dash-pix').forEach(btn => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const txId = parseInt(btn.dataset.id);
+      if (txId && typeof openPixPaymentModal === 'function') {
+        openPixPaymentModal(txId, () => renderDashboard());
+      }
+    };
+  });
+
   contentDiv.querySelectorAll('.btn-alert-link, .priority-item-clickable').forEach(btn => {
     btn.onclick = (e) => {
       e.preventDefault();
@@ -1731,6 +1742,7 @@ function renderDashboardKanbanColumns(summary, paidBills, unpaidBills) {
                     <div style="font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:4px">
                       ${item.description}
                       ${userBadge}
+                      ${(item.pix_code || (item.notes && item.notes.includes('000201'))) ? `<button type="button" class="btn-dash-pix" data-id="${item.id}" title="Pagar com PIX (Abrir QR Code)" style="background:rgba(6,182,212,0.18);color:#38bdf8;border:1px solid rgba(6,182,212,0.4);font-size:9px;padding:1px 6px;border-radius:4px;cursor:pointer;font-weight:800;display:inline-flex;align-items:center;gap:2px">⚡ PIX</button>` : ''}
                     </div>
                     <div style="font-size:10.5px;color:var(--text-muted)">${item.account_name || 'Geral'} • ${fmt.date(item.date)}</div>
                   </div>
@@ -2593,6 +2605,7 @@ function renderRecurringList(container, items, monthlyTxs, type, accounts, categ
           ${statusBadge}
         </div>
         <div class="transaction-actions">
+          ${((tx && (tx.pix_code || (tx.notes && tx.notes.includes('000201')))) || (item.pix_code || (item.notes && item.notes.includes('000201')))) ? `<button class="btn btn-secondary btn-sm rec-pix" data-id="${tx ? tx.id : item.id}" title="Pagar com PIX (QR Code)" style="background:rgba(6,182,212,0.14);color:#38bdf8;border-color:rgba(6,182,212,0.4);font-size:11px;padding:2px 7px;border-radius:6px;font-weight:700">⚡ PIX</button>` : ''}
           ${canEdit ? `<button class="btn btn-ghost btn-sm btn-icon rec-priority" data-id="${item.id}" title="${item.is_priority ? 'Remover prioridade' : 'Marcar como prioritário'}">${item.is_priority ? '★' : '☆'}</button>` : ''}
           ${canEdit ? `<button class="btn btn-ghost btn-sm btn-icon rec-edit" data-id="${item.id}" title="Editar">✏️</button>` : ''}
           ${canEdit ? `<button class="btn btn-danger btn-sm btn-icon rec-delete" data-id="${item.id}" title="Excluir">🗑</button>` : ''}
@@ -2600,6 +2613,15 @@ function renderRecurringList(container, items, monthlyTxs, type, accounts, categ
         </div>
       </div>`;
   }).join('');
+
+  list.querySelectorAll('.rec-pix').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const targetId = parseInt(btn.dataset.id);
+      const tx = monthlyTxs.find(t => t.id == targetId || t.recurring_item_id == targetId);
+      if (tx && typeof openPixPaymentModal === 'function') openPixPaymentModal(tx, () => renderRecurring());
+    };
+  });
 
   list.querySelectorAll('.rec-toggle-paid').forEach(btn => {
     btn.onclick = async (e) => {
@@ -2851,12 +2873,21 @@ function renderAvulsosList(container, txs, accounts, categories, tabType) {
         ${statusBadge}
       </div>
       <div class="transaction-actions">
+        ${(t.pix_code || (t.notes && t.notes.includes('000201'))) ? `<button class="btn btn-secondary btn-sm avl-pix" data-id="${t.id}" title="Pagar com PIX (QR Code)" style="background:rgba(6,182,212,0.14);color:#38bdf8;border-color:rgba(6,182,212,0.4);font-size:11px;padding:2px 7px;border-radius:6px;font-weight:700">⚡ PIX</button>` : ''}
         ${canEdit ? `<button class="btn btn-ghost btn-sm btn-icon avl-edit" data-id="${t.id}" title="Editar">✏️</button>` : ''}
         ${canEdit ? `<button class="btn btn-danger btn-sm btn-icon avl-delete" data-id="${t.id}" title="Excluir">🗑</button>` : ''}
         ${!canEdit ? `<span title="Apenas Leitura" style="font-size:12px;opacity:0.6;margin-right:8px">🔒 Apenas Leitura</span>` : ''}
       </div>
     </div>`;
   }).join('');
+
+  list.querySelectorAll('.avl-pix').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const tx = txs.find(t => t.id == parseInt(btn.dataset.id));
+      if (tx && typeof openPixPaymentModal === 'function') openPixPaymentModal(tx, () => renderRecurring());
+    };
+  });
 
   list.querySelectorAll('.avl-toggle').forEach(btn => {
     btn.onclick = async () => {
@@ -2867,16 +2898,13 @@ function renderAvulsosList(container, txs, accounts, categories, tabType) {
         toast('Status atualizado');
         renderRecurring();
       } else {
-        openPaymentDateModal(txId, tx ? tx.date : null, () => {
-          renderRecurring();
-        });
+        openPaymentDateModal(txId, tx ? tx.date : null, () => renderRecurring());
       }
     };
   });
   list.querySelectorAll('.avl-edit').forEach(btn => {
     btn.onclick = () => {
-      const transactionId = parseInt(btn.dataset.id);
-      const tx = txs.find(t => t.id == transactionId);
+      const tx = txs.find(t => t.id == parseInt(btn.dataset.id));
       openAvulsoModal(accounts, categories, tx);
     };
   });
@@ -2889,32 +2917,23 @@ function renderAvulsosList(container, txs, accounts, categories, tabType) {
       const amountStr = tx ? fmt.currency(tx.amount) : '';
 
       Modal.open('Excluir Lançamento Variável', `
-        <div style="padding: 16px; text-align: center;">
-          <p style="margin-bottom: 20px; font-size: 15px; color: var(--text-primary); line-height: 1.5;">
-            Tem certeza que deseja excluir permanentemente a despesa variável <strong>${desc}</strong>${amountStr ? ' no valor de <strong style="color:var(--danger)">' + amountStr + '</strong>' : ''}?
+        <div style="padding:16px;text-align:center">
+          <p style="margin-bottom:20px;font-size:15px;color:var(--text-primary);line-height:1.5">
+            Tem certeza que deseja excluir permanentemente a despesa <strong>${desc}</strong>${amountStr ? ' no valor de <strong style="color:var(--danger)">' + amountStr + '</strong>' : ''}?
           </p>
-          <div style="display: flex; flex-direction: column; gap: 12px;">
-            <button class="btn btn-danger" id="btn-confirm-delete-avl" style="font-weight: 600; padding: 10px; background:#ef4444; border-color:#ef4444; color:#ffffff; border-radius:8px; cursor:pointer;">
-              🗑️ Sim, Excluir Definitivamente
-            </button>
-            <button class="btn btn-secondary" id="btn-cancel-delete-avl" style="margin-top: 4px; padding: 8px;">
-              Cancelar
-            </button>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <button class="btn btn-danger" id="btn-confirm-delete-avl" style="font-weight:600;padding:10px;background:#ef4444;border-color:#ef4444;color:#fff;border-radius:8px">🗑️ Sim, Excluir Definitivamente</button>
+            <button class="btn btn-secondary" id="btn-cancel-delete-avl" style="padding:8px">Cancelar</button>
           </div>
         </div>
       `);
 
       document.getElementById('btn-cancel-delete-avl').onclick = Modal.close;
-
       document.getElementById('btn-confirm-delete-avl').onclick = async () => {
         Modal.close();
         const res = await window.api.transactions.delete(txId);
-        if (res && res.error) {
-          toast(res.error, 'error');
-        } else {
-          toast('Despesa variável excluída com sucesso!', 'success');
-          renderRecurring();
-        }
+        if (res && res.error) toast(res.error, 'error');
+        else { toast('Despesa variável excluída com sucesso!', 'success'); renderRecurring(); }
       };
     };
   });
@@ -4162,13 +4181,17 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
   Modal.open(isEdit ? 'Editar Lançamento Avulso' : 'Novo Lançamento Avulso', `
     <div id="avl-dup-warning" style="display:none; margin-bottom:12px; padding:10px 14px; border-radius:8px; font-size:12px; animation:fadeIn 0.25s ease;"></div>
     
-    ${!isEdit ? `
-      <div style="margin-bottom: 12px; display: flex; justify-content: flex-end;">
+    <div style="margin-bottom: 12px; display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;">
+      ${!isEdit ? `
         <button type="button" class="btn btn-secondary btn-sm" id="avl-btn-scan-qr" style="font-size: 11.5px; display: inline-flex; align-items: center; gap: 6px; border-color: var(--accent); color: var(--accent-light); background: rgba(16,185,129,0.08); padding: 5px 12px; border-radius: 20px; cursor: pointer;">
-          <span>📷</span> Escanear Nota Fiscal (QR Code)
+          <span>📷</span> Escanear Nota Fiscal / PDF
         </button>
-      </div>
-    ` : ''}
+      ` : (tx && (tx.pix_code || (tx.notes && tx.notes.includes('000201')))) ? `
+        <button type="button" class="btn btn-secondary btn-sm" id="avl-btn-open-pix" style="font-size: 11.5px; display: inline-flex; align-items: center; gap: 6px; border-color: rgba(6,182,212,0.4); color: #38bdf8; background: rgba(6,182,212,0.12); padding: 5px 12px; border-radius: 20px; cursor: pointer; font-weight: 700;">
+          <span>⚡</span> Pagar com PIX (Ver QR Code)
+        </button>
+      ` : ''}
+    </div>
 
     <div class="type-toggle" id="avl-type-toggle">
       <button data-type="expense" class="${typeVal === 'expense' ? 'active-expense' : ''}">💸 Despesa</button>
@@ -4310,9 +4333,15 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
   if (scanQrBtn) {
     scanQrBtn.onclick = () => {
       Modal.close();
-      if (typeof openNFCeScannerModal === 'function') {
-        openNFCeScannerModal();
-      }
+      if (typeof openNFCeScannerModal === 'function') openNFCeScannerModal();
+    };
+  }
+
+  const openPixBtn = document.getElementById('avl-btn-open-pix');
+  if (openPixBtn && tx) {
+    openPixBtn.onclick = () => {
+      Modal.close();
+      if (typeof openPixPaymentModal === 'function') openPixPaymentModal(tx);
     };
   }
 
@@ -5485,6 +5514,95 @@ async function openPaymentDateModal(txId, currentDate, onComplete) {
     } catch (err) {
       console.error(err);
       toast('Erro ao atualizar status', 'error');
+    }
+  };
+}
+
+/**
+ * Abre o Modal Dedicado de Pagamento via PIX com exibição do QR Code e confirmação direta (OK Já Pago)
+ */
+async function openPixPaymentModal(txOrId, onComplete) {
+  let tx = typeof txOrId === 'object' && txOrId !== null ? txOrId : null;
+  if (!tx && txOrId) {
+    try {
+      const allTxs = await window.api.transactions.getAll({ userId: State.user.id });
+      tx = allTxs.find(t => t.id == txOrId);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  if (!tx) {
+    toast('Lançamento não encontrado.', 'error');
+    return;
+  }
+
+  const pixCode = tx.pix_code || (tx.notes ? (tx.notes.match(/000201[0-9A-Za-z.=-]+/) || [])[0] : null);
+  if (!pixCode) {
+    toast('Este lançamento não possui código PIX associado.', 'warning');
+    return;
+  }
+
+  const desc = tx.description || 'Pagamento PIX';
+  const amt = tx.amount || 0;
+  const today = new Date().toISOString().split('T')[0];
+
+  Modal.open('⚡ Pagar com PIX', `
+    <div style="padding: 14px 16px; text-align: center;">
+      <div style="background: linear-gradient(135deg, rgba(6,182,212,0.14), rgba(16,185,129,0.08)); border: 1px solid rgba(6,182,212,0.35); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.15);">
+        <div style="font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 2px;">${desc}</div>
+        <div style="font-size: 32px; font-weight: 900; color: var(--accent-light); letter-spacing: -0.02em; margin: 4px 0;">${fmt.currency(amt)}</div>
+        <div style="font-size: 11.5px; color: var(--text-muted);">Aponte o aplicativo do seu banco para o QR Code abaixo:</div>
+
+        <div style="display: flex; justify-content: center; margin: 12px 0;">
+          <img id="pix-direct-qrcode-img" alt="QR Code PIX" style="width: 190px; height: 190px; border-radius: 12px; background: white; padding: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.2);">
+        </div>
+
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-pix-direct-copy" style="font-size: 12px; font-weight: 600; padding: 6px 14px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; margin: 0 auto;">
+          <span>📋</span> Copiar Código PIX (Copia e Cola)
+        </button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 10px;">
+        <button type="button" class="btn btn-primary" id="btn-pix-direct-confirm-paid" style="font-weight: 700; font-size: 14px; padding: 11px 20px; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(135deg, #10b981, #059669); border: none; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);">
+          <span>✅</span> Confirmar Pagamento Realizado (OK Já Pago)
+        </button>
+        <button type="button" class="btn btn-secondary" id="btn-pix-direct-close" style="padding: 8px; font-size: 12.5px;">
+          Fechar (Pagar Mais Tarde)
+        </button>
+      </div>
+    </div>
+  `);
+
+  const qrcodeImg = document.getElementById('pix-direct-qrcode-img');
+  if (qrcodeImg && typeof QRCode !== 'undefined' && QRCode.toDataURL) {
+    QRCode.toDataURL(pixCode, { width: 400, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
+      .then(url => { qrcodeImg.src = url; })
+      .catch(err => console.error('[Pix QR] Erro ao renderizar QR code:', err));
+  }
+
+  document.getElementById('btn-pix-direct-copy').onclick = () => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(pixCode);
+    }
+    toast('📋 Código PIX copiado com sucesso! Cole no app do seu banco.', 'success');
+  };
+
+  document.getElementById('btn-pix-direct-close').onclick = Modal.close;
+
+  document.getElementById('btn-pix-direct-confirm-paid').onclick = async () => {
+    try {
+      await window.api.transactions.togglePaidWithDate(tx.id, today, {});
+      if (typeof playScanBeep === 'function') playScanBeep();
+      toast(`✅ Pagamento de ${fmt.currency(amt)} confirmado com sucesso!`, 'success');
+      Modal.close();
+      if (onComplete) onComplete();
+      else {
+        if (typeof renderRecurring === 'function' && State.currentPage === 'recurring') renderRecurring();
+        if (typeof renderDashboard === 'function' && (State.currentPage === 'dashboard' || !State.currentPage)) renderDashboard();
+      }
+    } catch (err) {
+      console.error(err);
+      toast('Erro ao confirmar pagamento: ' + err.message, 'error');
     }
   };
 }

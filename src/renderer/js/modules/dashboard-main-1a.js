@@ -628,6 +628,17 @@ function bindDashboardEvents(contentDiv, summary, txs, monthly, today) {
   }
 
   // 4. Clickable priority and transaction items
+  contentDiv.querySelectorAll('.btn-dash-pix').forEach(btn => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const txId = parseInt(btn.dataset.id);
+      if (txId && typeof openPixPaymentModal === 'function') {
+        openPixPaymentModal(txId, () => renderDashboard());
+      }
+    };
+  });
+
   contentDiv.querySelectorAll('.btn-alert-link, .priority-item-clickable').forEach(btn => {
     btn.onclick = (e) => {
       e.preventDefault();
