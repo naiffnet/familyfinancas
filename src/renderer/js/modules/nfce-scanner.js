@@ -88,32 +88,19 @@ function decodeHexAscii(str) {
 }
 
 const KNOWN_CNPJS = [
-  { root: '94896792', name: 'Supermercados Rissul', cat: 'Alimentação' },
-  { root: '92754738', name: 'Supermercado Zaffari', cat: 'Alimentação' },
-  { root: '45543915', name: 'Carrefour Supermercado', cat: 'Alimentação' },
-  { root: '01545822', name: 'Supermercados Asun', cat: 'Alimentação' },
-  { root: '07170938', name: 'Stok Center Atacado', cat: 'Alimentação' },
-  { root: '06057223', name: 'Assaí Atacadista', cat: 'Alimentação' },
-  { root: '47508411', name: 'Pão de Açúcar / Extra', cat: 'Alimentação' },
-  { root: '75315333', name: 'Bistek Supermercados', cat: 'Alimentação' },
-  { root: '83646984', name: 'Fort Atacadista', cat: 'Alimentação' },
-  { root: '02502844', name: 'Angeloni Supermercados', cat: 'Alimentação' },
-  { root: '92999999', name: 'Farmácia Panvel', cat: 'Saúde' },
-  { root: '92999704', name: 'Farmácia Panvel', cat: 'Saúde' },
-  { root: '92665611', name: 'Farmácia Panvel', cat: 'Saúde' },
-  { root: '61585865', name: 'Droga Raia / Drogasil', cat: 'Saúde' },
-  { root: '88212147', name: 'Farmácias São João', cat: 'Saúde' },
-  { root: '05493015', name: 'Farmácia Pague Menos', cat: 'Saúde' },
-  { root: '33000167', name: 'Posto Petrobras', cat: 'Transporte' },
-  { root: '33453598', name: 'Posto Shell', cat: 'Transporte' },
-  { root: '33337122', name: 'Posto Ipiranga', cat: 'Transporte' },
-  { root: '92798735', name: 'Lojas Renner', cat: 'Vestuário' },
-  { root: '61099966', name: 'Lojas Riachuelo', cat: 'Vestuário' },
-  { root: '45242914', name: 'Lojas C&A', cat: 'Vestuário' },
-  { root: '00776574', name: 'Cassol Centerlar', cat: 'Moradia' },
-  { root: '01438784', name: 'Leroy Merlin', cat: 'Moradia' },
-  { root: '42591651', name: 'McDonald\'s', cat: 'Alimentação' },
-  { root: '13574594', name: 'Burger King', cat: 'Alimentação' }
+  { root: '94896792', name: 'Supermercados Rissul', cat: 'Alimentação' }, { root: '92754738', name: 'Supermercado Zaffari', cat: 'Alimentação' },
+  { root: '45543915', name: 'Carrefour Supermercado', cat: 'Alimentação' }, { root: '01545822', name: 'Supermercados Asun', cat: 'Alimentação' },
+  { root: '07170938', name: 'Stok Center Atacado', cat: 'Alimentação' }, { root: '06057223', name: 'Assaí Atacadista', cat: 'Alimentação' },
+  { root: '47508411', name: 'Pão de Açúcar / Extra', cat: 'Alimentação' }, { root: '75315333', name: 'Bistek Supermercados', cat: 'Alimentação' },
+  { root: '83646984', name: 'Fort Atacadista', cat: 'Alimentação' }, { root: '02502844', name: 'Angeloni Supermercados', cat: 'Alimentação' },
+  { root: '92999999', name: 'Farmácia Panvel', cat: 'Saúde' }, { root: '92999704', name: 'Farmácia Panvel', cat: 'Saúde' },
+  { root: '92665611', name: 'Farmácia Panvel', cat: 'Saúde' }, { root: '61585865', name: 'Droga Raia / Drogasil', cat: 'Saúde' },
+  { root: '88212147', name: 'Farmácias São João', cat: 'Saúde' }, { root: '05493015', name: 'Farmácia Pague Menos', cat: 'Saúde' },
+  { root: '33000167', name: 'Posto Petrobras', cat: 'Transporte' }, { root: '33453598', name: 'Posto Shell', cat: 'Transporte' },
+  { root: '33337122', name: 'Posto Ipiranga', cat: 'Transporte' }, { root: '92798735', name: 'Lojas Renner', cat: 'Vestuário' },
+  { root: '61099966', name: 'Lojas Riachuelo', cat: 'Vestuário' }, { root: '45242914', name: 'Lojas C&A', cat: 'Vestuário' },
+  { root: '00776574', name: 'Cassol Centerlar', cat: 'Moradia' }, { root: '01438784', name: 'Leroy Merlin', cat: 'Moradia' },
+  { root: '42591651', name: 'McDonald\'s', cat: 'Alimentação' }, { root: '13574594', name: 'Burger King', cat: 'Alimentação' }
 ];
 
 function parsePixPayload(text) {
@@ -256,36 +243,22 @@ function parseSingleCode(raw) {
   if (result.cnpj) {
     const root = result.cnpj.replace(/[^0-9]/g, '').substring(0, 8);
     const k = KNOWN_CNPJS.find(x => x.root === root);
-    if (k) {
-      result.description = `${k.name}${result.nNF ? ` (NFC-e #${result.nNF})` : ''}`;
-      result.suggestedCategory = k.cat;
-    }
+    if (k) { result.description = `${k.name}${result.nNF ? ` (NFC-e #${result.nNF})` : ''}`; result.suggestedCategory = k.cat; }
   }
 
   if (!result.description) {
     const merchants = [
-      { pattern: /zaffari|bourbon/i, name: 'Supermercado Zaffari', cat: 'Alimentação' },
-      { pattern: /carrefour/i, name: 'Carrefour Supermercado', cat: 'Alimentação' },
-      { pattern: /rissul|unidasul|macromix/i, name: 'Supermercados Rissul', cat: 'Alimentação' },
-      { pattern: /pao.*acucar|extra|assai/i, name: 'Supermercado', cat: 'Alimentação' },
-      { pattern: /panvel/i, name: 'Farmácia Panvel', cat: 'Saúde' },
-      { pattern: /raia|drogasil/i, name: 'Droga Raia / Drogasil', cat: 'Saúde' },
-      { pattern: /sao.*joao/i, name: 'Farmácia São João', cat: 'Saúde' },
-      { pattern: /pague.*menos/i, name: 'Farmácia Pague Menos', cat: 'Saúde' },
-      { pattern: /ipiranga/i, name: 'Posto Ipiranga', cat: 'Transporte' },
-      { pattern: /shell/i, name: 'Posto Shell', cat: 'Transporte' },
-      { pattern: /petrobras|vibra/i, name: 'Posto Petrobras', cat: 'Transporte' },
-      { pattern: /mcdonald/i, name: 'McDonald\'s', cat: 'Alimentação' },
-      { pattern: /burger.*king/i, name: 'Burger King', cat: 'Alimentação' },
-      { pattern: /renner/i, name: 'Lojas Renner', cat: 'Vestuário' },
+      { pattern: /zaffari|bourbon/i, name: 'Supermercado Zaffari', cat: 'Alimentação' }, { pattern: /carrefour/i, name: 'Carrefour', cat: 'Alimentação' },
+      { pattern: /rissul|unidasul|macromix/i, name: 'Supermercados Rissul', cat: 'Alimentação' }, { pattern: /pao.*acucar|extra|assai/i, name: 'Supermercado', cat: 'Alimentação' },
+      { pattern: /panvel/i, name: 'Farmácia Panvel', cat: 'Saúde' }, { pattern: /raia|drogasil/i, name: 'Droga Raia / Drogasil', cat: 'Saúde' },
+      { pattern: /sao.*joao/i, name: 'Farmácia São João', cat: 'Saúde' }, { pattern: /pague.*menos/i, name: 'Farmácia Pague Menos', cat: 'Saúde' },
+      { pattern: /ipiranga/i, name: 'Posto Ipiranga', cat: 'Transporte' }, { pattern: /shell/i, name: 'Posto Shell', cat: 'Transporte' },
+      { pattern: /petrobras|vibra/i, name: 'Posto Petrobras', cat: 'Transporte' }, { pattern: /mcdonald/i, name: 'McDonald\'s', cat: 'Alimentação' },
+      { pattern: /burger.*king/i, name: 'Burger King', cat: 'Alimentação' }, { pattern: /renner/i, name: 'Lojas Renner', cat: 'Vestuário' },
       { pattern: /riachuelo/i, name: 'Lojas Riachuelo', cat: 'Vestuário' }
     ];
     for (const m of merchants) {
-      if (m.pattern.test(text)) {
-        result.description = `${m.name}${result.nNF ? ` (NFC-e #${result.nNF})` : ''}`;
-        result.suggestedCategory = m.cat;
-        break;
-      }
+      if (m.pattern.test(text)) { result.description = `${m.name}${result.nNF ? ` (NFC-e #${result.nNF})` : ''}`; result.suggestedCategory = m.cat; break; }
     }
   }
 
@@ -294,47 +267,189 @@ function parseSingleCode(raw) {
     result.suggestedCategory = 'Alimentação';
   }
 
-  if (result.accessKey) {
-    result.notes = `Chave NFC-e: ${result.accessKey}`;
-  }
+  if (result.accessKey) result.notes = `Chave NFC-e: ${result.accessKey}`;
   return result;
 }
 
-function mergeScanResults(codes) {
-  if (!codes || !codes.length) return null;
-  const uniqueCodes = [...new Set(codes.map(c => c.trim()).filter(Boolean))];
-  if (uniqueCodes.length === 1) return parseSingleCode(uniqueCodes[0]);
+function extractInfoFromText(fullText) {
+  if (!fullText || typeof fullText !== 'string') return null;
+  const res = {
+    type: 'expense', amount: null, date: null, dueDate: null, competence: null,
+    description: '', suggestedCategory: 'Alimentação', accessKey: '', cnpj: '',
+    nNF: '', pixCode: null, boletoCode: null, notes: '', isPix: false, isBoleto: false
+  };
 
-  let nfceObj = null;
-  let pixObj = null;
-
-  for (const c of uniqueCodes) {
-    const p = parseSingleCode(c);
-    if (!p) continue;
-    if (p.isPix) pixObj = p;
-    else if (p.accessKey || p.rawUrl.includes('sefaz') || p.rawUrl.includes('nfce') || p.rawUrl.includes('nfe')) nfceObj = p;
+  // 1. Procura Código PIX Copia e Cola no texto (EMVCo 000201...)
+  const pixMatch = fullText.match(/(00020126[0-9A-Za-z.=-]+)/i) || fullText.match(/(000201[0-9A-Za-z.=-]{30,})/i);
+  if (pixMatch) {
+    res.pixCode = pixMatch[1].trim();
+    res.isPix = true;
+    const p = parsePixPayload(res.pixCode);
+    if (p && p.amount) res.amount = p.amount;
+    if (p && p.receiver) res.description = p.receiver;
   }
 
-  if (nfceObj && pixObj) {
-    const merged = {
-      ...nfceObj,
-      isPix: true,
-      pixCode: pixObj.pixCode,
-      pixReceiver: pixObj.pixReceiver,
-      pixTxid: pixObj.pixTxid
-    };
-    if (!merged.amount && pixObj.amount) merged.amount = pixObj.amount;
-    if (pixObj.pixReceiver && (!merged.description || merged.description.startsWith('Compra Cupom Fiscal'))) {
-      merged.description = `${pixObj.pixReceiver}${merged.nNF ? ` (NFC-e #${merged.nNF})` : ''}`;
+  // 2. Procura Chave de Acesso de NF-e / NFC-e (44 dígitos)
+  const keyRawMatch = fullText.match(/\b(\d{4}[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{4}[.\s]?\d{4})\b/);
+  if (keyRawMatch) {
+    const cleanKey = keyRawMatch[1].replace(/[^0-9]/g, '');
+    if (cleanKey.length === 44) {
+      res.accessKey = cleanKey;
+      const rawCnpj = cleanKey.substring(6, 20);
+      res.cnpj = rawCnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+      res.nNF = parseInt(cleanKey.substring(25, 34), 10).toString();
+      const aa = cleanKey.substring(2, 4);
+      const mm = cleanKey.substring(4, 6);
+      res.competence = `${parseInt(aa, 10) + 2000}-${mm.padStart(2, '0')}`;
     }
-    const notesParts = [];
-    if (merged.accessKey) notesParts.push(`Chave NFC-e: ${merged.accessKey}`);
-    if (pixObj.pixCode) notesParts.push(`PIX Copia e Cola: ${pixObj.pixCode}`);
-    merged.notes = notesParts.join('\n');
-    return merged;
   }
 
-  return nfceObj || pixObj || parseSingleCode(uniqueCodes[0]);
+  // 3. Procura Linha Digitável de Boleto
+  const boletoMatch = fullText.match(/\b(\d{5}[.\s]?\d{5}\s+\d{5}[.\s]?\d{6}\s+\d{5}[.\s]?\d{6}\s+\d\s+\d{14})\b/);
+  if (boletoMatch) {
+    res.boletoCode = boletoMatch[1].replace(/[^0-9]/g, '');
+    res.isBoleto = true;
+  }
+
+  // 4. Procura CNPJ no texto
+  const cnpjMatch = fullText.match(/\b(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})\b/);
+  if (cnpjMatch && !res.cnpj) res.cnpj = cnpjMatch[1];
+
+  // 5. Procura Data de Vencimento
+  const dueMatch = fullText.match(/(?:vencimento|venc|data\s+de\s+vencimento|data\s+vencimento|vence\s+em|pagar\s+at[eé]|validade)\s*[:\s]*(\d{2}[/-]\d{2}[/-]\d{4})/i) ||
+                   fullText.match(/(?:vencimento|venc)\s*[:\s]*(\d{4}[/-]\d{2}[/-]\d{2})/i);
+  if (dueMatch) {
+    const rawDue = dueMatch[1].replace(/\//g, '-');
+    const parts = rawDue.split('-');
+    if (parts[0].length === 4) res.dueDate = `${parts[0]}-${parts[1]}-${parts[2]}`;
+    else res.dueDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+    res.date = res.dueDate;
+    res.competence = res.dueDate.slice(0, 7);
+  }
+
+  // 6. Procura Data de Emissão (se não achou vencimento)
+  if (!res.date) {
+    const emiMatch = fullText.match(/(?:emiss[aã]o|data\s+da\s+emiss[aã]o|emitido\s+em|data\s+de\s+emiss[aã]o)\s*[:\s]*(\d{2}[/-]\d{2}[/-]\d{4})/i) ||
+                     fullText.match(/(?:emiss[aã]o)\s*[:\s]*(\d{4}[/-]\d{2}[/-]\d{2})/i);
+    if (emiMatch) {
+      const rawEmi = emiMatch[1].replace(/\//g, '-');
+      const parts = rawEmi.split('-');
+      if (parts[0].length === 4) res.date = `${parts[0]}-${parts[1]}-${parts[2]}`;
+      else res.date = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      if (!res.competence) res.competence = res.date.slice(0, 7);
+    }
+  }
+
+  // 7. Procura Valor Total / Valor a Pagar
+  if (!res.amount) {
+    const valMatch = fullText.match(/(?:valor\s+total|total\s+a\s+pagar|valor\s+a\s+pagar|valor\s+do\s+documento|valor\s+cobrado|valor\s+l[ií]quido|total\s+da\s+nota|total\s+nota|total\s+geral|valor\s+fatura)\s*[:\s]*R?\$?\s*([\d.]+,\d{2})/i) ||
+                     fullText.match(/R\$\s*([\d.]+,\d{2})/i);
+    if (valMatch) {
+      const cleanNum = valMatch[1].replace(/\./g, '').replace(',', '.');
+      const parsedAmt = parseFloat(cleanNum);
+      if (!isNaN(parsedAmt) && parsedAmt > 0) res.amount = parsedAmt;
+    }
+  }
+
+  // 8. Procura Razão Social / Beneficiário
+  if (!res.description) {
+    const merchantMatch = fullText.match(/(?:benefici[aá]rio|raz[aã]o\s+social|nome\s+empresarial|cedente|prestador|emitente|estabelecimento)\s*[:\s]*([^\n\r,;]{3,50})/i);
+    if (merchantMatch) {
+      const rawName = merchantMatch[1].trim();
+      if (rawName.length > 3) res.description = rawName;
+    }
+  }
+
+  return res;
+}
+
+function mergeScanResults(codes, textData = null) {
+  const visualList = codes && codes.length ? [...new Set(codes.map(c => c.trim()).filter(Boolean))] : [];
+  let baseObj = null;
+
+  if (visualList.length > 0) {
+    let nfceObj = null;
+    let pixObj = null;
+
+    for (const c of visualList) {
+      const p = parseSingleCode(c);
+      if (!p) continue;
+      if (p.isPix) pixObj = p;
+      else if (p.accessKey || p.rawUrl.includes('sefaz') || p.rawUrl.includes('nfce') || p.rawUrl.includes('nfe')) nfceObj = p;
+    }
+
+    if (nfceObj && pixObj) {
+      baseObj = {
+        ...nfceObj,
+        isPix: true,
+        pixCode: pixObj.pixCode,
+        pixReceiver: pixObj.pixReceiver,
+        pixTxid: pixObj.pixTxid
+      };
+      if (!baseObj.amount && pixObj.amount) baseObj.amount = pixObj.amount;
+      if (pixObj.pixReceiver && (!baseObj.description || baseObj.description.startsWith('Compra Cupom Fiscal'))) {
+        baseObj.description = `${pixObj.pixReceiver}${baseObj.nNF ? ` (NFC-e #${baseObj.nNF})` : ''}`;
+      }
+    } else {
+      baseObj = nfceObj || pixObj || parseSingleCode(visualList[0]);
+    }
+  }
+
+  if (!baseObj && textData) {
+    baseObj = textData;
+  } else if (baseObj && textData) {
+    if (textData.dueDate) {
+      baseObj.dueDate = textData.dueDate;
+      baseObj.date = textData.dueDate;
+      baseObj.competence = textData.dueDate.slice(0, 7);
+    } else if (textData.date && !baseObj.date) {
+      baseObj.date = textData.date;
+      baseObj.competence = textData.date.slice(0, 7);
+    }
+    if (textData.amount && (!baseObj.amount || baseObj.amount <= 0)) baseObj.amount = textData.amount;
+    if (textData.pixCode && !baseObj.pixCode) {
+      baseObj.pixCode = textData.pixCode;
+      baseObj.isPix = true;
+    }
+    if (textData.accessKey && !baseObj.accessKey) {
+      baseObj.accessKey = textData.accessKey;
+      baseObj.cnpj = textData.cnpj;
+      baseObj.nNF = textData.nNF;
+      if (!baseObj.competence) baseObj.competence = textData.competence;
+    }
+    if (textData.description && (!baseObj.description || baseObj.description.startsWith('Compra Cupom Fiscal'))) {
+      baseObj.description = textData.description;
+    }
+  }
+
+  if (!baseObj) return null;
+
+  const today = new Date().toISOString().split('T')[0];
+  if (!baseObj.date) {
+    baseObj.date = baseObj.competence && baseObj.competence !== today.slice(0, 7) ? `${baseObj.competence}-01` : today;
+    baseObj.competence = baseObj.competence || today.slice(0, 7);
+  }
+
+  if (baseObj.cnpj && (!baseObj.description || baseObj.description.startsWith('Compra Cupom Fiscal'))) {
+    const root = baseObj.cnpj.replace(/[^0-9]/g, '').substring(0, 8);
+    const k = KNOWN_CNPJS.find(x => x.root === root);
+    if (k) {
+      baseObj.description = `${k.name}${baseObj.nNF ? ` (NFC-e #${baseObj.nNF})` : ''}`;
+      baseObj.suggestedCategory = k.cat;
+    }
+  }
+
+  if (!baseObj.description) {
+    baseObj.description = baseObj.nNF ? `Nota Fiscal #${baseObj.nNF}` : (baseObj.isPix ? 'Pagamento PIX' : 'Despesa / Fatura');
+  }
+
+  const notesParts = [];
+  if (baseObj.accessKey) notesParts.push(`Chave NF: ${baseObj.accessKey}`);
+  if (baseObj.pixCode) notesParts.push(`PIX Copia e Cola: ${baseObj.pixCode}`);
+  if (baseObj.boletoCode) notesParts.push(`Linha Digitável: ${baseObj.boletoCode}`);
+  baseObj.notes = notesParts.join('\n');
+
+  return baseObj;
 }
 
 function parseNFCeUrl(raw) {
@@ -427,7 +542,7 @@ const NFCeCameraManager = {
     this.isScanning = false;
     playScanBeep();
     vibrateDevice(80);
-    const parsed = mergeScanResults(rawList);
+    const parsed = mergeScanResults(rawList, null);
     this.stop();
     if (onResultCallback) onResultCallback(parsed);
   },
@@ -446,11 +561,13 @@ const NFCeCameraManager = {
       const w = canvas.width, h = canvas.height;
       const slices = [
         { x: 0, y: 0, w: w, h: h },
-        { x: 0, y: 0, w: Math.round(w / 2), h: Math.round(h / 2) },
-        { x: Math.round(w / 2), y: 0, w: w - Math.round(w / 2), h: Math.round(h / 2) },
-        { x: 0, y: Math.round(h / 2), w: Math.round(w / 2), h: h - Math.round(h / 2) },
-        { x: Math.round(w / 2), y: Math.round(h / 2), w: w - Math.round(w / 2), h: h - Math.round(h / 2) },
-        { x: 0, y: Math.round(h * 0.4), w: w, h: Math.round(h * 0.6) }
+        { x: 0, y: 0, w: Math.round(w * 0.55), h: Math.round(h * 0.55) },
+        { x: Math.round(w * 0.45), y: 0, w: Math.round(w * 0.55), h: Math.round(h * 0.55) },
+        { x: 0, y: Math.round(h * 0.45), w: Math.round(w * 0.55), h: Math.round(h * 0.55) },
+        { x: Math.round(w * 0.45), y: Math.round(h * 0.45), w: Math.round(w * 0.55), h: Math.round(h * 0.55) },
+        { x: 0, y: Math.round(h * 0.35), w: w, h: Math.round(h * 0.65) },
+        { x: 0, y: 0, w: w, h: Math.round(h * 0.6) },
+        { x: Math.round(w * 0.2), y: Math.round(h * 0.2), w: Math.round(w * 0.6), h: Math.round(h * 0.6) }
       ];
 
       for (const s of slices) {
@@ -470,13 +587,21 @@ const NFCeCameraManager = {
       // 1. PDF
       if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
         if (!window.pdfjsLib) throw new Error('Leitor de PDF não inicializado.');
-        toast('Lendo páginas do PDF da nota fiscal...', 'info');
+        toast('Lendo páginas e dados fiscais do PDF...', 'info');
         const arrayBuffer = await file.arrayBuffer();
         const pdfDoc = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         const allCodes = [];
+        let fullPdfText = '';
 
-        for (let pageNum = 1; pageNum <= Math.min(pdfDoc.numPages, 3); pageNum++) {
+        for (let pageNum = 1; pageNum <= Math.min(pdfDoc.numPages, 4); pageNum++) {
           const page = await pdfDoc.getPage(pageNum);
+          
+          try {
+            const textContent = await page.getTextContent();
+            const pageText = textContent.items.map(item => item.str).join(' ');
+            fullPdfText += ' ' + pageText;
+          } catch(e) {}
+
           const viewport = page.getViewport({ scale: 2.0 });
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -488,10 +613,17 @@ const NFCeCameraManager = {
           pageCodes.forEach(c => allCodes.push(c));
         }
 
-        if (allCodes.length > 0) {
-          this.handleDetectedCodes(allCodes, onResultCallback);
+        const textExtracted = extractInfoFromText(fullPdfText);
+        const mergedResult = mergeScanResults(allCodes, textExtracted);
+
+        if (mergedResult && (mergedResult.accessKey || mergedResult.pixCode || mergedResult.amount || mergedResult.dueDate || mergedResult.nNF || (mergedResult.description && !mergedResult.description.startsWith('Compra Cupom')))) {
+          this.isScanning = false;
+          playScanBeep();
+          vibrateDevice(80);
+          this.stop();
+          if (onResultCallback) onResultCallback(mergedResult);
         } else {
-          toast('Nenhum QR Code foi encontrado no PDF. Verifique se o documento contém cupom fiscal ou QR do Pix.', 'warning');
+          toast('Nenhum dado fiscal ou QR Code legível foi identificado neste PDF. Você pode digitar ou colar as informações abaixo.', 'warning');
         }
         return;
       }
@@ -503,7 +635,7 @@ const NFCeCameraManager = {
 
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      const testResolutions = [1800, 1200, 800];
+      const testResolutions = [2000, 1400, 900];
       let allFoundCodes = [];
 
       for (const maxDim of testResolutions) {
@@ -569,20 +701,13 @@ function openNFCeScannerModal(customCallback = null) {
   modalWrap.innerHTML = `
     <div class="scanner-modal-card">
       <div class="scanner-modal-header">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:20px">📷</span>
-          <span style="font-weight:700;font-size:15px;color:var(--text-primary)">Leitor de Nota Fiscal (QR Code & PDF)</span>
-        </div>
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-size:20px">📷</span><span style="font-weight:700;font-size:15px;color:var(--text-primary)">Leitor de Nota Fiscal (QR Code & PDF)</span></div>
         <button class="scanner-close-btn" id="scanner-btn-close" title="Fechar">✕</button>
       </div>
       <div class="scanner-viewport-container">
         <video id="nfce-scanner-video" class="scanner-video-feed" playsinline muted autoplay></video>
         <div class="scanner-hud-overlay">
-          <div class="scanner-viewfinder">
-            <div class="viewfinder-corner tl"></div><div class="viewfinder-corner tr"></div>
-            <div class="viewfinder-corner bl"></div><div class="viewfinder-corner br"></div>
-            <div class="scanner-laser-line"></div>
-          </div>
+          <div class="scanner-viewfinder"><div class="viewfinder-corner tl"></div><div class="viewfinder-corner tr"></div><div class="viewfinder-corner bl"></div><div class="viewfinder-corner br"></div><div class="scanner-laser-line"></div></div>
         </div>
         <div class="scanner-live-badge"><span class="scanner-pulse-dot"></span> Câmera Ao Vivo</div>
         <div id="scanner-error-fallback" class="scanner-error-overlay" style="display:none">
@@ -614,12 +739,7 @@ function openNFCeScannerModal(customCallback = null) {
   const errorOverlay = document.getElementById('scanner-error-fallback');
   const errorMsg = document.getElementById('scanner-error-msg');
 
-  const handleSuccess = (parsedData) => {
-    NFCeCameraManager.stop();
-    modalWrap.remove();
-    handleNFCeScanResult(parsedData, customCallback);
-  };
-
+  const handleSuccess = (parsedData) => { NFCeCameraManager.stop(); modalWrap.remove(); handleNFCeScanResult(parsedData, customCallback); };
   const handleError = (err) => {
     if (errorOverlay) {
       errorOverlay.style.display = 'flex';
@@ -663,10 +783,7 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
 
   let matchedCatId = '';
   if (parsedData.suggestedCategory) {
-    const matchedCat = categories.find(c =>
-      c.name.toLowerCase().includes(parsedData.suggestedCategory.toLowerCase()) ||
-      parsedData.suggestedCategory.toLowerCase().includes(c.name.toLowerCase())
-    );
+    const matchedCat = categories.find(c => c.name.toLowerCase().includes(parsedData.suggestedCategory.toLowerCase()) || parsedData.suggestedCategory.toLowerCase().includes(c.name.toLowerCase()));
     if (matchedCat) matchedCatId = matchedCat.id;
   }
 
@@ -682,7 +799,7 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
           ${amountVal !== '' ? fmt.currency(amountVal) : 'R$ 0,00'}
         </div>
         <div style="font-size:11.5px;color:var(--text-muted);display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap">
-          <span>📅 Data: <strong id="nfce-preview-date">${fmt.date(dateVal)}</strong></span>
+          <span>📅 ${parsedData.dueDate ? 'Vencimento' : 'Data'}: <strong id="nfce-preview-date" style="color:${parsedData.dueDate ? '#60a5fa' : 'inherit'}">${fmt.date(dateVal)}</strong></span>
           ${parsedData.nNF ? `<span>🔢 NF-e: <strong>#${parsedData.nNF}</strong></span>` : ''}
           ${parsedData.cnpj ? `<span>🏢 CNPJ: <strong>${parsedData.cnpj}</strong></span>` : ''}
         </div>
@@ -690,7 +807,6 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
       </div>
 
       ${parsedData.pixCode ? `
-        <!-- Destaque do PIX Integrado da Nota Fiscal -->
         <div style="background:linear-gradient(135deg,rgba(6,182,212,0.12),rgba(16,185,129,0.08));border:1px solid rgba(6,182,212,0.3);border-radius:8px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
           <div style="display:flex;align-items:center;gap:8px">
             <span style="font-size:20px">⚡</span>
@@ -712,62 +828,29 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
       ` : ''}
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="form-group" style="margin:0">
-          <label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Descrição</label>
-          <input type="text" id="nfce-conf-desc" value="${descVal}" style="font-size:13px;font-weight:600">
-        </div>
-        <div class="form-group" style="margin:0">
-          <label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Valor (R$)</label>
-          <input type="number" step="0.01" min="0" id="nfce-conf-amount" placeholder="0,00" value="${amountVal}" style="font-size:13px;font-weight:700;color:var(--accent-light)">
-        </div>
+        <div class="form-group" style="margin:0"><label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Descrição</label><input type="text" id="nfce-conf-desc" value="${descVal}" style="font-size:13px;font-weight:600"></div>
+        <div class="form-group" style="margin:0"><label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Valor (R$)</label><input type="number" step="0.01" min="0" id="nfce-conf-amount" placeholder="0,00" value="${amountVal}" style="font-size:13px;font-weight:700;color:var(--accent-light)"></div>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="form-group" style="margin:0">
-          <label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Conta / Cartão Pagador</label>
-          <select id="nfce-conf-account" style="font-size:13px">
-            ${accounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-group" style="margin:0">
-          <label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Categoria</label>
-          <select id="nfce-conf-category" style="font-size:13px">
-            <option value="">Sem categoria</option>
-            ${categories.filter(c => c.type === 'expense' || c.type === 'both').map(c => `
-              <option value="${c.id}" ${String(c.id) === String(matchedCatId) ? 'selected' : ''}>${c.icon} ${c.name}</option>
-            `).join('')}
-          </select>
-        </div>
+        <div class="form-group" style="margin:0"><label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Conta / Cartão Pagador</label><select id="nfce-conf-account" style="font-size:13px">${accounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}</select></div>
+        <div class="form-group" style="margin:0"><label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Categoria</label><select id="nfce-conf-category" style="font-size:13px"><option value="">Sem categoria</option>${categories.filter(c => c.type === 'expense' || c.type === 'both').map(c => `<option value="${c.id}" ${String(c.id) === String(matchedCatId) ? 'selected' : ''}>${c.icon} ${c.name}</option>`).join('')}</select></div>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="form-group" style="margin:0">
-          <label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Data do Pagamento</label>
-          <input type="date" id="nfce-conf-date" value="${dateVal}" style="font-size:13px">
-        </div>
-        <div class="form-group" style="margin:0">
-          <label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Mês de Competência</label>
-          <input type="month" id="nfce-conf-competence" value="${competenceVal}" style="font-size:13px">
-        </div>
+        <div class="form-group" style="margin:0"><label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">${parsedData.dueDate ? 'Data de Vencimento' : 'Data do Pagamento'}</label><input type="date" id="nfce-conf-date" value="${dateVal}" style="font-size:13px"></div>
+        <div class="form-group" style="margin:0"><label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Mês de Competência</label><input type="month" id="nfce-conf-competence" value="${competenceVal}" style="font-size:13px"></div>
       </div>
 
       <div class="form-group" style="margin:4px 0 0 0">
-        <label style="font-size:12.5px;display:flex;align-items:center;gap:8px;cursor:pointer">
-          <input type="checkbox" id="nfce-conf-paid" ${parsedData.pixCode ? '' : 'checked'}> Já foi pago / debitado da conta
-        </label>
+        <label style="font-size:12.5px;display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="nfce-conf-paid" ${(parsedData.dueDate || parsedData.pixCode) ? '' : 'checked'}> Já foi pago / debitado da conta</label>
       </div>
 
       <div style="padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-        <button type="button" class="btn btn-secondary" id="nfce-conf-btn-reject" style="color:#f87171;border-color:rgba(239,68,68,0.35);background:rgba(239,68,68,0.06);font-weight:600;padding:8px 16px;border-radius:8px;display:flex;align-items:center;gap:6px">
-          <span>✕</span> Não Aceitar
-        </button>
+        <button type="button" class="btn btn-secondary" id="nfce-conf-btn-reject" style="color:#f87171;border-color:rgba(239,68,68,0.35);background:rgba(239,68,68,0.06);font-weight:600;padding:8px 16px;border-radius:8px;display:flex;align-items:center;gap:6px"><span>✕</span> Não Aceitar</button>
         <div style="display:flex;gap:8px">
-          <button type="button" class="btn btn-secondary" id="nfce-conf-btn-more-options" style="font-weight:600;padding:8px 14px;border-radius:8px;display:flex;align-items:center;gap:6px" title="Abrir no formulário completo com todas as opções">
-            <span>✏️</span> Mais Opções
-          </button>
-          <button type="button" class="btn btn-primary" id="nfce-conf-btn-accept" style="font-weight:700;padding:8px 20px;border-radius:8px;display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,#10b981,#059669);border:none;box-shadow:0 4px 14px rgba(16,185,129,0.3)">
-            <span>✓</span> Aceitar e Criar Lançamento
-          </button>
+          <button type="button" class="btn btn-secondary" id="nfce-conf-btn-more-options" style="font-weight:600;padding:8px 14px;border-radius:8px;display:flex;align-items:center;gap:6px" title="Abrir no formulário completo com todas as opções"><span>✏️</span> Mais Opções</button>
+          <button type="button" class="btn btn-primary" id="nfce-conf-btn-accept" style="font-weight:700;padding:8px 20px;border-radius:8px;display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,#10b981,#059669);border:none;box-shadow:0 4px 14px rgba(16,185,129,0.3)"><span>✓</span> Aceitar e Criar Lançamento</button>
         </div>
       </div>
     </div>
