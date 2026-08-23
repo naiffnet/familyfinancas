@@ -1,8 +1,8 @@
 const crypto = require('crypto');
-
-// Load environment variables locally if running under electron or local testing
 const fs = require('fs');
 const path = require('path');
+
+// Load environment variables locally if running under electron or local testing
 const dotenvPath = path.join(__dirname, '..', '..', '.env');
 if (fs.existsSync(dotenvPath)) {
   const envContent = fs.readFileSync(dotenvPath, 'utf8');
@@ -19,11 +19,16 @@ if (fs.existsSync(dotenvPath)) {
   }
 }
 
-// Ensure DATA_ENCRYPTION_KEY is valid. Fallback to a zero-key for safe local testing if not defined.
+// Ensure DATA_ENCRYPTION_KEY is valid.
 let hexKey = process.env.DATA_ENCRYPTION_KEY;
 if (!hexKey || hexKey.length !== 64) {
-  console.warn("WARNING: DATA_ENCRYPTION_KEY not set or invalid. Using default development key.");
-  hexKey = "0000000000000000000000000000000000000000000000000000000000000000";
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error("ERRO CRÍTICO DE SEGURANÇA: DATA_ENCRYPTION_KEY de 64 caracteres hexadecimais é obrigatória no ambiente de produção. Gere uma chave segura com 'node scripts/generate-keys.js'.");
+  } else {
+    console.warn("[Segurança] AVISO: DATA_ENCRYPTION_KEY não configurada ou inválida no .env. Utilizando chave derivativa local para desenvolvimento.");
+  }
+  // Deterministic 256-bit dev key derived from app secret string
+  hexKey = crypto.createHash('sha256').update('financas-familia-default-dev-key').digest('hex');
 }
 const KEY = Buffer.from(hexKey, 'hex');
 
@@ -36,15 +41,15 @@ function encryptField(plainText) {
     const authTag = cipher.getAuthTag();
     return Buffer.concat([iv, authTag, encrypted]).toString('base64');
   } catch (err) {
-    console.error("Encryption error:", err);
-    return plainText; // Fallback to plain text on encryption error to prevent system crash
+    console.error("Erro ao criptografar campo:", err);
+    throw new Error("Falha de segurança ao criptografar dados sensíveis.");
   }
 }
 
 function decryptField(payload) {
   if (!payload) return null;
   
-  // If the payload doesn't look like base64, return as is (could be legacy plaintext).
+  // If the payload doesn't look like base64, return as is (legacy plaintext).
   const base64Regex = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
   if (!base64Regex.test(payload)) {
     return payload;

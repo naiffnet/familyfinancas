@@ -106,8 +106,15 @@ if (!window.api) {
       update:      (d)  => makeRpcCall('transactions:update', d),
       delete:      (id) => makeRpcCall('transactions:delete', id),
       togglePaid:  (id) => makeRpcCall('transactions:togglePaid', id),
-      togglePaidWithDate: (id, date) => makeRpcCall('transactions:togglePaidWithDate', id, date),
+      togglePaidWithDate: (id, date, options) => makeRpcCall('transactions:togglePaidWithDate', id, date, options),
       updatePositions: (userId, positions) => makeRpcCall('transactions:updatePositions', { userId, positions }),
+    },
+    invoices: {
+      getMonthly:  (d) => makeRpcCall('invoices:getMonthly', d),
+      pay:         (d) => makeRpcCall('invoices:pay', d),
+      renegotiate: (d) => makeRpcCall('invoices:renegotiate', d),
+      reopen:      (d) => makeRpcCall('invoices:reopen', d),
+      recalculate: (d) => makeRpcCall('invoices:recalculate', d),
     },
     budgets: {
       getAll: (d) => makeRpcCall('budgets:getAll', d),
@@ -134,6 +141,8 @@ if (!window.api) {
       export: () => makeRpcCall('backup:export'),
       restore: (d) => makeRpcCall('backup:restore', d),
       exportExcel: (d) => makeRpcCall('backup:exportExcel', d),
+      exportJson: (d) => makeRpcCall('backup:exportJson', d),
+      exportCsv: (d) => makeRpcCall('backup:exportCsv', d),
     },
     permissions: {
       get: (userId) => makeRpcCall('permissions:get', userId),
@@ -149,6 +158,20 @@ if (!window.api) {
     logs: {
       get: () => makeRpcCall('server:getLogs'),
       getByFamily: (id) => makeRpcCall('logs:getByFamily', id),
+    },
+    importer: {
+      parseOfx: (ofxString) => makeRpcCall('importer:parseOfx', { ofxString }),
+      parseCsv: (csvString) => makeRpcCall('importer:parseCsv', { csvString }),
+      importBatch: (d) => makeRpcCall('importer:importBatch', d),
+    },
+    sync: {
+      pushPull: (d) => makeRpcCall('sync:pushPull', d),
+      findDuplicates: (d) => makeRpcCall('sync:findDuplicates', d),
+      checkCandidate: (d) => makeRpcCall('sync:checkCandidate', d),
+      mergeTransactions: (d) => makeRpcCall('sync:mergeTransactions', d),
+      mergeBatch: (d) => makeRpcCall('sync:mergeBatch', d),
+      dismissDuplicate: (d) => makeRpcCall('sync:dismissDuplicate', d),
+      getHistory: (d) => makeRpcCall('sync:getHistory', d),
     },
   };
 }
@@ -170,6 +193,13 @@ const State = {
   activeDashTab: 'mensal',
   budgetUserId: null,
   currentSort: 'manual',
+  highlightCardId: null,
+  highlightCardColor: null,
+  highlightCardName: null,
+  highlightInvoiceId: null,
+  highlightAccountId: null,
+  highlightAccountColor: null,
+  highlightAccountName: null,
 };
 
 // ── Formatters ─────────────────────────
@@ -217,9 +247,15 @@ const BANKS = {
   visa:      { name: 'Visa',           color: '#1A1F71', bg: '#eff6ff', emoji: '💳', abbr: 'Visa' },
   mastercard:{ name: 'Mastercard',     color: '#FF5F00', bg: '#fff3e8', emoji: '💳', abbr: 'Mast' },
   elo:       { name: 'Elo',            color: '#231F20', bg: '#f1f5f9', emoji: '💳', abbr: 'Elo' },
-  ticket:    { name: 'Ticket Alimentação',color: '#EC1C24', bg: '#fee2e2', emoji: '🎟️', abbr: 'Tick' },
+  ticket:    { name: 'Ticket Benefícios',color: '#EC1C24', bg: '#fee2e2', emoji: '🎟️', abbr: 'Tick' },
   vr:        { name: 'VR Benefícios',  color: '#009A44', bg: '#f0fdf4', emoji: '🎟️', abbr: 'VR' },
-  sodexo:    { name: 'Sodexo',         color: '#0F2C59', bg: '#eff6ff', emoji: '🎟️', abbr: 'Sod' },
+  sodexo:    { name: 'Sodexo / Pluxee',color: '#0F2C59', bg: '#eff6ff', emoji: '🎟️', abbr: 'Pluxee' },
+  alelo:     { name: 'Alelo Benefícios',color: '#007b5f', bg: '#ecfdf5', emoji: '🎟️', abbr: 'Alelo' },
+  flash:     { name: 'Flash Benefícios',color: '#ff2d55', bg: '#fff0f3', emoji: '⚡', abbr: 'Flash' },
+  caju:      { name: 'Caju Benefícios', color: '#e83d6a', bg: '#fdf2f4', emoji: '🥜', abbr: 'Caju' },
+  banricard: { name: 'Banricard',      color: '#005CA9', bg: '#eff6ff', emoji: '🔵', abbr: 'BanriCard' },
+  swile:     { name: 'Swile Benefícios',color: '#ff4c61', bg: '#fff0f2', emoji: '🎟️', abbr: 'Swile' },
+  ben:       { name: 'Ben Visa Vale',  color: '#003399', bg: '#eff6ff', emoji: '🎟️', abbr: 'Ben' },
   dinheiro:  { name: 'Dinheiro (Carteira)', color: '#10b981', bg: '#ecfdf5', emoji: '💵', abbr: 'Din' },
   outro:     { name: 'Outro',          color: '#64748b', bg: '#f1f5f9', emoji: '🏦', abbr: '?' },
 };
@@ -230,7 +266,18 @@ const ACCOUNT_TYPES = {
   wallet: 'Carteira', 
   credit: 'Cartão de Crédito', 
   investment: 'Investimento',
-  voucher: 'Cartão Voucher / Benefício'
+  voucher: 'Cartão Benefício / Voucher'
+};
+
+const BENEFIT_TYPES = {
+  va: '🍽️ Vale Alimentação (VA)',
+  vr: '🍔 Vale Refeição (VR)',
+  vt: '🚌 Vale Transporte (VT)',
+  flex: '🌟 Flexível / Multibenefícios',
+  combustivel: '⛽ Combustível / Mobilidade',
+  saude: '💊 Farmácia / Saúde / Bem-Estar',
+  educacao: '📚 Educação / Cultura',
+  outro: '🎟️ Outro Benefício'
 };
 const COLORS = ['#10b981','#3b82f6','#8b5cf6','#f59e0b','#ef4444','#06b6d4','#ec4899','#f97316','#a855f7','#14b8a6','#64748b','#84cc16'];
 const ICONS_EXPENSE = ['🏠','🍽️','🚗','❤️','📚','🎮','👔','📱','📋','✈️','🐾','💄','🔧','⚡','💧','🎵','🎁','🛒','🏋️','🐕'];
@@ -251,6 +298,8 @@ const AVATARS = {
   avatar11: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g-chart" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#0284c7"/><stop offset="100%" stop-color="#0f172a"/></linearGradient><linearGradient id="g-bar" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#34d399"/><stop offset="100%" stop-color="#059669"/></linearGradient></defs><circle cx="50" cy="50" r="50" fill="url(#g-chart)"/><line x1="20" y1="30" x2="80" y2="30" stroke="#334155" stroke-dasharray="3 3"/><line x1="20" y1="50" x2="80" y2="50" stroke="#334155" stroke-dasharray="3 3"/><line x1="20" y1="70" x2="80" y2="70" stroke="#334155" stroke-dasharray="3 3"/><rect x="25" y="55" width="10" height="20" rx="2" fill="url(#g-bar)"/><rect x="40" y="43" width="10" height="32" rx="2" fill="url(#g-bar)"/><rect x="55" y="32" width="10" height="43" rx="2" fill="url(#g-bar)"/><rect x="70" y="20" width="10" height="55" rx="2" fill="url(#g-bar)"/><path d="M22 64 L38 52 L52 40 L70 25" fill="none" stroke="#f59e0b" stroke-width="4.5" stroke-linecap="round"/><path d="M66 22 L74 22 L74 30" fill="none" stroke="#f59e0b" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   avatar12: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g-dia" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#0891b2"/><stop offset="100%" stop-color="#4f46e5"/></linearGradient></defs><circle cx="50" cy="50" r="50" fill="url(#g-dia)"/><polygon points="50 18, 68 34, 50 82" fill="#38bdf8"/><polygon points="50 18, 32 34, 50 82" fill="#0284c7"/><polygon points="32 34, 50 34, 50 82" fill="#0369a1"/><polygon points="68 34, 50 34, 50 82" fill="#0ea5e9"/><polygon points="50 18, 32 34, 20 34" fill="#0284c7" opacity="0.6"/><polygon points="50 18, 68 34, 80 34" fill="#7dd3fc" opacity="0.6"/><polygon points="20 34, 32 34, 50 82" fill="#005885"/><polygon points="80 34, 68 34, 50 82" fill="#bae6fd"/><path d="M22 18 L24 22 L28 24 L24 26 L22 30 L20 26 L16 24 L20 22 Z" fill="#fff"/><path d="M78 68 L80 72 L84 74 L80 76 L78 80 L76 76 L72 74 L76 72 Z" fill="#fff"/></svg>`
 };
+
+const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
 function renderAvatarHtml(user, size = 36) {
   if (user.avatar_image && AVATARS[user.avatar_image]) {
@@ -274,10 +323,10 @@ function toast(message, type = 'success') {
 
 // ── Modal ──────────────────────────────
 const Modal = {
-  open(title, bodyHTML, wide = false) {
+  open(title, bodyHTML, wide = false, isSettings = false) {
     document.getElementById('modal-title').textContent = title;
     document.getElementById('modal-body').innerHTML = bodyHTML;
-    document.getElementById('modal').className = `modal${wide ? ' modal-lg' : ''}`;
+    document.getElementById('modal').className = `modal${wide ? ' modal-lg' : ''}${isSettings ? ' modal-no-scroll' : ''}`;
     document.getElementById('modal-overlay').classList.remove('hidden');
   },
   close() {
@@ -290,10 +339,14 @@ document.getElementById('modal-overlay').onclick = (e) => { if (e.target.id === 
 
 // ── Navigation ─────────────────────────
 function navigate(page) {
+  if (page === 'settings') {
+    openSettingsModal('profile');
+    return;
+  }
   // Se a página alvo for restrita, encontrar o primeiro menu permitido
-  if (page !== 'settings' && State.permissions && State.permissions['allow_' + page] === 0) {
+  if (State.permissions && State.permissions['allow_' + page] === 0) {
     const menus = ['dashboard', 'recurring', 'accounts', 'budget', 'goals', 'reports'];
-    const firstAllowed = menus.find(m => State.permissions['allow_' + m] !== 0) || 'settings';
+    const firstAllowed = menus.find(m => State.permissions['allow_' + m] !== 0) || 'dashboard';
     page = firstAllowed;
   }
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
@@ -305,8 +358,44 @@ function navigate(page) {
 }
 
 async function renderPage(page) {
-  const renders = { dashboard: renderDashboard, recurring: renderRecurring, accounts: renderAccounts, budget: renderBudget, goals: renderGoals, reports: renderReports, settings: renderSettings, families: renderFamilies };
+  const renders = { dashboard: renderDashboard, recurring: renderRecurring, accounts: renderAccounts, budget: renderBudget, goals: renderGoals, reports: renderReports, manual: renderManual, settings: renderSettings, families: renderFamilies };
   if (renders[page]) await renders[page]();
+}
+
+// ── Navegação Direta para Lançamento com Destaque Visual ──
+async function goToTransaction({ recurringId, txId, type = 'expense', month, year }) {
+  if (month && year) {
+    State.currentMonth = parseInt(month);
+    State.currentYear = parseInt(year);
+  }
+  State.currentRecurringTab = type || 'expense';
+  navigate('recurring');
+
+  let attempts = 0;
+  const maxAttempts = 15;
+  const interval = setInterval(() => {
+    attempts++;
+    let targetEl = null;
+    if (recurringId) {
+      targetEl = document.querySelector(`.recurring-item[data-id="${recurringId}"]`);
+    }
+    if (!targetEl && txId) {
+      targetEl = document.querySelector(`.transaction-item[data-id="${txId}"]`);
+    }
+
+    if (targetEl) {
+      clearInterval(interval);
+      targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      targetEl.classList.remove('highlight-flash');
+      void targetEl.offsetWidth; // Force DOM reflow
+      targetEl.classList.add('highlight-flash');
+      setTimeout(() => {
+        targetEl.classList.remove('highlight-flash');
+      }, 3500);
+    } else if (attempts >= maxAttempts) {
+      clearInterval(interval);
+    }
+  }, 100);
 }
 
 // ── Period Selector ────────────────────
@@ -571,7 +660,7 @@ function buildDonut(pct, color, size = 90) {
     </svg>`;
 }
 
-// ── Credit Card Donut (two-tone: used + free) ──
+// ── Credit Card Donut (two-tone: used + free + negative/exceeded alert) ──
 function buildCreditDonut(spent, limit, size = 110) {
   const cx = size / 2;
   const cy = size / 2;
@@ -585,24 +674,26 @@ function buildCreditDonut(spent, limit, size = 110) {
     </svg>`;
   }
 
-  const pct       = Math.min(100, Math.max(0, (spent / limit) * 100));
-  const usedArc   = (pct / 100) * circ;
-  const freeArc   = circ - usedArc;
+  const isExceeded = spent > limit;
+  const available  = limit - spent;
+  const pctReal    = (spent / limit) * 100;
+  const pctClamped = Math.min(100, Math.max(0, pctReal));
+  const usedArc    = (pctClamped / 100) * circ;
 
   // Colors
-  const usedColor = pct > 80 ? '#ef4444' : pct > 60 ? '#f59e0b' : '#f97316';
-  const freeColor = pct > 80 ? '#991b1b' : pct > 60 ? '#92400e' : '#10b981';
+  const usedColor = isExceeded ? '#ef4444' : pctReal > 80 ? '#ef4444' : pctReal > 60 ? '#f59e0b' : '#f97316';
+  const freeColor = isExceeded ? '#7f1d1d' : pctReal > 80 ? '#991b1b' : pctReal > 60 ? '#92400e' : '#10b981';
 
-  // Inner labels
-  const pctLabel  = Math.round(pct) + '%';
-  const subLabel  = pct > 80 ? 'crítico' : pct > 60 ? 'atenção' : 'usado';
-  const subColor  = pct > 80 ? '#fca5a5' : pct > 60 ? '#fde68a' : '#6ee7b7';
+  // Inner labels: if exceeded, can show percentage (e.g. 125%) and EXCEDIDO
+  const pctLabel  = Math.round(pctReal) + '%';
+  const subLabel  = isExceeded ? 'ultrapassado' : pctReal > 80 ? 'crítico' : pctReal > 60 ? 'atenção' : 'usado';
+  const subColor  = isExceeded ? '#f87171' : pctReal > 80 ? '#fca5a5' : pctReal > 60 ? '#fde68a' : '#6ee7b7';
 
   return `
     <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
       <!-- Free arc (full circle behind, representing available limit) -->
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${freeColor}"
-        stroke-width="12" opacity="0.28"/>
+        stroke-width="12" opacity="${isExceeded ? '0.5' : '0.28'}"/>
       <!-- Used arc (committed amount — on top) -->
       <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${usedColor}"
         stroke-width="12"
@@ -610,11 +701,15 @@ function buildCreditDonut(spent, limit, size = 110) {
         stroke-dashoffset="${circ / 4}"
         stroke-linecap="round"
         style="transition:stroke-dasharray 0.9s cubic-bezier(.4,0,.2,1)"/>
+      ${isExceeded ? `
+        <!-- Negative / Exceeded outer pulse ring -->
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="4 4" opacity="0.85"/>
+      ` : ''}
       <!-- Center: percentage -->
       <text x="${cx}" y="${cy - 7}" text-anchor="middle" dominant-baseline="central"
-        fill="${usedColor}" font-size="${size * 0.20}px" font-weight="900" font-family="Inter">${pctLabel}</text>
+        fill="${usedColor}" font-size="${size * (pctReal >= 100 ? 0.17 : 0.20)}px" font-weight="900" font-family="Inter">${pctLabel}</text>
       <text x="${cx}" y="${cy + 12}" text-anchor="middle" dominant-baseline="central"
-        fill="${subColor}" font-size="${size * 0.095}px" font-weight="600" font-family="Inter" opacity="0.9">${subLabel}</text>
+        fill="${subColor}" font-size="${size * 0.088}px" font-weight="700" font-family="Inter" text-transform="uppercase" opacity="0.95">${subLabel}</text>
     </svg>`;
 }
 
@@ -677,10 +772,11 @@ async function renderDashboard() {
     periodWrap.innerHTML = '';
     periodWrap.appendChild(buildPeriodSelector(renderDashboard));
 
-    const [summary, monthly, txs] = await Promise.all([
+    const [summary, monthly, txs, potentialDuplicates] = await Promise.all([
       window.api.dashboard.getSummary({ userId: State.user.id, month: State.currentMonth, year: State.currentYear }),
       window.api.dashboard.getMonthlyChart({ userId: State.user.id, months: 6 }),
       window.api.reports.getCashflow({ userId: State.user.id, month: State.currentMonth, year: State.currentYear }),
+      window.api.sync.findDuplicates({ familyId: State.user.family_id || State.user.familyId || 1, userId: State.user.id, daysWindow: 45, minScore: 75 }).catch(() => [])
     ]);
 
     const today = new Date().getDate();
@@ -688,19 +784,141 @@ async function renderDashboard() {
     const debitAccounts  = summary.accounts.filter(a => a.type !== 'credit' && a.type !== 'investment');
     const recurringPct   = summary.totalRecurring > 0 ? Math.round((summary.paidRecurring / summary.totalRecurring) * 100) : 0;
 
+    const paidBills = (txs || []).filter(t => t.type === 'expense' && (t.is_paid === 1 || t.is_paid === true));
+    const unpaidBills = (txs || []).filter(t => t.type === 'expense' && (t.is_paid === 0 || t.is_paid === false));
+    const totalPaidAmount = paidBills.reduce((acc, t) => acc + (t.amount || 0), 0);
+    const totalUnpaidAmount = unpaidBills.reduce((acc, t) => acc + (t.amount || 0), 0);
+
+    const incomeAlerts = (summary.alertItems || []).filter(a => a.type === 'income');
+    const expenseAlerts = (summary.alertItems || []).filter(a => a.type !== 'income');
+
     const contentDiv = document.getElementById('dashboard-tab-content');
     contentDiv.innerHTML = `
-      ${summary.alertItems.length > 0 ? `
-      <div class="alert-banner">
-        <span class="alert-banner-icon">🚨</span>
-        <div>
-          <div class="alert-banner-title">Vencimentos próximos (próximos ${summary.alertDays} dias)</div>
+      ${(potentialDuplicates && potentialDuplicates.length > 0) ? `
+      <div class="alert-banner" style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(59, 130, 246, 0.1)); border: 1px solid rgba(139, 92, 246, 0.35); margin-bottom: 16px; padding: 12px 18px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 22px;">🛡️</span>
+          <div>
+            <div style="font-size: 13px; font-weight: 700; color: #a78bfa;">Anti-Duplicidade: ${potentialDuplicates.length} potencial(is) lançamento(s) duplicado(s) detectado(s)</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Membros da família podem ter lançado o mesmo gasto na Web e no Desktop.</div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-primary btn-sm" id="btn-open-dedup-banner" style="background: #8b5cf6; border: none; font-size: 11.5px; padding: 6px 14px; white-space: nowrap; font-weight: 700;">
+          🔍 Conciliar Agora ➔
+        </button>
+      </div>` : ''}
+
+      ${incomeAlerts.length > 0 ? `
+      <div class="alert-banner alert-banner-income">
+        <span class="alert-banner-icon">💰</span>
+        <div style="flex:1">
+          <div class="alert-banner-title">Recebimentos próximos (próximos ${summary.alertDays} dias)</div>
           <div class="alert-banner-items">
-            ${summary.alertItems.map(a => {
+            ${incomeAlerts.map(a => {
               const daysLeft = a.due_day - today;
-              return `<span class="alert-chip">${a.rec_icon || '📋'} ${a.rec_name} — ${daysLeft === 0 ? 'Hoje!' : `em ${daysLeft} dia${daysLeft > 1 ? 's' : ''}`} • ${fmt.currency(a.amount)}</span>`;
+              return `<button type="button" class="alert-chip alert-chip-income btn-alert-link" data-rec-id="${a.recurring_item_id || ''}" data-tx-id="${a.id || ''}" data-type="income" title="Clique para abrir este recebimento no Planejamento">${a.rec_icon || '💼'} ${a.rec_name} — ${daysLeft === 0 ? 'Hoje!' : `em ${daysLeft} dia${daysLeft > 1 ? 's' : ''}`} • ${fmt.currency(a.amount)} <span style="font-size:10px;margin-left:2px;opacity:0.8">➔</span></button>`;
             }).join('')}
           </div>
+        </div>
+      </div>` : ''}
+
+      ${expenseAlerts.length > 0 ? `
+      <div class="alert-banner alert-banner-expense">
+        <span class="alert-banner-icon">🚨</span>
+        <div style="flex:1">
+          <div class="alert-banner-title">Vencimentos próximos (próximos ${summary.alertDays} dias)</div>
+          <div class="alert-banner-items">
+            ${expenseAlerts.map(a => {
+              const daysLeft = a.due_day - today;
+              return `<button type="button" class="alert-chip alert-chip-expense btn-alert-link" data-rec-id="${a.recurring_item_id || ''}" data-tx-id="${a.id || ''}" data-type="expense" title="Clique para abrir esta despesa no Planejamento">${a.rec_icon || '📋'} ${a.rec_name} — ${daysLeft === 0 ? 'Hoje!' : `em ${daysLeft} dia${daysLeft > 1 ? 's' : ''}`} • ${fmt.currency(a.amount)} <span style="font-size:10px;margin-left:2px;opacity:0.8">➔</span></button>`;
+            }).join('')}
+          </div>
+        </div>
+      </div>` : ''}
+
+      ${(summary.overduePreviousItems && summary.overduePreviousItems.length > 0) ? `
+      <!-- ⚠️ CONTAINER DE LANÇAMENTOS NÃO PAGOS DE MESES ANTERIORES -->
+      <div class="card overdue-container" style="border: 1px solid rgba(245, 158, 11, 0.4); background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(239, 68, 68, 0.05)); margin-bottom: 20px; padding: 18px 20px; border-radius: var(--radius); box-shadow: 0 4px 16px rgba(0,0,0,0.15);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(245, 158, 11, 0.18); border: 1px solid rgba(245, 158, 11, 0.35); display: flex; align-items: center; justify-content: center; font-size: 18px;">
+              ⚠️
+            </div>
+            <div>
+              <div style="font-size: 14px; font-weight: 800; color: #fbbf24; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px;">
+                Pendências de Meses Anteriores Não Pagas
+                <span class="badge" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px;">
+                  ${summary.overduePreviousItems.length} pendência${summary.overduePreviousItems.length > 1 ? 's' : ''}
+                </span>
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                Lançamentos anteriores a <strong>${fmt.monthYear(State.currentMonth, State.currentYear)}</strong> em aberto. Clique no item para abrir direto no mês correspondente.
+              </div>
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Total Acumulado</div>
+            <div style="font-size: 18px; font-weight: 900; color: #f87171;">
+              ${fmt.currency(summary.overduePreviousItems.reduce((acc, t) => acc + (t.type === 'expense' ? t.amount : -t.amount), 0))}
+            </div>
+          </div>
+        </div>
+
+        <div class="overdue-items-list" style="max-height: 290px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
+          ${summary.overduePreviousItems.map(item => {
+            const parts = (item.date || '').split('-');
+            const itemYear = parts[0];
+            const itemMonth = parseInt(parts[1], 10);
+            const formattedDate = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : item.date;
+            const isExpense = item.type === 'expense';
+            const userBadge = item.user_name ? `<span class="profile-badge" style="background:${item.user_avatar_color || '#10b981'}22;color:${item.user_avatar_color || '#10b981'};border:1px solid ${item.user_avatar_color || '#10b981'}44;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600;">${item.user_name}</span>` : '';
+            const accountBadge = item.account_name ? `<span style="font-size: 10px; color: var(--text-muted); font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">🏦 ${item.account_name}</span>` : '';
+
+            return `
+              <div class="overdue-item-row" 
+                   data-tx-id="${item.id}" 
+                   data-rec-id="${item.recurring_item_id || ''}" 
+                   data-type="${item.type}" 
+                   data-month="${itemMonth}" 
+                   data-year="${itemYear}"
+                   title="Clique para ir até '${item.description || item.rec_name || 'este lançamento'}' em ${fmt.monthYear(itemMonth, itemYear)}"
+                   style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; transition: all 0.2s ease;">
+                
+                <div style="display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1;">
+                  <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); font-size: 10px; font-weight: 700; padding: 4px 8px; border-radius: 6px; white-space: nowrap;">
+                    📅 ${fmt.monthYear(itemMonth, itemYear)}
+                  </span>
+                  
+                  <div style="font-size: 18px; line-height: 1;">${item.category_icon || item.rec_icon || (isExpense ? '📋' : '💰')}</div>
+
+                  <div style="min-width: 0; flex: 1;">
+                    <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px;">
+                      ${item.description || item.rec_name || 'Lançamento sem descrição'}
+                      ${userBadge}
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 8px; margin-top: 2px;">
+                      <span>Vencimento: <strong>${formattedDate}</strong></span>
+                      ${accountBadge}
+                    </div>
+                  </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 14px; flex-shrink: 0;">
+                  <div style="text-align: right;">
+                    <div style="font-size: 14px; font-weight: 800; color: ${isExpense ? '#f87171' : 'var(--accent-light)'};">
+                      ${isExpense ? '− ' : '+ '}${fmt.currency(item.amount)}
+                    </div>
+                    <div style="font-size: 10px; color: #f87171; font-weight: 600;">Não pago</div>
+                  </div>
+                  
+                  <div class="overdue-go-btn" style="width: 28px; height: 28px; border-radius: 50%; background: var(--bg-hover); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; color: #fbbf24; font-size: 12px; transition: transform 0.2s;">
+                    ➔
+                  </div>
+                </div>
+
+              </div>
+            `;
+          }).join('')}
         </div>
       </div>` : ''}
 
@@ -748,7 +966,7 @@ async function renderDashboard() {
       <div style="margin-bottom:24px">
         <div style="font-size:13px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px">🏦 Previsibilidade de Contas e Cartões</div>
         <div class="cards-widget-grid" id="cards-widget-grid">
-          ${creditAccounts.map(acc => renderCreditCardWidget(acc, summary.cardSpending[acc.id] || 0)).join('')}
+          ${creditAccounts.map(acc => renderCreditCardWidget(acc, summary.cardSpending[acc.id] || 0, (summary.cardMonthlyInvoices && summary.cardMonthlyInvoices[acc.id]) !== undefined ? summary.cardMonthlyInvoices[acc.id] : null)).join('')}
           ${debitAccounts.map(acc => renderDebitAccountWidget(acc)).join('')}
         </div>
       </div>` : `
@@ -759,7 +977,7 @@ async function renderDashboard() {
       </div>`}
 
       <!-- Priority + Charts -->
-      <div class="dashboard-middle-grid">
+      <div class="dashboard-middle-grid" style="margin-bottom:16px;">
         <!-- Prioridades -->
         <div class="card">
           <div class="card-title">⭐ Lançamentos prioritários</div>
@@ -767,7 +985,7 @@ async function renderDashboard() {
             ${summary.priorityItems.length === 0
               ? `<div class="no-data">Nenhum item marcado como prioritário.<br><small>Marque itens como ⭐ em Planejamento.</small></div>`
               : summary.priorityItems.map(item => `
-                <div class="priority-item ${item.is_paid ? 'priority-paid' : 'priority-pending'}" style="margin-bottom:0">
+                <div class="priority-item priority-item-clickable ${item.is_paid ? 'priority-paid' : 'priority-pending'}" data-rec-id="${item.recurring_item_id || item.id || ''}" data-tx-id="${item.id || ''}" data-type="${item.type || 'expense'}" style="margin-bottom:0" title="Clique para abrir no Planejamento">
                   <div style="font-size:18px">${item.rec_icon || '📋'}</div>
                   <div style="flex:1;min-width:0">
                     <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.rec_name || item.description}</div>
@@ -788,12 +1006,135 @@ async function renderDashboard() {
         </div>
       </div>
 
+      <!-- Quadros: Contas Pagas e Contas a Pagar (Acima do gráfico de 6 meses) -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 16px;">
+        
+        <!-- Quadro Contas Pagas -->
+        <div class="card" style="display: flex; flex-direction: column;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border);">
+            <div class="card-title" style="margin-bottom:0; display:flex; align-items:center; gap:6px;">
+              <span>✅</span> Contas Pagas <span class="badge" style="background:var(--accent-dim); color:var(--accent-light); margin-left:4px;">${paidBills.length}</span>
+            </div>
+            <div style="font-size: 14px; font-weight: 700; color: var(--accent-light);">${fmt.currency(totalPaidAmount)}</div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px; max-height: 240px; overflow-y: auto; padding-right: 4px;">
+            ${paidBills.length === 0
+              ? `<div class="no-data">Nenhuma conta paga neste mês.</div>`
+              : paidBills.map(item => `
+                <div class="priority-item priority-item-clickable priority-paid" data-rec-id="${item.recurring_item_id || ''}" data-tx-id="${item.id || ''}" data-type="${item.type || 'expense'}" style="margin-bottom:0" title="Clique para abrir no Planejamento">
+                  <div style="font-size:18px">${item.category_icon || '💸'}</div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.description}</div>
+                    <div style="font-size:11px;color:var(--text-muted)">${item.account_name || 'Geral'} • ${fmt.date(item.date)}${item.is_paid && item.payment_date && item.payment_date !== item.date ? ` • <span style="color:var(--accent-light)">pago em ${fmt.date(item.payment_date)}</span>` : ''}</div>
+                  </div>
+                  <div style="text-align:right;flex-shrink:0">
+                    <div style="font-weight:700;font-size:14px;color:var(--accent-light)">-${fmt.currency(item.amount)}</div>
+                    <span class="transaction-status status-paid">✓ Pago</span>
+                  </div>
+                </div>`).join('')
+            }
+          </div>
+        </div>
+
+        <!-- Quadro Contas a Pagar -->
+        <div class="card" style="display: flex; flex-direction: column;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border);">
+            <div class="card-title" style="margin-bottom:0; display:flex; align-items:center; gap:6px;">
+              <span>⏳</span> Contas a Pagar <span class="badge" style="background:var(--danger-dim); color:#f87171; margin-left:4px;">${unpaidBills.length}</span>
+            </div>
+            <div style="font-size: 14px; font-weight: 700; color: #f87171;">${fmt.currency(totalUnpaidAmount)}</div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px; max-height: 240px; overflow-y: auto; padding-right: 4px;">
+            ${unpaidBills.length === 0
+              ? `<div class="no-data">Nenhuma conta a pagar pendente neste mês.</div>`
+              : unpaidBills.map(item => `
+                <div class="priority-item priority-item-clickable priority-pending" data-rec-id="${item.recurring_item_id || ''}" data-tx-id="${item.id || ''}" data-type="${item.type || 'expense'}" style="margin-bottom:0" title="Clique para abrir no Planejamento">
+                  <div style="font-size:18px">${item.category_icon || '📋'}</div>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.description}</div>
+                    <div style="font-size:11px;color:var(--text-muted)">${item.account_name || 'Geral'} • ${fmt.date(item.date)}</div>
+                  </div>
+                  <div style="text-align:right;flex-shrink:0">
+                    <div style="font-weight:700;font-size:14px;color:#f87171">-${fmt.currency(item.amount)}</div>
+                    <span class="transaction-status status-pending">⏳ Pendente</span>
+                  </div>
+                </div>`).join('')
+            }
+          </div>
+        </div>
+
+      </div>
+
       <!-- Monthly Chart -->
       <div class="chart-card">
         <div class="card-title">Receitas × Despesas — últimos 6 meses</div>
         <canvas id="chart-monthly" style="max-height:200px"></canvas>
       </div>
     `;
+
+    // Bind Anti-Duplication Banner Click
+    const dedupBannerBtn = contentDiv.querySelector('#btn-open-dedup-banner');
+    if (dedupBannerBtn) {
+      dedupBannerBtn.onclick = () => openDeduplicationModal();
+    }
+
+    // Bind clickable alert chips and priority items to navigate directly to Planejamento
+    contentDiv.querySelectorAll('.btn-alert-link, .priority-item-clickable').forEach(btn => {
+      btn.onclick = (e) => {
+        e.preventDefault();
+        const recId = btn.dataset.recId;
+        const txId = btn.dataset.txId;
+        const type = btn.dataset.type || 'expense';
+        goToTransaction({ recurringId: recId, txId, type, month: State.currentMonth, year: State.currentYear });
+      };
+    });
+
+    // Bind clickable overdue previous items to navigate directly to the specific month/year and highlight transaction
+    contentDiv.querySelectorAll('.overdue-item-row').forEach(row => {
+      row.onclick = (e) => {
+        e.preventDefault();
+        const txId = row.dataset.txId;
+        const recId = row.dataset.recId;
+        const type = row.dataset.type || 'expense';
+        const month = parseInt(row.dataset.month, 10);
+        const year = parseInt(row.dataset.year, 10);
+        goToTransaction({ recurringId: recId, txId, type, month, year });
+      };
+    });
+
+    // Bind clickable credit card widgets to open Planejamento > Despesas and highlight its installments
+    contentDiv.querySelectorAll('.bank-card-credit').forEach(cardWidget => {
+      cardWidget.onclick = () => {
+        const cardId = parseInt(cardWidget.dataset.cardId);
+        const cardColor = cardWidget.dataset.bankColor;
+        const cardName = cardWidget.dataset.cardName;
+        State.highlightCardId = cardId;
+        State.highlightCardColor = cardColor;
+        State.highlightCardName = cardName;
+        State.highlightAccountId = null;
+        State.highlightAccountColor = null;
+        State.highlightAccountName = null;
+        State.currentRecurringTab = 'expense';
+        navigate('recurring');
+      };
+    });
+
+    // Bind clickable debit/checking account widgets to open Planejamento > Receitas and highlight its income transactions
+    contentDiv.querySelectorAll('.bank-card-debit').forEach(debitWidget => {
+      debitWidget.onclick = () => {
+        const accId = parseInt(debitWidget.dataset.accountId);
+        const accColor = debitWidget.dataset.bankColor;
+        const accName = debitWidget.dataset.accountName;
+        State.highlightAccountId = accId;
+        State.highlightAccountColor = accColor;
+        State.highlightAccountName = accName;
+        State.highlightCardId = null;
+        State.highlightCardColor = null;
+        State.highlightCardName = null;
+        State.currentRecurringTab = 'income';
+        navigate('recurring');
+      };
+    });
 
     // Render monthly charts
     if (document.getElementById('chart-monthly')) {
@@ -863,7 +1204,7 @@ async function renderDashboard() {
       <div style="margin-bottom:24px">
         <div style="font-size:13px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px">🏦 Saldos e Faturas Atuais (Reais)</div>
         <div class="cards-widget-grid">
-          ${creditAccounts.map(acc => renderCreditCardWidget(acc, acc.balance < 0 ? -acc.balance : 0)).join('')}
+          ${creditAccounts.map(acc => renderCreditCardWidget(acc, acc.credit_used !== undefined ? acc.credit_used : (acc.balance < 0 ? -acc.balance : 0))).join('')}
           ${debitAccounts.map(acc => renderDebitAccountStaticWidget(acc)).join('')}
         </div>
       </div>` : ''}
@@ -938,27 +1279,68 @@ async function renderDashboard() {
         options: chartOptions('line')
       });
     }
+
+    // Bind clickable credit card widgets in General tab
+    contentDiv.querySelectorAll('.bank-card-credit').forEach(cardWidget => {
+      cardWidget.onclick = () => {
+        const cardId = parseInt(cardWidget.dataset.cardId);
+        const cardColor = cardWidget.dataset.bankColor;
+        const cardName = cardWidget.dataset.cardName;
+        State.highlightCardId = cardId;
+        State.highlightCardColor = cardColor;
+        State.highlightCardName = cardName;
+        State.highlightAccountId = null;
+        State.highlightAccountColor = null;
+        State.highlightAccountName = null;
+        State.currentRecurringTab = 'expense';
+        navigate('recurring');
+      };
+    });
+
+    // Bind clickable debit account widgets in General tab
+    contentDiv.querySelectorAll('.bank-card-debit').forEach(debitWidget => {
+      debitWidget.onclick = () => {
+        const accId = parseInt(debitWidget.dataset.accountId);
+        const accColor = debitWidget.dataset.bankColor;
+        const accName = debitWidget.dataset.accountName;
+        State.highlightAccountId = accId;
+        State.highlightAccountColor = accColor;
+        State.highlightAccountName = accName;
+        State.highlightCardId = null;
+        State.highlightCardColor = null;
+        State.highlightCardName = null;
+        State.currentRecurringTab = 'income';
+        navigate('recurring');
+      };
+    });
   }
 }
 
-function renderCreditCardWidget(acc, spent) {
+function renderCreditCardWidget(acc, spent, monthInvoice) {
   const b = BANKS[acc.bank] || BANKS.outro;
   const limit     = acc.credit_limit || 0;
-  const available = Math.max(0, limit - spent);
-  const pct       = limit > 0 ? Math.min(100, (spent / limit) * 100) : 0;
-  const ringColor = pct > 80 ? '#ef4444' : pct > 60 ? '#f59e0b' : '#10b981';
+  const available = limit - spent;
+  const isExceeded = limit > 0 && spent > limit;
+  const pctReal   = limit > 0 ? (spent / limit) * 100 : 0;
+  const ringColor = isExceeded ? '#ef4444' : pctReal > 80 ? '#ef4444' : pctReal > 60 ? '#f59e0b' : '#10b981';
+  const availableColor = isExceeded ? '#f87171' : ringColor;
   const userBadge = acc.user_name
     ? `<span class="profile-badge" style="background:${acc.user_avatar_color || '#10b981'}22;color:${acc.user_avatar_color || '#10b981'};border:1px solid ${acc.user_avatar_color || '#10b981'}44;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600;display:inline-block">${acc.user_name}</span>`
     : '';
 
+  const invoiceAmount = monthInvoice !== undefined && monthInvoice !== null ? monthInvoice : null;
+
   return `
-    <div class="bank-card-widget bank-card-credit">
+    <div class="bank-card-widget bank-card-credit ${isExceeded ? 'card-limit-exceeded' : ''}" data-card-id="${acc.id}" data-bank-color="${b.color}" data-card-name="${acc.name}" title="Clique para ver fatura e destacar parcelas no Planejamento" style="cursor:pointer;${isExceeded ? 'border: 1px solid rgba(239, 68, 68, 0.45); box-shadow: 0 0 16px rgba(239, 68, 68, 0.15);' : ''}">
       <!-- Header -->
       <div class="bank-card-header">
         ${bankLogo(acc.bank, 40)}
         <div style="flex:1;min-width:0">
           <div class="bank-card-name">${acc.name}</div>
-          <div class="bank-card-type" style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">Cartão de Crédito ${userBadge}</div>
+          <div class="bank-card-type" style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+            Cartão de Crédito ${userBadge}
+            ${isExceeded ? `<span class="badge badge-danger" style="background:rgba(239,68,68,0.2);color:#f87171;border:1px solid rgba(239,68,68,0.4);font-size:9px;padding:1px 5px;border-radius:4px;font-weight:800">⚠️ LIMITE EXCEDIDO</span>` : ''}
+          </div>
         </div>
         <div class="bank-card-tag" style="background:${b.color}22;color:${b.color}">${b.name}</div>
       </div>
@@ -973,31 +1355,43 @@ function renderCreditCardWidget(acc, spent) {
         <!-- Values -->
         <div class="bank-card-values" style="gap:0">
           <!-- Limite total -->
-          <div style="margin-bottom:10px">
+          <div style="margin-bottom:8px">
             <div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:2px">Limite total</div>
             <div style="font-size:17px;font-weight:900;color:var(--text-primary);letter-spacing:-0.02em">${fmt.currency(limit)}</div>
           </div>
 
+          ${invoiceAmount !== null ? `
+          <!-- Fatura do Mês -->
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-top:1px solid var(--border)">
+            <span style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em">Fatura do Mês</span>
+            <span style="font-size:13px;font-weight:800;color:#f87171">${fmt.currency(invoiceAmount)}</span>
+          </div>` : ''}
+
           <!-- Comprometido -->
-          <div style="display:flex;flex-direction:column;gap:2px;padding:8px 0;border-top:1px solid var(--border)">
+          <div style="display:flex;flex-direction:column;gap:2px;padding:6px 0;border-top:1px solid var(--border)">
             <div style="display:flex;align-items:center;gap:5px">
-              <div style="width:8px;height:8px;border-radius:50%;background:${pct > 80 ? '#ef4444' : pct > 60 ? '#f59e0b' : '#f97316'};flex-shrink:0"></div>
-              <span style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Comprometido</span>
+              <div style="width:8px;height:8px;border-radius:50%;background:${isExceeded || pctReal > 80 ? '#ef4444' : pctReal > 60 ? '#f59e0b' : '#f97316'};flex-shrink:0"></div>
+              <span style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Comprometido Total</span>
             </div>
-            <div style="font-size:16px;font-weight:800;color:${pct > 80 ? '#f87171' : pct > 60 ? '#fbbf24' : '#fb923c'}">${fmt.currency(spent)}</div>
+            <div style="font-size:16px;font-weight:800;color:${isExceeded || pctReal > 80 ? '#f87171' : pctReal > 60 ? '#fbbf24' : '#fb923c'}">${fmt.currency(spent)}</div>
           </div>
 
           <!-- Disponível -->
-          <div style="display:flex;flex-direction:column;gap:2px;padding:8px 0;border-top:1px solid var(--border)">
+          <div style="display:flex;flex-direction:column;gap:2px;padding:6px 0;border-top:1px solid var(--border)">
             <div style="display:flex;align-items:center;gap:5px">
-              <div style="width:8px;height:8px;border-radius:50%;background:${ringColor};flex-shrink:0"></div>
-              <span style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Disponível</span>
+              <div style="width:8px;height:8px;border-radius:50%;background:${availableColor};flex-shrink:0"></div>
+              <span style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">${isExceeded ? 'Excedido / Negativo' : 'Disponível'}</span>
             </div>
-            <div style="font-size:16px;font-weight:800;color:${ringColor}">${fmt.currency(available)}</div>
+            <div style="font-size:16px;font-weight:800;color:${availableColor}">${fmt.currency(available)}</div>
           </div>
 
+          ${isExceeded ? `
+          <div style="margin-top:6px;padding:4px 8px;border-radius:6px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:#f87171;font-size:10px;font-weight:700;display:flex;align-items:center;gap:4px">
+            <span>⚠️</span> Estourado em ${fmt.currency(Math.abs(available))}
+          </div>` : ''}
+
           ${acc.closing_day ? `
-          <div style="margin-top:12px; padding-top:10px; border-top:1px dashed rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center;">
+          <div style="margin-top:10px; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center;">
             <div style="display:flex; flex-direction:column; align-items:flex-start; gap:2px">
               <span style="font-size:9px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em">Fechamento</span>
               <span style="font-size:12px; font-weight:700; color:var(--text-secondary); display:flex; align-items:center; gap:4px">
@@ -1020,24 +1414,40 @@ function renderDebitAccountWidget(acc) {
   const b = BANKS[acc.bank] || BANKS.outro;
   const balance = acc.balance || 0;
   const userBadge = acc.user_name ? `<span class="profile-badge" style="background:${acc.user_avatar_color || '#10b981'}22;color:${acc.user_avatar_color || '#10b981'};border:1px solid ${acc.user_avatar_color || '#10b981'}44;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600;margin-top:2px;display:inline-block">${acc.user_name}</span>` : '';
+  const isVoucher = acc.type === 'voucher';
+  const typeLabel = isVoucher ? (BENEFIT_TYPES[acc.benefit_type] || 'Cartão Benefício') : (ACCOUNT_TYPES[acc.type] || 'Conta');
 
   return `
-    <div class="bank-card-widget bank-card-debit">
+    <div class="bank-card-widget bank-card-debit ${isVoucher ? 'bank-card-voucher' : ''}" 
+         data-account-id="${acc.id}" 
+         data-bank-color="${b.color}" 
+         data-account-name="${acc.name}"
+         style="cursor:pointer;" 
+         title="Clique para abrir e destacar os lançamentos desta conta no Planejamento">
       <div class="bank-card-header">
         ${bankLogo(acc.bank, 44)}
         <div style="flex:1;min-width:0">
           <div class="bank-card-name">${acc.name}</div>
-          <div class="bank-card-type">${ACCOUNT_TYPES[acc.type] || 'Conta'} ${userBadge}</div>
+          <div class="bank-card-type">${typeLabel} ${userBadge}</div>
         </div>
         <div class="bank-card-tag" style="background:${b.color}22;color:${b.color}">${b.name}</div>
       </div>
       <div style="margin-top:16px">
-        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Rendimentos do mês</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${isVoucher ? 'Rendimentos / Recargas do mês' : 'Rendimentos do mês'}</div>
         <div style="font-size:28px;font-weight:800;color:${balance >= 0 ? 'var(--accent-light)' : '#f87171'};letter-spacing:-0.02em">${fmt.currency(balance)}</div>
-        ${acc.agency ? `<div style="font-size:11px;color:var(--text-muted);margin-top:8px">Ag. ${acc.agency}${acc.account_number ? ' • CC ' + acc.account_number : ''}</div>` : ''}
+        ${isVoucher ? `
+          <div style="font-size:11px;color:var(--text-muted);margin-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            ${acc.card_last_digits ? `<span style="font-weight:700">•••• ${acc.card_last_digits}</span>` : ''}
+            ${acc.benefit_monthly_credit ? `<span>• Recarga: <strong>${fmt.currency(acc.benefit_monthly_credit)}</strong> (Dia ${acc.benefit_credit_day || 1})</span>` : ''}
+          </div>
+        ` : (acc.agency ? `<div style="font-size:11px;color:var(--text-muted);margin-top:8px">Ag. ${acc.agency}${acc.account_number ? ' • CC ' + acc.account_number : ''}</div>` : '')}
       </div>
       <div style="margin-top:12px;height:6px;background:var(--bg-hover);border-radius:3px;overflow:hidden">
         <div style="height:100%;border-radius:3px;background:${b.color};width:${balance >= 0 ? '70' : '0'}%;transition:width 0.8s ease"></div>
+      </div>
+      <div style="margin-top:10px;font-size:11px;color:${b.color};font-weight:700;display:flex;align-items:center;gap:4px">
+        <span>🔍 Ver lançamentos</span>
+        <span style="font-size:10px">➔</span>
       </div>
     </div>`;
 }
@@ -1046,24 +1456,40 @@ function renderDebitAccountStaticWidget(acc) {
   const b = BANKS[acc.bank] || BANKS.outro;
   const balance = acc.balance || 0;
   const userBadge = acc.user_name ? `<span class="profile-badge" style="background:${acc.user_avatar_color || '#10b981'}22;color:${acc.user_avatar_color || '#10b981'};border:1px solid ${acc.user_avatar_color || '#10b981'}44;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600;margin-top:2px;display:inline-block">${acc.user_name}</span>` : '';
+  const isVoucher = acc.type === 'voucher';
+  const typeLabel = isVoucher ? (BENEFIT_TYPES[acc.benefit_type] || 'Cartão Benefício') : (ACCOUNT_TYPES[acc.type] || 'Conta');
 
   return `
-    <div class="bank-card-widget bank-card-debit">
+    <div class="bank-card-widget bank-card-debit ${isVoucher ? 'bank-card-voucher' : ''}" 
+         data-account-id="${acc.id}" 
+         data-bank-color="${b.color}" 
+         data-account-name="${acc.name}"
+         style="cursor:pointer;" 
+         title="Clique para abrir e destacar os lançamentos desta conta no Planejamento">
       <div class="bank-card-header">
         ${bankLogo(acc.bank, 44)}
         <div style="flex:1;min-width:0">
           <div class="bank-card-name">${acc.name}</div>
-          <div class="bank-card-type">${ACCOUNT_TYPES[acc.type] || 'Conta'} ${userBadge}</div>
+          <div class="bank-card-type">${typeLabel} ${userBadge}</div>
         </div>
         <div class="bank-card-tag" style="background:${b.color}22;color:${b.color}">${b.name}</div>
       </div>
       <div style="margin-top:16px">
-        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Saldo Atual (Lançamentos Reais)</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${isVoucher ? 'Saldo Disponível no Cartão' : 'Saldo Atual (Lançamentos Reais)'}</div>
         <div style="font-size:28px;font-weight:800;color:${balance >= 0 ? 'var(--accent-light)' : '#f87171'};letter-spacing:-0.02em">${fmt.currency(balance)}</div>
-        ${acc.agency ? `<div style="font-size:11px;color:var(--text-muted);margin-top:8px">Ag. ${acc.agency}${acc.account_number ? ' • CC ' + acc.account_number : ''}</div>` : ''}
+        ${isVoucher ? `
+          <div style="font-size:11px;color:var(--text-muted);margin-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            ${acc.card_last_digits ? `<span style="font-weight:700">•••• ${acc.card_last_digits}</span>` : ''}
+            ${acc.benefit_monthly_credit ? `<span>• Recarga: <strong>${fmt.currency(acc.benefit_monthly_credit)}</strong> (Dia ${acc.benefit_credit_day || 1})</span>` : ''}
+          </div>
+        ` : (acc.agency ? `<div style="font-size:11px;color:var(--text-muted);margin-top:8px">Ag. ${acc.agency}${acc.account_number ? ' • CC ' + acc.account_number : ''}</div>` : '')}
       </div>
       <div style="margin-top:12px;height:6px;background:var(--bg-hover);border-radius:3px;overflow:hidden">
         <div style="height:100%;border-radius:3px;background:${b.color};width:${balance >= 0 ? '70' : '0'}%;transition:width 0.8s ease"></div>
+      </div>
+      <div style="margin-top:10px;font-size:11px;color:${b.color};font-weight:700;display:flex;align-items:center;gap:4px">
+        <span>🔍 Ver lançamentos</span>
+        <span style="font-size:10px">➔</span>
       </div>
     </div>`;
 }
@@ -1388,7 +1814,7 @@ async function renderRecurring() {
     <div class="page-header">
       <div><h2 class="page-title">Planejamento Mensal</h2><p class="page-subtitle">Gerencie suas receitas e despesas (Fixas e Variáveis)</p></div>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-outline" id="btn-new-avulso" style="background:var(--bg-raised)">+ Nova Variável</button>
+        <button class="btn" id="btn-new-avulso" style="background:#6366f1;color:#ffffff;border:none;font-weight:600;padding:8px 16px;border-radius:8px;cursor:pointer">+ Nova Variável</button>
         <button class="btn btn-primary" id="btn-new-recurring">+ Nova Fixa</button>
       </div>
     </div>
@@ -1399,12 +1825,11 @@ async function renderRecurring() {
     <div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;" id="rec-controls-wrap">
       <div style="flex:1;min-width:250px;position:relative">
         <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--text-muted);pointer-events:none">🔍</span>
-        <input type="text" id="rec-search-input" placeholder="Buscar por descrição, valor, conta ou categoria..." 
-               style="width:100%;padding:10px 14px 10px 36px;border-radius:10px;border:1px solid var(--border-color);background:rgba(255,255,255,0.03);backdrop-filter:blur(10px);color:var(--text-primary);font-size:13px;outline:none;transition:border-color 0.2s">
+        <input type="text" id="rec-search-input" class="search-control-input" placeholder="Buscar por descrição, valor, conta ou categoria...">
       </div>
       <div style="display:flex;align-items:center;gap:6px">
         <span style="font-size:12px;color:var(--text-muted)">Ordenar por:</span>
-        <select id="rec-sort-select" style="padding:10px 14px;border-radius:10px;border:1px solid var(--border-color);background:rgba(255,255,255,0.03);backdrop-filter:blur(10px);color:var(--text-primary);font-size:13px;outline:none;cursor:pointer">
+        <select id="rec-sort-select" class="search-control-select">
           <option value="manual" ${State.currentSort === 'manual' ? 'selected' : ''}>👆 Ordem Manual</option>
           <option value="newest" ${State.currentSort === 'newest' ? 'selected' : ''}>📅 Mais Recentes</option>
           <option value="oldest" ${State.currentSort === 'oldest' ? 'selected' : ''}>📅 Mais Antigos</option>
@@ -1442,6 +1867,7 @@ async function renderRecurring() {
   async function loadTab(tab) {
     const content = document.getElementById('rec-content');
     content.innerHTML = `
+      ${tab === 'expense' ? '<div id="invoices-container" style="margin-bottom:24px"></div>' : ''}
       <div class="section-title" style="margin-top:10px;margin-bottom:10px;font-size:16px;font-weight:600;color:var(--text-primary);display:flex;align-items:center;gap:8px">
         <span style="font-size:18px">📌</span> ${tab === 'income' ? 'Receitas Fixas' : 'Despesas Fixas'}
       </div>
@@ -1453,10 +1879,11 @@ async function renderRecurring() {
       <div id="variable-container"></div>
     `;
 
-    const [items, monthlyTxs, allAvulsos] = await Promise.all([
+    const [items, monthlyTxs, allAvulsos, invoices] = await Promise.all([
       window.api.recurring.getAll(State.user.id, tab, State.currentMonth, State.currentYear),
       window.api.recurring.getMonthly({ userId: State.user.id, month: State.currentMonth, year: State.currentYear }),
-      window.api.transactions.getAll({ userId: State.user.id, month: State.currentMonth, year: State.currentYear, avulsoOnly: true })
+      window.api.transactions.getAll({ userId: State.user.id, month: State.currentMonth, year: State.currentYear, avulsoOnly: true }),
+      tab === 'expense' ? window.api.invoices.getMonthly({ userId: State.user.id, month: State.currentMonth, year: State.currentYear }).catch(e => { console.error(e); return []; }) : Promise.resolve([])
     ]);
     
     const avulsos = allAvulsos.filter(t => t.type === tab);
@@ -1501,6 +1928,9 @@ async function renderRecurring() {
         filteredAvulsos.sort((a, b) => a.amount - b.amount);
       }
 
+      if (tab === 'expense') {
+        renderInvoicesList(document.getElementById('invoices-container'), invoices, accounts);
+      }
       renderRecurringList(document.getElementById('fixed-container'), filteredItems, monthlyTxs, tab, accounts, categories);
       renderAvulsosList(document.getElementById('variable-container'), filteredAvulsos, accounts, categories, tab);
 
@@ -1509,6 +1939,12 @@ async function renderRecurring() {
 
       const avlList = document.getElementById('avulso-list');
       if (avlList) setupDragAndDrop(avlList, false);
+
+      if (tab === 'expense' && State.highlightCardId) {
+        applyTransactionCardHighlight();
+      } else if (tab === 'income' && State.highlightAccountId) {
+        applyTransactionAccountHighlight();
+      }
     };
 
     const searchInput = document.getElementById('rec-search-input');
@@ -1572,52 +2008,6 @@ function setupDragAndDrop(container, isRecurring) {
   });
 }
 
-function setupUserDragAndDrop(container) {
-  if (!container) return;
-
-  const items = container.querySelectorAll('.settings-item');
-  items.forEach(item => {
-    item.addEventListener('dragstart', (e) => {
-      e.dataTransfer.effectAllowed = 'move';
-      item.classList.add('dragging');
-    });
-
-    item.addEventListener('dragend', async () => {
-      item.classList.remove('dragging');
-      
-      const orderedElements = [...container.querySelectorAll('.settings-item')];
-      const positions = orderedElements.map((el, index) => ({
-        id: parseInt(el.dataset.id),
-        position: index
-      }));
-
-      try {
-        await window.api.auth.updatePositions(positions);
-        toast('Ordem dos perfis atualizada!');
-      } catch (err) {
-        console.error('Erro ao salvar nova ordenação de usuários:', err);
-        toast('Erro ao salvar a ordenação');
-      }
-    });
-  });
-
-  container.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    const draggingItem = container.querySelector('.dragging');
-    if (!draggingItem) return;
-
-    const siblings = [...container.querySelectorAll('.settings-item:not(.dragging)')];
-    
-    const nextSibling = siblings.find(sibling => {
-      const rect = sibling.getBoundingClientRect();
-      const midpoint = rect.top + rect.height / 2;
-      return e.clientY <= midpoint;
-    });
-
-    container.insertBefore(draggingItem, nextSibling);
-  });
-}
-
 function renderRecurringList(container, items, monthlyTxs, type, accounts, categories) {
   const now = new Date();
   const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -1653,10 +2043,33 @@ function renderRecurringList(container, items, monthlyTxs, type, accounts, categ
 
     const isAlert = !isPaid && daysLeft >= 0 && daysLeft <= alertDays;
     const isOverdue = !isPaid && daysLeft < 0;
-    const canEdit = State.permissions.can_edit_all === 1 || item.user_id === State.user.id;
+    const canEdit = State.user?.profile_type === 1 || State.user?.profile_type === 2 || State.permissions.can_edit_all === 1 || !item.user_id || item.user_id === State.user.id;
+
+    const compDateStr = tx ? tx.date.split(' ')[0] : `${State.currentYear}-${String(State.currentMonth).padStart(2,'0')}-${String(item.due_day).padStart(2,'0')}`;
+    const payDateStr = tx && tx.payment_date ? tx.payment_date.split(' ')[0] : null;
+
+    const isEarlyPaid = isPaid && payDateStr && compDateStr && (payDateStr < compDateStr);
+    const isLatePaid = isPaid && payDateStr && compDateStr && (payDateStr > compDateStr);
+    const hasPenalty = tx && tx.penalty_amount > 0;
+    const hasDiscount = tx && tx.discount_amount > 0;
+
+    const baseAmount = tx ? tx.amount : item.amount;
+    const netAmount = baseAmount + (tx?.penalty_amount || 0) - (tx?.discount_amount || 0);
 
     let statusBadge = '';
-    if (isPaid) statusBadge = `<span class="transaction-status status-paid">✓ Pago</span>`;
+    if (isPaid) {
+      if (isEarlyPaid && hasDiscount) {
+        statusBadge = `<span class="transaction-status status-paid-discount" title="Valor base: ${fmt.currency(baseAmount)} | Desconto: -${fmt.currency(tx.discount_amount)} | Total Pago: ${fmt.currency(netAmount)}">🏷️ Pago Antecipado c/ Desconto (${fmt.date(payDateStr)})</span>`;
+      } else if (isEarlyPaid) {
+        statusBadge = `<span class="transaction-status status-paid-early" title="Pago antecipado em ${fmt.date(payDateStr)}">✓ Pago Antecipado (${fmt.date(payDateStr)})</span>`;
+      } else if (isLatePaid && hasPenalty) {
+        statusBadge = `<span class="transaction-status status-paid-penalty" title="Valor base: ${fmt.currency(baseAmount)} | Juros: +${fmt.currency(tx.penalty_amount)} | Total Pago: ${fmt.currency(netAmount)}">⚠️ Pago em Atraso c/ Juros (${fmt.date(payDateStr)})</span>`;
+      } else if (isLatePaid) {
+        statusBadge = `<span class="transaction-status status-paid-late" title="Pago em atraso em ${fmt.date(payDateStr)}">⚠️ Pago em Atraso (${fmt.date(payDateStr)})</span>`;
+      } else {
+        statusBadge = `<span class="transaction-status status-paid">✓ Pago</span>`;
+      }
+    }
     else if (isOverdue) statusBadge = `<span class="transaction-status" style="background:#7f1d1d;color:#f87171">⚠️ Atrasado</span>`;
     else if (isAlert) statusBadge = `<span class="transaction-status" style="background:var(--warning-dim);color:var(--warning)">🚨 Vence em ${daysLeft}d</span>`;
     else statusBadge = `<span class="transaction-status status-pending">⏳ Dia ${item.due_day}</span>`;
@@ -1685,24 +2098,30 @@ function renderRecurringList(container, items, monthlyTxs, type, accounts, categ
     }
 
     return `
-      <div class="transaction-item recurring-item ${isPaid ? 'recurring-paid' : ''} ${item.is_priority ? 'recurring-priority' : ''}" data-id="${item.id}" draggable="${State.currentSort === 'manual' ? 'true' : 'false'}">
+      <div class="transaction-item recurring-item ${isPaid ? 'recurring-paid' : ''} ${item.is_priority ? 'recurring-priority' : ''}" data-id="${item.id}" data-account-id="${item.account_id || ''}" data-account-name="${(item.account_name || '').toLowerCase()}" data-invoice-id="${tx?.invoice_id || ''}" draggable="${State.currentSort === 'manual' ? 'true' : 'false'}">
         ${checkBtnHtml}
         <div class="transaction-category-icon" style="background:${item.color}22;font-size:20px">${item.icon}</div>
         <div class="transaction-info">
           <div class="transaction-desc" style="display:flex;align-items:center;gap:6px">
             ${item.is_priority ? '<span title="Prioritário" style="font-size:14px">⭐</span>' : ''}
             ${tx ? tx.description : item.name}
+            ${tx && tx.competence_date ? `<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:var(--bg-raised);color:var(--text-muted);border:1px solid var(--border);font-weight:600;margin-left:4px" title="Mês de Referência / Consumo">Ref: ${fmtCompetence(tx.competence_date)}</span>` : ''}
             ${!canEdit ? '<span title="Apenas Leitura" style="font-size: 11px; opacity: 0.7;">🔒</span>' : ''}
           </div>
           <div class="transaction-meta">
             ${item.category_name ? `${item.cat_icon || ''} ${item.category_name} • ` : ''}
-            ${item.account_name || '—'} • Todo dia ${item.due_day}
+            ${(item.account_type === 'credit' || accounts.find(a => a.id === item.account_id)?.type === 'credit') ? `<span style="font-size:10px;padding:1px 6px;border-radius:6px;background:rgba(236,72,153,0.15);color:#ec4899;border:1px solid rgba(236,72,153,0.3);font-weight:600">💳 ${item.account_name}</span>` : (item.account_name || '—')} • Todo dia ${item.due_day}
           </div>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
           <div class="transaction-amount ${type === 'income' ? 'income' : 'expense'}">
-            ${type === 'income' ? '+' : '-'}${fmt.currency(item.amount)}
+            ${type === 'income' ? '+' : '-'}${fmt.currency(isPaid ? netAmount : baseAmount)}
           </div>
+          ${isPaid && (hasPenalty || hasDiscount) ? `
+            <div style="font-size:10px;color:var(--text-muted);margin-top:-2px">
+              Base: ${fmt.currency(baseAmount)} • ${hasPenalty ? `Juros: +${fmt.currency(tx.penalty_amount)}` : `Desconto: -${fmt.currency(tx.discount_amount)}`}
+            </div>
+          ` : ''}
           ${statusBadge}
         </div>
         <div class="transaction-actions">
@@ -1734,7 +2153,47 @@ function renderRecurringList(container, items, monthlyTxs, type, accounts, categ
     btn.onclick = async (e) => { e.stopPropagation(); await window.api.recurring.togglePriority(parseInt(btn.dataset.id)); renderRecurring(); };
   });
   list.querySelectorAll('.rec-edit').forEach(btn => {
-    btn.onclick = (e) => { e.stopPropagation(); openRecurringModal(items.find(i => i.id === parseInt(btn.dataset.id)), accounts, categories, type); };
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const itemId = parseInt(btn.dataset.id);
+      const item = items.find(i => i.id === itemId);
+      const tx = monthlyTxs.find(t => t.recurring_item_id === itemId);
+
+      if (tx) {
+        Modal.open('Editar Lançamento Fixo', `
+          <div style="padding: 16px; text-align: center;">
+            <p style="margin-bottom: 24px; font-size: 15px; color: var(--text-primary);">
+              Como deseja editar o item <strong>"${tx.description || item.name}"</strong>?
+            </p>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              <button class="btn btn-primary" id="btn-edit-month" style="background: var(--accent); border-color: var(--accent); font-weight: 600;">
+                ✏️ Editar APENAS o valor/dados deste mês (${MONTHS[State.currentMonth - 1]} / ${State.currentYear})
+              </button>
+              <button class="btn btn-outline" id="btn-edit-all" style="background: var(--bg-raised); font-weight: 600;">
+                ⚙️ Editar o Cadastro Fixo Geral (Regra de todos os meses)
+              </button>
+              <button class="btn btn-secondary" id="btn-edit-cancel" style="margin-top: 8px;">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        `);
+
+        document.getElementById('btn-edit-cancel').onclick = Modal.close;
+
+        document.getElementById('btn-edit-month').onclick = () => {
+          Modal.close();
+          openEditMonthTransactionModal(tx, item, accounts, categories, type);
+        };
+
+        document.getElementById('btn-edit-all').onclick = () => {
+          Modal.close();
+          openRecurringModal(item, accounts, categories, type);
+        };
+      } else {
+        openRecurringModal(item, accounts, categories, type);
+      }
+    };
   });
   list.querySelectorAll('.rec-delete').forEach(btn => {
     btn.onclick = (e) => {
@@ -1826,6 +2285,11 @@ function renderRecurringList(container, items, monthlyTxs, type, accounts, categ
 }
 
 function renderAvulsosList(container, txs, accounts, categories, tabType) {
+  const now = new Date();
+  const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const settings = State.settings || {};
+  const alertDays = settings.alert_days_before || 3;
+
   container.innerHTML = `
     <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px">
       <span style="font-size:12px;color:var(--text-muted);margin-left:auto">${txs.length} lançamento(s)</span>
@@ -1838,25 +2302,65 @@ function renderAvulsosList(container, txs, accounts, categories, tabType) {
     return;
   }
   list.innerHTML = txs.map(t => {
-    const canEdit = State.permissions.can_edit_all === 1 || t.user_id === State.user.id;
+    const isPaid = t.is_paid === 1;
+    const canEdit = State.user?.profile_type === 1 || State.user?.profile_type === 2 || State.permissions.can_edit_all === 1 || !t.user_id || t.user_id === State.user.id;
     let checkBtnHtml = '';
     if (!canEdit) {
       checkBtnHtml = `
-        <button class="transaction-check-btn locked ${t.is_paid ? 'checked' : ''}" title="Apenas leitura (🔒)" disabled>
-          ${t.is_paid ? '✓' : '🔒'}
+        <button class="transaction-check-btn locked ${isPaid ? 'checked' : ''}" title="Apenas leitura (🔒)" disabled>
+          ${isPaid ? '✓' : '🔒'}
         </button>
       `;
     } else {
       checkBtnHtml = `
-        <button class="transaction-check-btn avl-toggle ${t.is_paid ? 'checked' : ''}" 
+        <button class="transaction-check-btn avl-toggle ${isPaid ? 'checked' : ''}" 
                 data-id="${t.id}" 
-                title="${t.is_paid ? (t.type === 'income' ? 'Marcar como não recebida' : 'Marcar como não paga') : (t.type === 'income' ? 'Marcar como recebida' : 'Marcar como paga')}">
-          ${t.is_paid ? '✓' : ''}
+                title="${isPaid ? (t.type === 'income' ? 'Marcar como não recebida' : 'Marcar como não paga') : (t.type === 'income' ? 'Marcar como recebida' : 'Marcar como paga')}">
+          ${isPaid ? '✓' : ''}
         </button>
       `;
     }
+
+    const compDateStr = t.date ? t.date.split(' ')[0] : null;
+    const payDateStr = t.payment_date ? t.payment_date.split(' ')[0] : null;
+    
+    let daysLeft = null;
+    if (compDateStr) {
+      const parts = compDateStr.split('-').map(Number);
+      const dueDate = new Date(parts[0], parts[1] - 1, parts[2]);
+      const diffTime = dueDate.getTime() - todayDate.getTime();
+      daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
+
+    const isAlert = !isPaid && daysLeft !== null && daysLeft >= 0 && daysLeft <= alertDays;
+    const isOverdue = !isPaid && daysLeft !== null && daysLeft < 0;
+    const isEarlyPaid = isPaid && payDateStr && compDateStr && (payDateStr < compDateStr);
+    const isLatePaid = isPaid && payDateStr && compDateStr && (payDateStr > compDateStr);
+    const hasPenalty = t.penalty_amount > 0;
+    const hasDiscount = t.discount_amount > 0;
+    const baseAmount = t.amount;
+    const netAmount = baseAmount + (t.penalty_amount || 0) - (t.discount_amount || 0);
+
+    let statusBadge = '';
+    if (isPaid) {
+      if (isEarlyPaid && hasDiscount) {
+        statusBadge = `<span class="transaction-status status-paid-discount" title="Valor base: ${fmt.currency(baseAmount)} | Desconto: -${fmt.currency(t.discount_amount)} | Total Pago: ${fmt.currency(netAmount)}">🏷️ Pago Antecipado c/ Desconto (${fmt.date(payDateStr)})</span>`;
+      } else if (isEarlyPaid) {
+        statusBadge = `<span class="transaction-status status-paid-early" title="Pago antecipado em ${fmt.date(payDateStr)}">✓ Pago Antecipado (${fmt.date(payDateStr)})</span>`;
+      } else if (isLatePaid && hasPenalty) {
+        statusBadge = `<span class="transaction-status status-paid-penalty" title="Valor base: ${fmt.currency(baseAmount)} | Juros: +${fmt.currency(t.penalty_amount)} | Total Pago: ${fmt.currency(netAmount)}">⚠️ Pago em Atraso c/ Juros (${fmt.date(payDateStr)})</span>`;
+      } else if (isLatePaid) {
+        statusBadge = `<span class="transaction-status status-paid-late" title="Pago em atraso em ${fmt.date(payDateStr)}">⚠️ Pago em Atraso (${fmt.date(payDateStr)})</span>`;
+      } else {
+        statusBadge = `<span class="transaction-status status-paid">✓ Pago${payDateStr ? ' (' + fmt.date(payDateStr) + ')' : ''}</span>`;
+      }
+    }
+    else if (isOverdue) statusBadge = `<span class="transaction-status" style="background:#7f1d1d;color:#f87171">⚠️ Atrasado</span>`;
+    else if (isAlert) statusBadge = `<span class="transaction-status" style="background:var(--warning-dim);color:var(--warning)">🚨 Vence em ${daysLeft}d</span>`;
+    else statusBadge = `<span class="transaction-status status-pending">⏳ Pendente</span>`;
+
     return `
-    <div class="transaction-item" data-id="${t.id}" draggable="${State.currentSort === 'manual' ? 'true' : 'false'}">
+    <div class="transaction-item" data-id="${t.id}" data-account-id="${t.account_id || ''}" data-account-name="${(t.account_name || '').toLowerCase()}" data-invoice-id="${t.invoice_id || ''}" draggable="${State.currentSort === 'manual' ? 'true' : 'false'}">
       ${checkBtnHtml}
       <div class="transaction-category-icon" style="background:${t.category_color ? t.category_color + '22' : 'var(--bg-raised)'}">
         ${t.category_icon || (t.type === 'income' ? '💰' : '📋')}
@@ -1864,13 +2368,19 @@ function renderAvulsosList(container, txs, accounts, categories, tabType) {
       <div class="transaction-info">
         <div class="transaction-desc" style="display:flex;align-items:center;gap:6px">
           ${t.description || 'Sem descrição'}
+          ${t.competence_date ? `<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:var(--bg-raised);color:var(--text-muted);border:1px solid var(--border);font-weight:600;margin-left:4px" title="Mês de Referência / Consumo">Ref: ${fmtCompetence(t.competence_date)}</span>` : ''}
           ${!canEdit ? '<span title="Apenas Leitura" style="font-size: 11px; opacity: 0.7;">🔒</span>' : ''}
         </div>
-        <div class="transaction-meta">${fmt.date(t.date)} • ${t.account_name || '—'} ${t.category_name ? `• ${t.category_name}` : ''}</div>
+        <div class="transaction-meta">${fmt.date(t.date)} • ${(t.account_type === 'credit' || accounts.find(a => a.id === t.account_id)?.type === 'credit') ? `<span style="font-size:10px;padding:1px 6px;border-radius:6px;background:rgba(236,72,153,0.15);color:#ec4899;border:1px solid rgba(236,72,153,0.3);font-weight:600">💳 ${t.account_name}</span>` : (t.account_name || '—')} ${t.category_name ? `• ${t.category_name}` : ''}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-        <div class="transaction-amount ${t.type === 'income' ? 'income' : 'expense'}">${t.type === 'income' ? '+' : '-'}${fmt.currency(t.amount)}</div>
-        <span class="transaction-status ${t.is_paid ? 'status-paid' : 'status-pending'}">${t.is_paid ? '✓ Pago' : '⏳ Pendente'}</span>
+        <div class="transaction-amount ${t.type === 'income' ? 'income' : 'expense'}">${t.type === 'income' ? '+' : '-'}${fmt.currency(isPaid ? netAmount : baseAmount)}</div>
+        ${isPaid && (hasPenalty || hasDiscount) ? `
+          <div style="font-size:10px;color:var(--text-muted);margin-top:-2px">
+            Base: ${fmt.currency(baseAmount)} • ${hasPenalty ? `Juros: +${fmt.currency(t.penalty_amount)}` : `Desconto: -${fmt.currency(t.discount_amount)}`}
+          </div>
+        ` : ''}
+        ${statusBadge}
       </div>
       <div class="transaction-actions">
         ${canEdit ? `<button class="btn btn-ghost btn-sm btn-icon avl-edit" data-id="${t.id}" title="Editar">✏️</button>` : ''}
@@ -1903,16 +2413,825 @@ function renderAvulsosList(container, txs, accounts, categories, tabType) {
     };
   });
   list.querySelectorAll('.avl-delete').forEach(btn => {
-    btn.onclick = async () => {
-      if (confirm('Excluir este lançamento?')) { await window.api.transactions.delete(parseInt(btn.dataset.id)); toast('Excluído'); renderRecurring(); }
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const txId = parseInt(btn.dataset.id);
+      const tx = txs.find(t => t.id == txId);
+      const desc = tx && tx.description ? `"${tx.description}"` : 'esta despesa variável';
+      const amountStr = tx ? fmt.currency(tx.amount) : '';
+
+      Modal.open('Excluir Lançamento Variável', `
+        <div style="padding: 16px; text-align: center;">
+          <p style="margin-bottom: 20px; font-size: 15px; color: var(--text-primary); line-height: 1.5;">
+            Tem certeza que deseja excluir permanentemente a despesa variável <strong>${desc}</strong>${amountStr ? ' no valor de <strong style="color:var(--danger)">' + amountStr + '</strong>' : ''}?
+          </p>
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <button class="btn btn-danger" id="btn-confirm-delete-avl" style="font-weight: 600; padding: 10px; background:#ef4444; border-color:#ef4444; color:#ffffff; border-radius:8px; cursor:pointer;">
+              🗑️ Sim, Excluir Definitivamente
+            </button>
+            <button class="btn btn-secondary" id="btn-cancel-delete-avl" style="margin-top: 4px; padding: 8px;">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      `);
+
+      document.getElementById('btn-cancel-delete-avl').onclick = Modal.close;
+
+      document.getElementById('btn-confirm-delete-avl').onclick = async () => {
+        Modal.close();
+        const res = await window.api.transactions.delete(txId);
+        if (res && res.error) {
+          toast(res.error, 'error');
+        } else {
+          toast('Despesa variável excluída com sucesso!', 'success');
+          renderRecurring();
+        }
+      };
     };
   });
+}
+
+// ── 💳 Destaque Interativo de Faturas e Parcelas de Cartão ──
+function toggleInvoiceHighlight(cardId, cardColor, cardName, invoiceId) {
+  if (State.highlightCardId === cardId || (invoiceId && State.highlightInvoiceId === invoiceId)) {
+    State.highlightCardId = null;
+    State.highlightCardColor = null;
+    State.highlightCardName = null;
+    State.highlightInvoiceId = null;
+    toast(`Destaque de fatura desativado`);
+  } else {
+    State.highlightCardId = cardId || null;
+    State.highlightCardColor = cardColor || '#3b82f6';
+    State.highlightCardName = cardName || 'Cartão';
+    State.highlightInvoiceId = invoiceId || null;
+  }
+
+  // Update invoice cards visual state
+  document.querySelectorAll('.invoice-card-item').forEach(cardEl => {
+    const cid = parseInt(cardEl.dataset.cardId);
+    const invId = parseInt(cardEl.dataset.invoiceId);
+    const color = cardEl.dataset.bankColor || '#3b82f6';
+    const isSelected = (State.highlightCardId && State.highlightCardId === cid) || (State.highlightInvoiceId && State.highlightInvoiceId === invId);
+    const badge = cardEl.querySelector('.invoice-highlight-badge');
+
+    if (isSelected) {
+      cardEl.classList.add('invoice-card-selected');
+      cardEl.style.background = `${color}25`;
+      cardEl.style.borderColor = color;
+      cardEl.style.boxShadow = `0 0 22px ${color}55, inset 0 0 10px ${color}22`;
+      if (badge) {
+        badge.innerHTML = `✨ <strong>Parcelas Destacadas abaixo</strong> (Clique para desmarcar)`;
+        badge.style.background = color;
+        badge.style.color = '#ffffff';
+        badge.style.borderColor = color;
+      }
+    } else {
+      cardEl.classList.remove('invoice-card-selected');
+      cardEl.style.background = `${color}15`;
+      cardEl.style.borderColor = `${color}44`;
+      cardEl.style.boxShadow = 'none';
+      if (badge) {
+        badge.innerHTML = `🔍 Ver Parcelas desta Fatura`;
+        badge.style.background = `${color}25`;
+        badge.style.color = color;
+        badge.style.borderColor = `${color}66`;
+      }
+    }
+  });
+
+  applyTransactionCardHighlight();
+}
+
+function applyTransactionCardHighlight() {
+  const cardId = State.highlightCardId;
+  const invoiceId = State.highlightInvoiceId;
+  const color = State.highlightCardColor || '#3b82f6';
+  const cardName = State.highlightCardName || 'Cartão';
+  const cleanCardName = cardName.toLowerCase().trim();
+
+  const allItems = document.querySelectorAll('#fixed-container .transaction-item, #variable-container .transaction-item');
+  let firstMatchedEl = null;
+  let matchCount = 0;
+
+  allItems.forEach(itemEl => {
+    const itemAccountId = parseInt(itemEl.dataset.accountId);
+    const itemInvoiceId = parseInt(itemEl.dataset.invoiceId);
+    const itemAccountName = (itemEl.dataset.accountName || '').toLowerCase().trim();
+    
+    // Reset previous dynamic highlight styles
+    itemEl.classList.remove('card-highlight-active', 'card-highlight-dimmed');
+    itemEl.style.removeProperty('border');
+    itemEl.style.removeProperty('border-color');
+    itemEl.style.removeProperty('border-left');
+    itemEl.style.removeProperty('background');
+    itemEl.style.removeProperty('box-shadow');
+    itemEl.style.removeProperty('transform');
+    
+    const existingPill = itemEl.querySelector('.card-highlight-pill');
+    if (existingPill) existingPill.remove();
+
+    if (cardId || invoiceId || cleanCardName) {
+      // Check matching criteria:
+      const matchAccount = cardId && !isNaN(cardId) && itemAccountId === cardId;
+      const matchInvoice = invoiceId && !isNaN(invoiceId) && itemInvoiceId === invoiceId;
+      const matchName = cleanCardName && itemAccountName && (cleanCardName.includes(itemAccountName) || itemAccountName.includes(cleanCardName));
+
+      const isMatch = matchAccount || matchInvoice || matchName;
+
+      if (isMatch) {
+        matchCount++;
+        if (!firstMatchedEl) firstMatchedEl = itemEl;
+
+        itemEl.classList.add('card-highlight-active');
+        itemEl.style.setProperty('border', `2px solid ${color}`, 'important');
+        itemEl.style.setProperty('border-left', `8px solid ${color}`, 'important');
+        itemEl.style.setProperty('background', `${color}18`, 'important');
+        itemEl.style.setProperty('box-shadow', `0 4px 20px ${color}48`, 'important');
+        itemEl.style.setProperty('transform', 'translateX(6px)', 'important');
+
+        const descEl = itemEl.querySelector('.transaction-desc');
+        if (descEl) {
+          const pill = document.createElement('span');
+          pill.className = 'card-highlight-pill';
+          pill.style.cssText = `font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 12px; background: ${color}; color: #ffffff; margin-left: 6px; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px ${color}66; animation: popIn 0.3s ease;`;
+          pill.innerHTML = `💳 ${cardName} • Composição da Fatura`;
+          descEl.appendChild(pill);
+        }
+      } else {
+        itemEl.classList.add('card-highlight-dimmed');
+      }
+    }
+  });
+
+  if ((cardId || invoiceId) && matchCount > 0 && firstMatchedEl) {
+    firstMatchedEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    toast(`✨ ${matchCount} lançamento(s) do cartão ${cardName} destacado(s)`);
+  } else if ((cardId || invoiceId) && matchCount === 0) {
+    toast(`Nenhum lançamento avulso ou fixo deste mês encontrado para o cartão ${cardName}.`);
+  }
+}
+
+function applyTransactionAccountHighlight() {
+  const accountId = State.highlightAccountId;
+  const color = State.highlightAccountColor || '#10b981';
+  const accountName = State.highlightAccountName || 'Conta';
+  const cleanAccountName = accountName.toLowerCase().trim();
+
+  const allItems = document.querySelectorAll('#fixed-container .transaction-item, #variable-container .transaction-item');
+  let firstMatchedEl = null;
+  let matchCount = 0;
+
+  allItems.forEach(itemEl => {
+    const itemAccountId = parseInt(itemEl.dataset.accountId);
+    const itemAccountName = (itemEl.dataset.accountName || '').toLowerCase().trim();
+    
+    // Reset previous dynamic highlight styles
+    itemEl.classList.remove('card-highlight-active', 'card-highlight-dimmed', 'account-highlight-active', 'account-highlight-dimmed');
+    itemEl.style.removeProperty('border');
+    itemEl.style.removeProperty('border-color');
+    itemEl.style.removeProperty('border-left');
+    itemEl.style.removeProperty('background');
+    itemEl.style.removeProperty('box-shadow');
+    itemEl.style.removeProperty('transform');
+    
+    const existingPill = itemEl.querySelector('.account-highlight-pill');
+    if (existingPill) existingPill.remove();
+
+    if (accountId || cleanAccountName) {
+      // Check matching criteria:
+      const matchAccount = accountId && !isNaN(accountId) && itemAccountId === accountId;
+      const matchName = cleanAccountName && itemAccountName && (cleanAccountName.includes(itemAccountName) || itemAccountName.includes(cleanAccountName));
+
+      const isMatch = matchAccount || matchName;
+
+      if (isMatch) {
+        matchCount++;
+        if (!firstMatchedEl) firstMatchedEl = itemEl;
+
+        itemEl.classList.add('account-highlight-active');
+        itemEl.style.setProperty('border', `2px solid ${color}`, 'important');
+        itemEl.style.setProperty('border-left', `8px solid ${color}`, 'important');
+        itemEl.style.setProperty('background', `${color}18`, 'important');
+        itemEl.style.setProperty('box-shadow', `0 4px 20px ${color}48`, 'important');
+        itemEl.style.setProperty('transform', 'translateX(6px)', 'important');
+
+        const descEl = itemEl.querySelector('.transaction-desc');
+        if (descEl) {
+          const pill = document.createElement('span');
+          pill.className = 'account-highlight-pill';
+          pill.style.cssText = `font-size: 10px; font-weight: 800; padding: 2px 8px; border-radius: 12px; background: ${color}; color: #ffffff; margin-left: 6px; display: inline-flex; align-items: center; gap: 4px; box-shadow: 0 2px 6px ${color}66; animation: popIn 0.3s ease; cursor: pointer;`;
+          pill.innerHTML = `🏦 ${accountName} • Composição do Rendimento ✕`;
+          pill.title = 'Clique para desmarcar o destaque';
+          pill.onclick = (e) => {
+            e.stopPropagation();
+            State.highlightAccountId = null;
+            State.highlightAccountColor = null;
+            State.highlightAccountName = null;
+            applyTransactionAccountHighlight();
+            toast('Destaque de conta desativado');
+          };
+          descEl.appendChild(pill);
+        }
+      } else {
+        itemEl.classList.add('card-highlight-dimmed');
+      }
+    }
+  });
+
+  if (accountId && matchCount > 0 && firstMatchedEl) {
+    firstMatchedEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    toast(`✨ ${matchCount} provento(s) da conta ${accountName} destacado(s)`);
+  } else if (accountId && matchCount === 0) {
+    toast(`Nenhum provento deste mês encontrado para a conta ${accountName}.`);
+  }
+}
+
+function renderInvoicesList(container, invoices, accounts) {
+  if (!container) return;
+  if (!Array.isArray(invoices) || invoices.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+
+  const mName = MONTHS[State.currentMonth - 1] || '';
+
+  container.innerHTML = `
+    <div class="section-title" style="margin-top:16px;margin-bottom:10px;font-size:16px;font-weight:600;color:var(--text-primary);display:flex;align-items:center;gap:8px">
+      <span style="font-size:18px">💳</span> Faturas de Cartão de Crédito (${mName} / ${State.currentYear})
+    </div>
+    <div class="invoices-list" style="display:flex;flex-direction:column;gap:10px">
+      ${invoices.map(inv => {
+        const b = BANKS[inv.bank] || BANKS.outro;
+        const netAmount = inv.amount + (inv.penalty_amount || 0) - (inv.discount_amount || 0);
+        const userBadge = inv.user_name ? `<span class="profile-badge" style="background:${inv.user_avatar_color || '#10b981'}22;color:${inv.user_avatar_color || '#10b981'};border:1px solid ${inv.user_avatar_color || '#10b981'}44;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600">${inv.user_name}</span>` : '';
+        const cardAccountId = inv.card_account_id || inv.card_id || inv.account_id;
+        const isSelected = (State.highlightCardId && State.highlightCardId === cardAccountId) || (State.highlightInvoiceId && State.highlightInvoiceId === inv.id);
+        
+        return `
+          <div class="invoice-card-item ${isSelected ? 'invoice-card-selected' : ''}" 
+               data-card-id="${cardAccountId || ''}" 
+               data-invoice-id="${inv.id || ''}" 
+               data-bank-color="${b.color}" 
+               data-card-name="${inv.card_name}"
+               style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-radius:var(--radius-md);background:${isSelected ? b.color + '25' : b.color + '15'};border:1.5px solid ${isSelected ? b.color : b.color + '44'};border-left:6px solid ${b.color};gap:12px;flex-wrap:wrap;cursor:pointer;${isSelected ? 'box-shadow: 0 0 20px ' + b.color + '44, inset 0 0 10px ' + b.color + '22;' : ''}">
+            <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1">
+              ${bankLogo(inv.bank, 36)}
+              <div>
+                <div style="font-size:15px;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  💳 FATURA ${inv.card_name.toUpperCase()} (Ref: ${String(inv.month).padStart(2,'0')}/${inv.year})
+                  ${userBadge}
+                </div>
+                <div style="font-size:12px;color:var(--text-muted);margin-top:2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <span>Vence dia ${inv.due_day} • Fecha dia ${inv.closing_day}</span>
+                  <span class="invoice-highlight-badge badge" style="background:${isSelected ? b.color : b.color + '25'};color:${isSelected ? '#ffffff' : b.color};border:1px solid ${b.color}66;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:10px;">
+                    ${isSelected ? '✨ Parcelas Destacadas abaixo' : '🔍 Ver Parcelas desta Fatura'}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            <div style="display:flex;align-items:center;gap:16px">
+              <div style="display:flex;flex-direction:column;align-items:flex-end">
+                <div style="font-size:16px;font-weight:900;color:#ef4444">
+                  -${fmt.currency(netAmount)}
+                </div>
+                ${inv.is_renegotiated ? `
+                  <span class="transaction-status" style="font-size:11px;background:#f59e0b22;color:#f59e0b;border:1px solid #f59e0b44">
+                    🤝 Renegociada / Parcelada
+                  </span>
+                ` : inv.is_paid ? `
+                  <span class="transaction-status status-paid" style="font-size:11px;background:#10b98122;color:#10b981;border:1px solid #10b98144">
+                    ✓ Quitada em ${fmt.date(inv.payment_date)} (${inv.payment_account_name || 'Conta'})
+                  </span>
+                ` : `
+                  <span class="transaction-status status-pending" style="font-size:11px">
+                    ⏳ Aberta • Vence em ${fmt.date(inv.due_date)}
+                  </span>
+                `}
+              </div>
+
+              ${!inv.is_paid ? `
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                  <button class="btn renegotiate-invoice-btn" data-id="${inv.id}" style="background:#f59e0b;border-color:#f59e0b;color:#000;font-weight:700;padding:8px 12px;font-size:12px;border-radius:8px">
+                    🤝 Parcelar / Acordo
+                  </button>
+                  <button class="btn btn-primary pay-invoice-btn" data-id="${inv.id}" style="background:${b.color};border-color:${b.color};font-weight:600;padding:8px 14px;font-size:12px">
+                    💳 Pagar Fatura
+                  </button>
+                </div>
+              ` : `
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                  <button class="btn btn-secondary reopen-invoice-btn" data-id="${inv.id}" style="font-size:12px;padding:8px 12px;border-radius:8px;color:${inv.is_renegotiated ? '#f59e0b' : 'var(--text-primary)'};border:1px solid ${inv.is_renegotiated ? '#f59e0b88' : 'var(--border)'}" title="Reabrir fatura e restaurar lançamentos para edição">
+                    ${inv.is_renegotiated ? '↩️ Desfazer Acordo / Reabrir' : '↩️ Desfazer Pagamento'}
+                  </button>
+                </div>
+              `}
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+
+  // Bind invoice card click to toggle highlight on its installments
+  container.querySelectorAll('.invoice-card-item').forEach(cardEl => {
+    cardEl.onclick = (e) => {
+      // If clicked inside an action button, do nothing
+      if (e.target.closest('.pay-invoice-btn, .renegotiate-invoice-btn, .reopen-invoice-btn')) {
+        return;
+      }
+      const cardId = parseInt(cardEl.dataset.cardId);
+      const invoiceId = parseInt(cardEl.dataset.invoiceId);
+      const cardColor = cardEl.dataset.bankColor;
+      const cardName = cardEl.dataset.cardName;
+      toggleInvoiceHighlight(cardId, cardColor, cardName, invoiceId);
+    };
+  });
+
+  container.querySelectorAll('.pay-invoice-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const invId = parseInt(btn.dataset.id);
+      const inv = invoices.find(i => i.id === invId);
+      if (inv) openPayInvoiceModal(inv, accounts);
+    };
+  });
+
+  container.querySelectorAll('.renegotiate-invoice-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const invId = parseInt(btn.dataset.id);
+      const inv = invoices.find(i => i.id === invId);
+      if (inv) openRenegotiateInvoiceModal(inv, accounts);
+    };
+  });
+
+  container.querySelectorAll('.reopen-invoice-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const invId = parseInt(btn.dataset.id);
+      const inv = invoices.find(i => i.id === invId);
+      if (inv) confirmReopenInvoice(inv);
+    };
+  });
+}
+
+function confirmReopenInvoice(inv) {
+  const isReneg = inv.is_renegotiated === 1;
+  const title = isReneg ? `Desfazer Acordo / Reabrir Fatura` : `Desfazer Pagamento da Fatura`;
+  const mStr = String(inv.month).padStart(2, '0');
+
+  Modal.open(title, `
+    <div style="padding: 16px;">
+      <p style="font-size:14px;color:var(--text-primary);margin-bottom:14px;line-height:1.5">
+        Tem certeza de que deseja <strong>reabrir a fatura do cartão "${inv.card_name}"</strong> referente ao mês <strong>${mStr}/${inv.year}</strong>?
+      </p>
+      
+      <div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;font-size:13px;color:var(--text-secondary);line-height:1.6;margin-bottom:20px">
+        ${isReneg ? `
+          <div style="color:#f59e0b;font-weight:700;margin-bottom:6px">⚠️ O que acontecerá ao desfazer o acordo:</div>
+          • O status de <strong>Renegociada / Parcelada</strong> desta fatura será cancelado.<br>
+          • As compras e lançamentos deste ciclo voltarão para o status <strong>Em Aberto</strong>.<br>
+          • O valor total da fatura será <strong>recalculado automaticamente</strong> com base nos lançamentos reais existentes.<br>
+          • Se houve entrada paga por conta corrente, o valor será estornado na conta.<br>
+          • As parcelas futuras deste acordo específico que não foram pagas serão removidas.
+        ` : `
+          <div style="color:var(--accent-light);font-weight:700;margin-bottom:6px">⚠️ O que acontecerá ao desfazer a quitação:</div>
+          • O pagamento registrado de <strong>R$ ${fmt.currency(inv.amount)}</strong> será cancelado.<br>
+          • O saldo da conta utilizada para pagamento será estornado.<br>
+          • A fatura e suas compras voltarão para o status <strong>Em Aberto</strong> para você ajustar ou quitar novamente.
+        `}
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:10px;">
+        <button type="button" class="btn btn-secondary" onclick="Modal.close()">Cancelar</button>
+        <button type="button" class="btn btn-danger" id="btn-confirm-reopen-invoice" style="background:#ef4444;border-color:#ef4444;color:#fff;font-weight:700;padding:8px 16px;border-radius:8px">
+          Sim, Reabrir Fatura
+        </button>
+      </div>
+    </div>
+  `);
+
+  const confirmBtn = document.getElementById('btn-confirm-reopen-invoice');
+  if (confirmBtn) {
+    confirmBtn.onclick = async () => {
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = 'Reabrindo...';
+      try {
+        const activeUserId = (State.user && State.user.id) || (inv && inv.user_id) || 1;
+        const res = await window.api.invoices.reopen({
+          invoiceId: inv.id,
+          userId: activeUserId
+        });
+        if (res && res.success) {
+          Modal.close();
+          toast(res.message || 'Fatura reaberta com sucesso!');
+          if (typeof renderRecurring === 'function') renderRecurring();
+          if (typeof renderDashboard === 'function') renderDashboard();
+          if (typeof renderTransactions === 'function') renderTransactions();
+          if (typeof renderAccounts === 'function') renderAccounts();
+        } else {
+          confirmBtn.disabled = false;
+          confirmBtn.innerHTML = 'Sim, Reabrir Fatura';
+          toast(res ? res.error : 'Erro ao reabrir fatura', 'error');
+        }
+      } catch (err) {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = 'Sim, Reabrir Fatura';
+        toast('Erro ao reabrir fatura: ' + err.message, 'error');
+      }
+    };
+  }
+}
+
+function openRenegotiateInvoiceModal(inv, accounts) {
+  const b = BANKS[inv.bank] || BANKS.outro;
+  const checkingAccounts = accounts.filter(a => a.type !== 'credit');
+  const today = new Date().toISOString().split('T')[0];
+
+  let nextM = inv.month + 1;
+  let nextY = inv.year;
+  if (nextM > 12) {
+    nextM = 1;
+    nextY += 1;
+  }
+  const defaultFirstMonth = `${nextY}-${String(nextM).padStart(2, '0')}`;
+  const invAmount = inv.amount;
+
+  Modal.open(`🤝 Renegociar / Parcelar Fatura: ${inv.card_name}`, `
+    <div style="padding: 16px;">
+      <!-- Invoice Summary Header -->
+      <div style="padding:14px;border-radius:var(--radius-sm);background:#f59e0b15;border:1px solid #f59e0b44;border-left:5px solid #f59e0b;margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <div>
+            <div style="font-size:12px;color:var(--text-muted)">Fatura em Aberto (Ref: ${String(inv.month).padStart(2,'0')}/${inv.year})</div>
+            <div style="font-size:22px;font-weight:900;color:#ef4444;margin-top:2px">${fmt.currency(invAmount)}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Cartão: ${inv.card_name} • Titular: ${inv.user_name}</div>
+          </div>
+          <span style="font-size:32px">🤝</span>
+        </div>
+      </div>
+
+      <!-- Down Payment Section -->
+      <div class="form-row" style="margin-bottom: 14px;">
+        <div class="form-group" style="flex:1">
+          <label style="font-size:12px;font-weight:600;color:var(--text-muted)">Valor da Entrada à Vista (R$)</label>
+          <input type="number" step="0.01" min="0" max="${invAmount}" id="reneg-down-payment" placeholder="0,00" value="0" style="font-weight:700">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label style="font-size:12px;font-weight:600;color:var(--text-muted)">Data do Pagamento da Entrada</label>
+          <input type="date" id="reneg-down-date" value="${today}">
+        </div>
+      </div>
+
+      <div class="form-group" id="group-down-account" style="margin-bottom: 14px; display: none;">
+        <label style="font-size:12px;font-weight:600;color:var(--text-muted)">Conta Corrente Pagadora da Entrada</label>
+        <select id="reneg-down-account" style="width:100%;padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-raised);color:var(--text-primary)">
+          ${checkingAccounts.map(a => `<option value="${a.id}">${a.name} (Saldo: ${fmt.currency(a.balance)})</option>`).join('')}
+        </select>
+      </div>
+
+      <!-- Installments Configuration -->
+      <div class="form-row" style="margin-bottom: 14px;">
+        <div class="form-group" style="flex:1">
+          <label style="font-size:12px;font-weight:600;color:var(--text-muted)">Número de Parcelas do Acordo</label>
+          <select id="reneg-count" style="font-weight:700">
+            ${[2,3,4,5,6,7,8,9,10,11,12,15,18,24,36].map(n => `<option value="${n}" ${n === 6 ? 'selected' : ''}>${n} vezes (${n}x)</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group" style="flex:1">
+          <label style="font-size:12px;font-weight:600;color:var(--text-muted)">Mês da 1ª Parcela</label>
+          <input type="month" id="reneg-first-month" value="${defaultFirstMonth}">
+        </div>
+      </div>
+
+      <!-- Value / Interest Calculation Mode -->
+      <div class="form-row" style="margin-bottom: 14px;">
+        <div class="form-group" style="flex:1">
+          <label style="font-size:12px;font-weight:600;color:var(--text-muted)">Valor de Cada Parcela (R$)</label>
+          <input type="number" step="0.01" min="0" id="reneg-installment-amount" placeholder="0,00" style="font-weight:900;font-size:16px;color:#f59e0b">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label style="font-size:12px;font-weight:600;color:var(--text-muted)">Taxa de Juros Mensal (% a.m.)</label>
+          <input type="number" step="0.01" min="0" id="reneg-interest-rate" placeholder="0,00" value="0">
+        </div>
+      </div>
+
+      <!-- Live Simulation Summary Box -->
+      <div id="reneg-simulation-box" style="padding:14px;border-radius:var(--radius-sm);background:rgba(255,255,255,0.03);border:1px dashed var(--border);margin-bottom:16px">
+        <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">📊 Resumo do Acordo</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:10px;font-size:12px">
+          <div>
+            <div style="color:var(--text-muted)">Saldo Financiado:</div>
+            <div id="sim-financed" style="font-weight:700;color:var(--text-primary)">R$ 0,00</div>
+          </div>
+          <div>
+            <div style="color:var(--text-muted)">Total das Parcelas:</div>
+            <div id="sim-total-installments" style="font-weight:700;color:var(--text-primary)">R$ 0,00</div>
+          </div>
+          <div>
+            <div style="color:var(--text-muted)">Juros do Acordo:</div>
+            <div id="sim-interest" style="font-weight:700;color:#ef4444">R$ 0,00</div>
+          </div>
+          <div>
+            <div style="color:var(--text-muted)">Total do Acordo:</div>
+            <div id="sim-grand-total" style="font-weight:900;color:#f59e0b">R$ 0,00</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label style="font-size:12px;font-weight:600;color:var(--text-muted)">Observação / Detalhes do Acordo (Opcional)</label>
+        <input type="text" id="reneg-notes" placeholder="Ex: Acordo realizado pelo app do banco...">
+      </div>
+
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px;text-align:center">
+        🔒 <em>A fatura antiga será marcada como quitada pelo acordo, a entrada (se informada) sairá da conta corrente e o parcelamento ficará no cartão comprometendo o limite mês a mês.</em>
+      </p>
+
+      <div style="display: flex; gap: 12px; justify-content: center;">
+        <button class="btn btn-secondary" id="reneg-cancel">Cancelar</button>
+        <button class="btn" id="reneg-confirm" style="background: #f59e0b; border-color: #f59e0b; color: #000; font-weight: 700; padding: 10px 20px; border-radius: 8px">
+          🤝 Confirmar e Lançar Parcelamento
+        </button>
+      </div>
+    </div>
+  `);
+
+  const downInput = document.getElementById('reneg-down-payment');
+  const countSelect = document.getElementById('reneg-count');
+  const installmentInput = document.getElementById('reneg-installment-amount');
+  const interestInput = document.getElementById('reneg-interest-rate');
+  const groupDownAccount = document.getElementById('group-down-account');
+
+  const updateSimulation = (source = 'auto') => {
+    const down = parseFloat(downInput.value) || 0;
+    groupDownAccount.style.display = down > 0 ? 'block' : 'none';
+
+    const count = parseInt(countSelect.value, 10) || 6;
+    const financed = Math.max(0, invAmount - down);
+
+    if (source === 'interest' || source === 'auto' || source === 'down' || source === 'count') {
+      const rateMonthly = (parseFloat(interestInput.value) || 0) / 100;
+      let calculatedInstallment = 0;
+      if (rateMonthly > 0) {
+        // PMT = PV * ( i * (1+i)^n ) / ((1+i)^n - 1)
+        calculatedInstallment = financed * (rateMonthly * Math.pow(1 + rateMonthly, count)) / (Math.pow(1 + rateMonthly, count) - 1);
+      } else {
+        calculatedInstallment = financed / count;
+      }
+      installmentInput.value = calculatedInstallment > 0 ? calculatedInstallment.toFixed(2) : '';
+    }
+
+    const currentInstallment = parseFloat(installmentInput.value) || 0;
+    const totalInstallments = currentInstallment * count;
+    const grandTotal = down + totalInstallments;
+    const interestTotal = Math.max(0, grandTotal - invAmount);
+
+    document.getElementById('sim-financed').textContent = fmt.currency(financed);
+    document.getElementById('sim-total-installments').textContent = fmt.currency(totalInstallments);
+    document.getElementById('sim-interest').textContent = fmt.currency(interestTotal);
+    document.getElementById('sim-grand-total').textContent = fmt.currency(grandTotal);
+  };
+
+  downInput.oninput = () => updateSimulation('down');
+  countSelect.onchange = () => updateSimulation('count');
+  interestInput.oninput = () => updateSimulation('interest');
+  installmentInput.oninput = () => updateSimulation('manual');
+
+  // Initial calculation
+  updateSimulation('auto');
+
+  document.getElementById('reneg-cancel').onclick = Modal.close;
+  document.getElementById('reneg-confirm').onclick = async () => {
+    const downPayment = parseFloat(downInput.value) || 0;
+    const downPaymentDate = document.getElementById('reneg-down-date').value;
+    const downPaymentAccountId = downPayment > 0 ? parseInt(document.getElementById('reneg-down-account').value, 10) : null;
+    const installmentsCount = parseInt(countSelect.value, 10);
+    const installmentAmount = parseFloat(installmentInput.value) || 0;
+    const firstInstallmentMonth = document.getElementById('reneg-first-month').value;
+    const notes = (document.getElementById('reneg-notes').value || '').trim();
+
+    if (downPayment > 0 && (!downPaymentAccountId || isNaN(downPaymentAccountId))) {
+      toast('Selecione a conta corrente de onde saiu o pagamento da entrada', 'error');
+      return;
+    }
+    if (!installmentsCount || installmentsCount < 2) {
+      toast('Informe um número válido de parcelas (mínimo 2x)', 'error');
+      return;
+    }
+    if (!installmentAmount || installmentAmount <= 0) {
+      toast('Informe o valor de cada parcela', 'error');
+      return;
+    }
+    if (!firstInstallmentMonth) {
+      toast('Informe o mês da 1ª parcela', 'error');
+      return;
+    }
+
+    try {
+      const res = await window.api.invoices.renegotiate({
+        invoiceId: inv.id,
+        downPayment,
+        downPaymentAccountId,
+        downPaymentDate,
+        installmentsCount,
+        installmentAmount,
+        firstInstallmentMonth,
+        notes,
+        userId: State.user.id
+      });
+
+      if (res && res.error) {
+        toast(res.error, 'error');
+        return;
+      }
+
+      toast(`Acordo da fatura "${inv.card_name}" registrado com sucesso em ${installmentsCount}x!`);
+      Modal.close();
+      renderRecurring();
+    } catch (err) {
+      console.error(err);
+      toast('Erro ao registrar acordo: ' + err.message, 'error');
+    }
+  };
+}
+
+function openPayInvoiceModal(inv, accounts) {
+  const b = BANKS[inv.bank] || BANKS.outro;
+  const checkingAccounts = accounts.filter(a => a.type !== 'credit');
+  const today = new Date().toISOString().split('T')[0];
+
+  Modal.open(`Quitar Fatura: ${inv.card_name} (Ref: ${String(inv.month).padStart(2,'0')}/${inv.year})`, `
+    <div style="padding: 16px;">
+      <div style="padding:12px;border-radius:var(--radius-sm);background:${b.color}15;border:1px solid ${b.color}44;margin-bottom:16px;text-align:center">
+        <div style="font-size:12px;color:var(--text-muted)">Valor Bruto da Fatura</div>
+        <div style="font-size:22px;font-weight:900;color:var(--text-primary);margin-top:2px">${fmt.currency(inv.amount)}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Titular: ${inv.user_name} • Vencimento: ${fmt.date(inv.due_date)}</div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 14px;">
+        <label style="font-size:12px;font-weight:600;color:var(--text-muted)">Conta Corrente Pagadora (Saída do Dinheiro)</label>
+        <select id="pay-inv-account" style="width:100%;padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-raised);color:var(--text-primary)">
+          ${checkingAccounts.map(a => `<option value="${a.id}">${a.name} (Saldo: ${fmt.currency(a.balance)})</option>`).join('')}
+        </select>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 14px;">
+        <label style="font-size:12px;font-weight:600;color:var(--text-muted)">Data do Efetivo Pagamento</label>
+        <input type="date" id="pay-inv-date" value="${today}" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-raised); color: var(--text-primary); text-align: center; font-weight: 600;">
+      </div>
+
+      <div class="form-row" style="margin-bottom: 16px;">
+        <div class="form-group">
+          <label style="font-size:11px;color:var(--text-muted)">Juros / Multa por Atraso (R$)</label>
+          <input type="number" step="0.01" min="0" id="pay-inv-penalty" placeholder="0,00">
+        </div>
+        <div class="form-group">
+          <label style="font-size:11px;color:var(--text-muted)">Desconto Obtido (R$)</label>
+          <input type="number" step="0.01" min="0" id="pay-inv-discount" placeholder="0,00">
+        </div>
+      </div>
+
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px;text-align:center">
+        🔒 <em>O valor total da fatura será debitado da conta corrente selecionada e todas as compras do cartão deste ciclo serão marcadas como quitadas em lote.</em>
+      </p>
+
+      <div style="display: flex; gap: 12px; justify-content: center;">
+        <button class="btn btn-secondary" id="pay-inv-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="pay-inv-confirm" style="background: ${b.color}; border-color: ${b.color}; font-weight: 600;">
+          Confirmar Quitação da Fatura
+        </button>
+      </div>
+    </div>
+  `);
+
+  document.getElementById('pay-inv-cancel').onclick = Modal.close;
+  document.getElementById('pay-inv-confirm').onclick = async () => {
+    const paymentAccountId = parseInt(document.getElementById('pay-inv-account').value);
+    const paymentDate = document.getElementById('pay-inv-date').value;
+    const penaltyAmount = parseFloat(document.getElementById('pay-inv-penalty').value) || 0;
+    const discountAmount = parseFloat(document.getElementById('pay-inv-discount').value) || 0;
+
+    if (!paymentAccountId || isNaN(paymentAccountId)) {
+      toast('Selecione uma conta corrente para pagamento', 'error');
+      return;
+    }
+    if (!paymentDate) {
+      toast('Informe a data de pagamento', 'error');
+      return;
+    }
+
+    try {
+      const res = await window.api.invoices.pay({
+        invoiceId: inv.id,
+        paymentAccountId,
+        paymentDate,
+        penaltyAmount,
+        discountAmount,
+        userId: State.user.id
+      });
+
+      if (res && res.error) {
+        toast(res.error, 'error');
+        return;
+      }
+
+      toast(`Fatura do cartão "${inv.card_name}" quitada com sucesso! Limite liberado.`);
+      Modal.close();
+      renderRecurring();
+    } catch (err) {
+      console.error(err);
+      toast('Erro ao quitar fatura: ' + err.message, 'error');
+    }
+  };
 }
 
 async function loadAvulsos(container, accounts, categories, tabType) {
   let txs = await window.api.transactions.getAll({ userId: State.user.id, month: State.currentMonth, year: State.currentYear, avulsoOnly: true });
   txs = txs.filter(t => t.type === tabType);
   renderAvulsosList(container, txs, accounts, categories, tabType);
+}
+
+function attachRealtimeDuplicateChecker({ amountInput, dateInput, descInput, accountSelect, typeGetter, excludeId = null, containerEl }) {
+  if (!amountInput || !dateInput || !containerEl) return;
+
+  let debounceTimer = null;
+
+  const runCheck = async () => {
+    const amount = parseFloat(amountInput.value) || 0;
+    const date = dateInput.value;
+    const description = (descInput?.value || '').trim();
+    const accountId = parseInt(accountSelect?.value, 10) || null;
+    const type = typeof typeGetter === 'function' ? typeGetter() : typeGetter || 'expense';
+
+    if (amount <= 0 || !date || description.length < 2) {
+      containerEl.style.display = 'none';
+      containerEl.innerHTML = '';
+      return;
+    }
+
+    try {
+      const familyId = State.user?.family_id || State.user?.familyId || 1;
+      const res = await window.api.sync.checkCandidate({
+        familyId,
+        amount,
+        date,
+        description,
+        accountId,
+        type,
+        excludeId
+      });
+
+      if (res && res.hasDuplicate && res.candidate) {
+        const cand = res.candidate;
+        const color = res.score >= 90 ? '#ef4444' : '#f59e0b';
+        const badgeText = res.score >= 95 ? '🚨 Duplicata Quase Certa' : (res.score >= 80 ? '⚠️ Alta Similaridade' : '🔍 Lançamento Parecido');
+
+        containerEl.style.display = 'block';
+        containerEl.style.border = `1.5px solid ${color}`;
+        containerEl.style.background = `${color}18`;
+        containerEl.innerHTML = `
+          <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
+            <div>
+              <div style="font-weight:700; color:${color}; display:flex; align-items:center; gap:6px; margin-bottom:3px;">
+                <span>${badgeText} (${res.score}%)</span>
+              </div>
+              <div style="line-height:1.5; color:var(--text-secondary); font-size:12px;">
+                Atenção: Já existe um lançamento similar de <strong>${cand.user_name || 'um familiar'}</strong> em <strong>${fmt.date(cand.date)}</strong> no valor de <strong style="color:var(--text-primary)">${fmt.currency(cand.amount)}</strong> (<em>${cand.description || 'Sem descrição'}</em>).
+              </div>
+            </div>
+            <button type="button" class="btn btn-sm" id="btn-dismiss-modal-dup" style="padding:2px 8px; font-size:11px; border-radius:6px; border:1px solid ${color}66; color:var(--text-muted); background:transparent; cursor:pointer;" title="Ignorar aviso">
+              ✕
+            </button>
+          </div>
+        `;
+
+        const dismissBtn = containerEl.querySelector('#btn-dismiss-modal-dup');
+        if (dismissBtn) {
+          dismissBtn.onclick = () => {
+            containerEl.style.display = 'none';
+          };
+        }
+      } else {
+        containerEl.style.display = 'none';
+        containerEl.innerHTML = '';
+      }
+    } catch (e) {
+      console.warn('Erro ao verificar duplicata candidata:', e);
+    }
+  };
+
+  const scheduleCheck = () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(runCheck, 350);
+  };
+
+  amountInput.addEventListener('input', scheduleCheck);
+  dateInput.addEventListener('change', scheduleCheck);
+  if (descInput) descInput.addEventListener('input', scheduleCheck);
+  if (accountSelect) accountSelect.addEventListener('change', scheduleCheck);
 }
 
 function openRecurringModal(item, accounts, categories, type) {
@@ -1932,8 +3251,17 @@ function openRecurringModal(item, accounts, categories, type) {
   if (isEdit && item.created_at) {
     startMonthVal = item.created_at.slice(0, 7);
   }
+  let competenceMonthVal = startMonthVal;
+  if (isEdit && item.competence_offset !== undefined && item.competence_offset !== null) {
+    const [sy, sm] = startMonthVal.split('-').map(Number);
+    let compMonth = sm + item.competence_offset;
+    let compYear = sy + Math.floor((compMonth - 1) / 12);
+    compMonth = ((compMonth - 1) % 12 + 12) % 12 + 1;
+    competenceMonthVal = `${compYear}-${String(compMonth).padStart(2, '0')}`;
+  }
 
   Modal.open(isEdit ? 'Editar Item Recorrente' : `Nova ${type === 'income' ? 'Receita' : 'Despesa'} Fixa`, `
+    <div id="rec-dup-warning" style="display:none; margin-bottom:12px; padding:10px 14px; border-radius:8px; font-size:12px; animation:fadeIn 0.25s ease;"></div>
     <div class="form-group">
       <label>Nome</label>
       <input type="text" id="rec-name" placeholder="${type === 'income' ? 'Ex: Salário, Freelance...' : 'Ex: Aluguel, Netflix, Luz...'}" value="${item?.name || ''}">
@@ -1969,11 +3297,17 @@ function openRecurringModal(item, accounts, categories, type) {
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label>Mês de Início</label>
-        <input type="month" id="rec-start-month" value="${startMonthVal}">
+        <label title="Mês em que a primeira cobrança/lançamento será gerada">📅 Mês de Vencimento <span style="font-size:11px;opacity:0.65;font-weight:400">(1ª ocorrência)</span></label>
+        <input type="month" id="rec-start-month" value="${startMonthVal}" title="Mês e ano em que este item começa a ser cobrado/gerado">
       </div>
       <div class="form-group">
-        <label>Repetir por quantos meses? (0 ou vazio para indefinido)</label>
+        <label title="Mês ao qual este item se refere — ex: conta de luz de março, paga em abril">📋 Mês de Referência <span style="font-size:11px;opacity:0.65;font-weight:400">(competência)</span></label>
+        <input type="month" id="rec-competence-month" value="${competenceMonthVal}" title="Mês de consumo/competência a que este item se refere. Pode ser diferente do mês de vencimento.">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1">
+        <label>Repetir por quantos meses? <span style="font-size:11px;opacity:0.65;font-weight:400">(0 ou vazio = indefinido)</span></label>
         <input type="number" id="rec-repeat-months" min="0" placeholder="Repetir indefinidamente" value="${item?.repeat_months || ''}">
       </div>
     </div>
@@ -2034,6 +3368,41 @@ function openRecurringModal(item, accounts, categories, type) {
     };
   }
 
+  const startMonthInput = document.getElementById('rec-start-month');
+  const compMonthInput = document.getElementById('rec-competence-month');
+  let compManuallyChanged = isEdit && item?.competence_offset !== 0 && item?.competence_offset !== undefined;
+  if (compMonthInput) {
+    compMonthInput.onchange = () => { compManuallyChanged = true; };
+    if (startMonthInput) {
+      startMonthInput.onchange = () => {
+        if (!compManuallyChanged && startMonthInput.value) {
+          compMonthInput.value = startMonthInput.value;
+        }
+      };
+    }
+  }
+
+  // Realtime Candidate Duplicate Checker
+  attachRealtimeDuplicateChecker({
+    amountInput: document.getElementById('rec-amount'),
+    dateInput: {
+      get value() {
+        const m = document.getElementById('rec-start-month')?.value || defaultStartMonth;
+        const d = String(document.getElementById('rec-due-day')?.value || 1).padStart(2, '0');
+        return `${m}-${d}`;
+      },
+      addEventListener(evt, fn) {
+        document.getElementById('rec-start-month')?.addEventListener(evt, fn);
+        document.getElementById('rec-due-day')?.addEventListener(evt, fn);
+      }
+    },
+    descInput: document.getElementById('rec-name'),
+    accountSelect: document.getElementById('rec-account'),
+    typeGetter: () => type,
+    excludeId: item?.id,
+    containerEl: document.getElementById('rec-dup-warning')
+  });
+
   document.getElementById('rec-cancel').onclick = Modal.close;
   document.getElementById('rec-save').onclick = async () => {
     try {
@@ -2045,7 +3414,24 @@ function openRecurringModal(item, accounts, categories, type) {
       if (!account_id) { toast('Selecione uma conta', 'error'); return; }
 
       const startMonth = document.getElementById('rec-start-month').value;
+      const competenceMonth = document.getElementById('rec-competence-month')?.value || startMonth;
       const created_at = startMonth ? `${startMonth}-01 00:00:00` : null;
+
+      let competence_offset = 0;
+      if (startMonth && competenceMonth) {
+        const [sy, sm] = startMonth.split('-').map(Number);
+        const [cy, cm] = competenceMonth.split('-').map(Number);
+        competence_offset = (cy - sy) * 12 + (cm - sm);
+      }
+
+      // Build notes with competence info if different from start month
+      let notesVal = document.getElementById('rec-notes').value;
+      if (competenceMonth && competenceMonth !== startMonth && !notesVal.includes('Ref.:')) {
+        const [cy, cm] = competenceMonth.split('-');
+        const mNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+        const compLabel = `${mNames[parseInt(cm,10)-1]}/${cy}`;
+        notesVal = notesVal ? `${notesVal} | Ref.: ${compLabel}` : `Ref.: ${compLabel}`;
+      }
 
       const data = {
         user_id: State.user.id, name, type, amount,
@@ -2054,9 +3440,10 @@ function openRecurringModal(item, accounts, categories, type) {
         due_day: parseInt(document.getElementById('rec-due-day').value),
         is_priority: document.getElementById('rec-priority').checked ? 1 : 0,
         icon, color,
-        notes: document.getElementById('rec-notes').value,
+        notes: notesVal,
         repeat_months: parseInt(document.getElementById('rec-repeat-months').value) || 0,
         start_installment: parseInt(document.getElementById('rec-start-installment').value) || 1,
+        competence_offset,
         created_at
       };
       if (!isEdit) {
@@ -2083,6 +3470,131 @@ function openRecurringModal(item, accounts, categories, type) {
     } catch (err) {
       console.error(err);
       toast('Erro ao salvar item recorrente: ' + err.message, 'error');
+    }
+  };
+}
+
+function fmtCompetence(compStr) {
+  if (!compStr) return '';
+  const parts = compStr.split('-');
+  if (parts.length >= 2) {
+    const y = parts[0];
+    const m = parseInt(parts[1], 10);
+    const mNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    return `${mNames[m - 1]}/${y}`;
+  }
+  return compStr;
+}
+
+function openEditMonthTransactionModal(tx, item, accounts, categories, type) {
+  const dateVal = tx.date ? tx.date.split(' ')[0] : new Date().toISOString().split('T')[0];
+  const amountVal = tx.amount || item.amount;
+  const descVal = tx.description || item.name;
+  const accountVal = tx.account_id || item.account_id || (accounts[0]?.id || '');
+  const categoryVal = tx.category_id || item.category_id || '';
+  
+  const defaultComp = tx.competence_date ? tx.competence_date.slice(0,7) : `${State.currentYear}-${String(State.currentMonth).padStart(2,'0')}`;
+
+  Modal.open(`Editar Lançamento do Mês (${MONTHS[State.currentMonth - 1]} / ${State.currentYear})`, `
+    <div id="mod-tx-dup-warning" style="display:none; margin-bottom:12px; padding:10px 14px; border-radius:8px; font-size:12px; animation:fadeIn 0.25s ease;"></div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Valor deste Mês (R$)</label>
+        <input type="number" id="mod-tx-amount" step="0.01" min="0" placeholder="0,00" value="${amountVal}">
+      </div>
+      <div class="form-group">
+        <label>Data de Vencimento</label>
+        <input type="date" id="mod-tx-date" value="${dateVal}">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Descrição</label>
+        <input type="text" id="mod-tx-desc" placeholder="Descrição" value="${descVal}">
+      </div>
+      <div class="form-group">
+        <label>Mês de Referência / Consumo</label>
+        <input type="month" id="mod-tx-competence" value="${defaultComp}" title="Selecione o mês/ano de consumo a que se refere esta fatura">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Conta / Cartão</label>
+        <select id="mod-tx-account">
+          <option value="">Selecione...</option>
+          ${accounts.map(a => `<option value="${a.id}" ${a.id == accountVal ? 'selected' : ''}>${a.name}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Categoria</label>
+        <select id="mod-tx-category">
+          <option value="">Sem Categoria</option>
+          ${categories.filter(c => c.type === type || c.type === 'both').map(c => `<option value="${c.id}" ${c.id == categoryVal ? 'selected' : ''}>${c.icon} ${c.name}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <p style="font-size:12px;color:var(--text-muted);margin-top:8px;margin-bottom:16px;">
+      🔒 <em>Esta alteração afeta <strong>exclusivamente a parcela deste mês</strong>. O mês de consumo (referência) fica discriminado junto do vencimento.</em>
+    </p>
+    <div class="modal-footer" style="padding:0;border:none;margin-top:4px">
+      <button class="btn btn-secondary" id="mod-tx-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="mod-tx-save">Salvar este Mês</button>
+    </div>
+  `);
+
+  attachRealtimeDuplicateChecker({
+    amountInput: document.getElementById('mod-tx-amount'),
+    dateInput: document.getElementById('mod-tx-date'),
+    descInput: document.getElementById('mod-tx-desc'),
+    accountSelect: document.getElementById('mod-tx-account'),
+    typeGetter: () => type,
+    excludeId: tx?.id,
+    containerEl: document.getElementById('mod-tx-dup-warning')
+  });
+
+  document.getElementById('mod-tx-cancel').onclick = Modal.close;
+
+  document.getElementById('mod-tx-save').onclick = async () => {
+    const amount = parseFloat(document.getElementById('mod-tx-amount').value);
+    const date = document.getElementById('mod-tx-date').value;
+    const description = document.getElementById('mod-tx-desc').value.trim();
+    const competence_date = document.getElementById('mod-tx-competence').value;
+    const account_id = parseInt(document.getElementById('mod-tx-account').value);
+    const category_id = parseInt(document.getElementById('mod-tx-category').value) || null;
+
+    if (!amount || isNaN(amount) || amount <= 0) {
+      toast('Informe um valor válido', 'error');
+      return;
+    }
+    if (!description) {
+      toast('Informe a descrição', 'error');
+      return;
+    }
+
+    try {
+      const res = await window.api.transactions.update({
+        id: tx.id,
+        user_id: tx.user_id,
+        account_id,
+        category_id,
+        type: tx.type,
+        amount,
+        description,
+        date,
+        competence_date,
+        is_paid: tx.is_paid,
+        notes: tx.notes
+      });
+      if (res && res.error) {
+        toast(res.error, 'error');
+        return;
+      }
+      toast(`Lançamento do mês atualizado com sucesso!`);
+      Modal.close();
+      renderRecurring();
+    } catch (err) {
+      console.error(err);
+      toast('Erro ao atualizar lançamento do mês: ' + err.message, 'error');
     }
   };
 }
@@ -2130,7 +3642,7 @@ async function showDidacticFeedback(data) {
 function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense') {
   const isEdit = !!tx;
   if (isEdit) {
-    const canEdit = State.permissions.can_edit_all === 1 || tx.user_id === State.user.id;
+    const canEdit = (State.user.profile_type === 1 || State.user.profile_type === 2) || (State.permissions && State.permissions.can_edit_all === 1) || (!tx.user_id || tx.user_id === State.user.id);
     if (!canEdit) {
       toast('Você não tem permissão para editar este lançamento', 'error');
       return;
@@ -2146,6 +3658,7 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
   const paidChecked = isEdit ? (tx.is_paid ? 'checked' : '') : 'checked';
 
   Modal.open(isEdit ? 'Editar Lançamento Avulso' : 'Novo Lançamento Avulso', `
+    <div id="avl-dup-warning" style="display:none; margin-bottom:12px; padding:10px 14px; border-radius:8px; font-size:12px; animation:fadeIn 0.25s ease;"></div>
     <div class="type-toggle" id="avl-type-toggle">
       <button data-type="expense" class="${typeVal === 'expense' ? 'active-expense' : ''}">💸 Despesa</button>
       <button data-type="income" class="${typeVal === 'income' ? 'active-income' : ''}">💰 Receita</button>
@@ -2156,13 +3669,19 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
         <input type="number" id="avl-amount" step="0.01" min="0" placeholder="0,00" value="${amountVal}">
       </div>
       <div class="form-group">
-        <label>Data</label>
+        <label title="Data de vencimento ou pagamento deste lançamento">📅 Mês de Vencimento <span style="font-size:11px;opacity:0.65;font-weight:400">(data)</span></label>
         <input type="date" id="avl-date" value="${dateVal}">
       </div>
     </div>
-    <div class="form-group">
-      <label>Descrição</label>
-      <input type="text" id="avl-desc" placeholder="Ex: Compra no mercado, Presente..." value="${descVal}">
+    <div class="form-row">
+      <div class="form-group">
+        <label title="Mês ao qual este gasto se refere — ex: conta de luz consumida em março, paga em abril">📋 Mês de Referência <span style="font-size:11px;opacity:0.65;font-weight:400">(competência)</span></label>
+        <input type="month" id="avl-competence" value="${isEdit && tx.competence_date ? tx.competence_date.slice(0,7) : (dateVal ? dateVal.slice(0,7) : '')}" title="Mês de consumo/competência. Pode ser anterior ao mês de vencimento.">
+      </div>
+      <div class="form-group">
+        <label>Descrição</label>
+        <input type="text" id="avl-desc" placeholder="Ex: Compra no mercado, Presente..." value="${descVal}">
+      </div>
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -2179,6 +3698,22 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
         </select>
       </div>
     </div>
+    
+    <div class="form-row" id="group-credit-product-row">
+      <div class="form-group">
+        <label style="font-size:12px; font-weight:600;">Recurso / Produto da Conta</label>
+        <select id="avl-credit-product">
+          <option value="normal" ${(!tx || tx.credit_product === 'normal' || !tx.credit_product) ? 'selected' : ''}>💵 Saldo Normal (À Vista)</option>
+          <option value="banricompras" ${(tx && tx.credit_product === 'banricompras') ? 'selected' : ''}>🛍️ Banricompras (Débito Agendado / Pré-datado)</option>
+          <option value="credito_minuto" ${(tx && tx.credit_product === 'credito_minuto') ? 'selected' : ''}>⚡ Crédito Minuto (Empréstimo)</option>
+        </select>
+      </div>
+      <div class="form-group" id="group-due-date" style="${(tx && tx.credit_product === 'banricompras') ? '' : 'display:none'}">
+        <label style="font-size:12px; font-weight:600; color:#fbbf24;">Data do Débito (Banricompras)</label>
+        <input type="date" id="avl-due-date" value="${(tx && tx.due_date) ? tx.due_date : ''}">
+      </div>
+    </div>
+
     <div class="form-group">
       <label><input type="checkbox" id="avl-paid" ${paidChecked}> Já foi pago/recebido</label>
     </div>
@@ -2204,6 +3739,52 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
   // Carregar categorias correspondentes ao tipo inicial
   updateAvulsoCategories(typeVal);
 
+  const creditProductSelect = document.getElementById('avl-credit-product');
+  const groupDueDate = document.getElementById('group-due-date');
+  const dateInput = document.getElementById('avl-date');
+  const dueDateInput = document.getElementById('avl-due-date');
+  const paidCheckbox = document.getElementById('avl-paid');
+  const competenceInput = document.getElementById('avl-competence');
+
+  // Realtime Candidate Duplicate Checker
+  attachRealtimeDuplicateChecker({
+    amountInput: document.getElementById('avl-amount'),
+    dateInput: document.getElementById('avl-date'),
+    descInput: document.getElementById('avl-desc'),
+    accountSelect: document.getElementById('avl-account'),
+    typeGetter: () => currentType,
+    excludeId: tx?.id,
+    containerEl: document.getElementById('avl-dup-warning')
+  });
+
+  // Auto-sync Mês de Referência with date when user changes date (only if competence wasn't manually edited)
+  let competenceManuallyChanged = isEdit && !!tx.competence_date;
+  if (competenceInput) {
+    competenceInput.onchange = () => { competenceManuallyChanged = true; };
+    if (dateInput) {
+      dateInput.onchange = () => {
+        if (!competenceManuallyChanged && dateInput.value) {
+          competenceInput.value = dateInput.value.slice(0, 7);
+        }
+      };
+    }
+  }
+
+  if (creditProductSelect) {
+    creditProductSelect.onchange = () => {
+      const isBanri = creditProductSelect.value === 'banricompras';
+      groupDueDate.style.display = isBanri ? '' : 'none';
+      if (isBanri) {
+        paidCheckbox.checked = false;
+        if (!dueDateInput.value && dateInput.value) {
+          const d = new Date(dateInput.value);
+          d.setDate(d.getDate() + 30);
+          dueDateInput.value = d.toISOString().split('T')[0];
+        }
+      }
+    };
+  }
+
   document.querySelectorAll('#avl-type-toggle button').forEach(btn => {
     btn.onclick = () => {
       currentType = btn.dataset.type;
@@ -2219,11 +3800,16 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
       const amount = parseFloat(document.getElementById('avl-amount').value);
       const date = document.getElementById('avl-date').value;
       const account_id = parseInt(document.getElementById('avl-account').value);
-      
+      const credit_product = document.getElementById('avl-credit-product')?.value || 'normal';
+      const due_date = credit_product === 'banricompras' ? document.getElementById('avl-due-date')?.value : null;
+
       if (!amount || amount <= 0) { toast('Informe o valor', 'error'); return; }
       if (!date) { toast('Informe a data', 'error'); return; }
       if (!account_id || isNaN(account_id)) { toast('Selecione uma conta', 'error'); return; }
       
+      const competenceMonthVal = document.getElementById('avl-competence')?.value;
+      const competence_date = competenceMonthVal ? `${competenceMonthVal}-01` : null;
+
       const data = {
         user_id: State.user.id, account_id,
         category_id: parseInt(document.getElementById('avl-category').value) || null,
@@ -2233,6 +3819,9 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
         date, is_paid: document.getElementById('avl-paid').checked ? 1 : 0,
         is_avulso: isEdit ? tx.is_avulso : 1,
         notes: isEdit ? tx.notes : null,
+        credit_product,
+        due_date,
+        competence_date
       };
 
       if (isEdit) {
@@ -2260,17 +3849,36 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
   };
 }
 
-function openPaymentDateModal(txId, currentDate, onComplete) {
+async function openPaymentDateModal(txId, currentDate, onComplete) {
   const cleanDate = currentDate ? currentDate.split(' ')[0] : new Date().toISOString().split('T')[0];
-  
-  Modal.open('Data de Pagamento / Recebimento', `
-    <div style="padding: 16px; text-align: center;">
-      <p style="margin-bottom: 16px; font-size: 14px; color: var(--text-secondary);">
-        Informe qual dia em que ocorreu o pagamento ou recebimento deste lançamento:
+  let tx = null;
+  try {
+    const allTxs = await window.api.transactions.getAll({ userId: State.user.id });
+    tx = allTxs.find(t => t.id == txId);
+  } catch (e) {
+    console.error(e);
+  }
+  const compDate = tx ? tx.date.split(' ')[0] : cleanDate;
+  const baseAmount = tx ? tx.amount : 0;
+
+  Modal.open('Confirmar Pagamento / Liquidação', `
+    <div style="padding: 16px;">
+      <p style="margin-bottom: 16px; font-size: 14px; color: var(--text-secondary); text-align: center;">
+        Informe a data do efetivo pagamento e eventuais ajustes (juros ou desconto):
       </p>
-      <div class="form-group" style="margin-bottom: 20px;">
-        <input type="date" id="payment-date-input" value="${cleanDate}" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-raised); color: var(--text-primary); text-align: center;">
+      
+      <div class="form-group" style="margin-bottom: 16px;">
+        <label style="font-size:12px;font-weight:600;color:var(--text-muted)">Data do Efetivo Pagamento</label>
+        <input type="date" id="payment-date-input" value="${cleanDate}" style="width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-raised); color: var(--text-primary); text-align: center; font-weight: 600;">
       </div>
+
+      <div id="payment-options-container" style="background: var(--bg-raised); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 16px;">
+      </div>
+
+      <div id="payment-summary-box" style="padding: 10px; background: rgba(16, 185, 129, 0.1); border-radius: var(--radius-sm); font-size: 13px; margin-bottom: 16px; text-align: center; border: 1px solid rgba(16, 185, 129, 0.3);">
+        <strong>Total a Debitar da Conta:</strong> <span id="payment-total-preview" style="font-weight:700; font-size:15px; color:var(--accent-light);">${fmt.currency(baseAmount)}</span>
+      </div>
+
       <div style="display: flex; gap: 12px; justify-content: center;">
         <button class="btn btn-secondary" id="btn-pay-cancel">Cancelar</button>
         <button class="btn btn-primary" id="btn-pay-confirm" style="background: var(--accent); border-color: var(--accent); font-weight: 600;">
@@ -2279,17 +3887,118 @@ function openPaymentDateModal(txId, currentDate, onComplete) {
       </div>
     </div>
   `);
-  
+
+  const dateInput = document.getElementById('payment-date-input');
+  const optContainer = document.getElementById('payment-options-container');
+  const totalPreview = document.getElementById('payment-total-preview');
+
+  function updatePaymentOptionsUI() {
+    const selDate = dateInput.value;
+    let html = '';
+    let isEarly = selDate < compDate;
+    let isLate = selDate > compDate;
+
+    if (isEarly) {
+      html = `
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;font-weight:600;color:var(--accent-light)">
+            <input type="checkbox" id="chk-discount"> 🏷️ Aplicar desconto por antecipação
+          </label>
+          <div id="row-discount-val" style="display:none;margin-top:4px">
+            <label style="font-size:11px;color:var(--text-muted)">Valor do Desconto (R$)</label>
+            <input type="number" step="0.01" min="0" id="input-discount-val" placeholder="0.00" style="width:100%;padding:8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-surface);color:var(--text-primary)">
+          </div>
+        </div>
+      `;
+    } else if (isLate) {
+      html = `
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;font-weight:600;color:#fbbf24">
+            <input type="checkbox" id="chk-penalty"> ⚠️ Aplicar juros/multa por atraso
+          </label>
+          <div id="row-penalty-val" style="display:none;margin-top:4px">
+            <label style="font-size:11px;color:var(--text-muted)">Valor de Juros/Multa (R$)</label>
+            <input type="number" step="0.01" min="0" id="input-penalty-val" placeholder="0.00" style="width:100%;padding:8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-surface);color:var(--text-primary)">
+          </div>
+        </div>
+      `;
+    } else {
+      html = `<div style="font-size:12px;color:var(--text-muted);text-align:center">Pagamento na data exata de vencimento (${fmt.date(compDate)})</div>`;
+    }
+    optContainer.innerHTML = html;
+
+    const chkDiscount = document.getElementById('chk-discount');
+    const chkPenalty = document.getElementById('chk-penalty');
+    const inputDiscount = document.getElementById('input-discount-val');
+    const inputPenalty = document.getElementById('input-penalty-val');
+
+    if (chkDiscount) {
+      chkDiscount.onchange = () => {
+        document.getElementById('row-discount-val').style.display = chkDiscount.checked ? 'block' : 'none';
+        recalcTotal();
+      };
+    }
+    if (chkPenalty) {
+      chkPenalty.onchange = () => {
+        document.getElementById('row-penalty-val').style.display = chkPenalty.checked ? 'block' : 'none';
+        recalcTotal();
+      };
+    }
+    if (inputDiscount) inputDiscount.oninput = recalcTotal;
+    if (inputPenalty) inputPenalty.oninput = recalcTotal;
+
+    recalcTotal();
+  }
+
+  function recalcTotal() {
+    let penaltyVal = 0;
+    let discountVal = 0;
+
+    const chkDiscount = document.getElementById('chk-discount');
+    const chkPenalty = document.getElementById('chk-penalty');
+    const inputDiscount = document.getElementById('input-discount-val');
+    const inputPenalty = document.getElementById('input-penalty-val');
+
+    if (chkDiscount && chkDiscount.checked && inputDiscount) {
+      discountVal = parseFloat(inputDiscount.value) || 0;
+    }
+    if (chkPenalty && chkPenalty.checked && inputPenalty) {
+      penaltyVal = parseFloat(inputPenalty.value) || 0;
+    }
+
+    const finalNet = baseAmount + penaltyVal - discountVal;
+    totalPreview.innerText = fmt.currency(finalNet);
+  }
+
+  dateInput.onchange = updatePaymentOptionsUI;
+  updatePaymentOptionsUI();
+
   document.getElementById('btn-pay-cancel').onclick = Modal.close;
   document.getElementById('btn-pay-confirm').onclick = async () => {
-    const selectedDate = document.getElementById('payment-date-input').value;
+    const selectedDate = dateInput.value;
     if (!selectedDate) {
       toast('Selecione uma data válida', 'error');
       return;
     }
+
+    let penalty_amount = 0;
+    let discount_amount = 0;
+
+    const chkDiscount = document.getElementById('chk-discount');
+    const chkPenalty = document.getElementById('chk-penalty');
+    const inputDiscount = document.getElementById('input-discount-val');
+    const inputPenalty = document.getElementById('input-penalty-val');
+
+    if (chkDiscount && chkDiscount.checked && inputDiscount) {
+      discount_amount = parseFloat(inputDiscount.value) || 0;
+    }
+    if (chkPenalty && chkPenalty.checked && inputPenalty) {
+      penalty_amount = parseFloat(inputPenalty.value) || 0;
+    }
+
     try {
-      await window.api.transactions.togglePaidWithDate(txId, selectedDate);
-      toast('Lançamento marcado como pago na data selecionada');
+      await window.api.transactions.togglePaidWithDate(txId, selectedDate, { penalty_amount, discount_amount });
+      toast('Pagamento confirmado com sucesso!');
       Modal.close();
       if (onComplete) onComplete();
     } catch (err) {
@@ -2315,35 +4024,38 @@ async function renderAccounts() {
   ]);
   const cardSpending = summary.cardSpending || {};
 
-  const debitAccounts = accounts.filter(a => a.type !== 'credit');
+  const bankAccounts = accounts.filter(a => a.type !== 'credit' && a.type !== 'voucher');
+  const voucherAccounts = accounts.filter(a => a.type === 'voucher');
   const creditAccounts = accounts.filter(a => a.type === 'credit');
 
   page.innerHTML = `
     <div class="page-header" style="align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
       <div>
         <h2 class="page-title">Contas & Cartões</h2>
-        <p class="page-subtitle">Gerencie suas contas bancárias e cartões</p>
+        <p class="page-subtitle">Gerencie suas contas bancárias, cartões de benefício e cartões de crédito</p>
       </div>
-      <div id="accounts-period-holder" style="display: flex; align-items: center; justify-content: center;"></div>
-      <button class="btn btn-primary" id="btn-new-account">+ Nova conta</button>
+      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <button class="btn btn-secondary" id="btn-import-statement" style="display:flex;align-items:center;gap:6px"><span>📥</span> Importar Extrato (OFX / CSV)</button>
+        <button class="btn btn-primary" id="btn-new-account">+ Nova conta / cartão</button>
+      </div>
     </div>
 
     ${accounts.length === 0 ? `
       <div class="empty-state">
         <div class="empty-icon">🏦</div>
-        <div class="empty-title">Nenhuma conta cadastrada</div>
-        <div class="empty-desc">Adicione sua conta corrente, poupança ou cartão de crédito</div>
+        <div class="empty-title">Nenhuma conta ou cartão cadastrado</div>
+        <div class="empty-desc">Adicione sua conta corrente, poupança, cartão benefício ou cartão de crédito</div>
       </div>
     ` : `
       <!-- 🏦 SEÇÃO 1: CONTAS BANCÁRIAS (Diferença entre Receitas e Despesas do mês) -->
       <div style="margin-bottom: 32px;">
         <h3 style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-          🏦 Contas Bancárias <span style="font-size: 11px; font-weight: 500; text-transform: none; color: var(--text-muted); opacity: 0.85;">(Diferença entre Receitas e Despesas do mês)</span>
+          🏦 Contas Bancárias & Carteiras <span style="font-size: 11px; font-weight: 500; text-transform: none; color: var(--text-muted); opacity: 0.85;">(Diferença entre Receitas e Despesas do mês)</span>
         </h3>
         <div class="accounts-grid">
-          ${debitAccounts.length === 0 ? `
-            <div class="empty-state" style="grid-column: 1/-1; padding: 24px;">Nenhuma conta bancária ativa para este período.</div>
-          ` : debitAccounts.map(acc => {
+          ${bankAccounts.length === 0 ? `
+            <div class="empty-state" style="grid-column: 1/-1; padding: 24px;">Nenhuma conta corrente ou carteira cadastrada.</div>
+          ` : bankAccounts.map(acc => {
             const b = BANKS[acc.bank] || BANKS.outro;
             const canEdit = State.permissions.can_edit_all === 1 || acc.user_id === State.user.id;
             const userBadge = acc.user_name ? `<span class="profile-badge" style="background:${acc.user_avatar_color || '#10b981'}22;color:${acc.user_avatar_color || '#10b981'};border:1px solid ${acc.user_avatar_color || '#10b981'}44;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600;margin-left:6px;vertical-align:middle;display:inline-block">${acc.user_name}</span>` : '';
@@ -2368,6 +4080,30 @@ async function renderAccounts() {
                 <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Saldo do mês</div>
                 <div class="account-balance" style="color:${monthlyDiff >= 0 ? 'var(--accent-light)' : '#f87171'}">${fmt.currency(monthlyDiff)}</div>
                 ${acc.agency ? `<div style="font-size:11px;color:var(--text-muted);margin-top:6px">Ag. ${acc.agency}${acc.account_number ? ' • CC ' + acc.account_number : ''}</div>` : ''}
+                
+                ${(acc.overdraft_limit > 0 || acc.banricompras_limit > 0 || acc.credit_minuto_limit > 0) ? `
+                  <div style="margin-top: 10px; margin-bottom: 10px; padding: 10px; border-radius: var(--radius-sm); background: var(--bg-surface); border: 1px solid var(--border);">
+                    <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px;">
+                      📋 Limites da Conta
+                    </div>
+                    ${acc.overdraft_limit > 0 ? `
+                    <div style="font-size: 11px; display: flex; justify-content: space-between; margin-bottom: 3px;">
+                      <span style="color: var(--text-muted);">🔴 Cheque Especial:</span>
+                      <span style="font-weight: 600; color: var(--text-primary);">${fmt.currency(acc.overdraft_limit)}</span>
+                    </div>` : ''}
+                    ${acc.banricompras_limit > 0 ? `
+                    <div style="font-size: 11px; display: flex; justify-content: space-between; margin-bottom: 3px;">
+                      <span style="color: var(--text-muted);">🛍️ Banricompras:</span>
+                      <span style="font-weight: 600; color: #fbbf24;">${fmt.currency(acc.banricompras_available)} / ${fmt.currency(acc.banricompras_limit)}</span>
+                    </div>` : ''}
+                    ${acc.credit_minuto_limit > 0 ? `
+                    <div style="font-size: 11px; display: flex; justify-content: space-between;">
+                      <span style="color: var(--text-muted);">⚡ Crédito Minuto:</span>
+                      <span style="font-weight: 600; color: #60a5fa;">${fmt.currency(acc.credit_minuto_limit)}</span>
+                    </div>` : ''}
+                  </div>
+                ` : ''}
+
                 <div class="account-actions">
                   ${canEdit 
                     ? `<button class="btn btn-secondary btn-sm acc-edit" data-id="${acc.id}">✏️ Editar</button>
@@ -2380,10 +4116,66 @@ async function renderAccounts() {
         </div>
       </div>
 
-      <!-- 💳 SEÇÃO 2: LIMITES DE CARTÕES (Fatura do período e limites disponíveis) -->
+      <!-- 🎟️ SEÇÃO 2: CARTÕES BENEFÍCIO & VOUCHERS -->
+      <div style="margin-bottom: 32px;">
+        <h3 style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+          🎟️ Cartões Benefício & Vouchers <span style="font-size: 11px; font-weight: 500; text-transform: none; color: var(--text-muted); opacity: 0.85;">(Alimentação, Refeição, Mobilidade e Multibenefícios)</span>
+        </h3>
+        <div class="accounts-grid">
+          ${voucherAccounts.length === 0 ? `
+            <div class="empty-state" style="grid-column: 1/-1; padding: 24px;">Nenhum cartão benefício cadastrado. Clique em "+ Nova conta / cartão" para adicionar.</div>
+          ` : voucherAccounts.map(acc => {
+            const b = BANKS[acc.bank] || BANKS.outro;
+            const canEdit = State.permissions.can_edit_all === 1 || acc.user_id === State.user.id;
+            const userBadge = acc.user_name ? `<span class="profile-badge" style="background:${acc.user_avatar_color || '#10b981'}22;color:${acc.user_avatar_color || '#10b981'};border:1px solid ${acc.user_avatar_color || '#10b981'}44;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600;margin-left:6px;vertical-align:middle;display:inline-block">${acc.user_name}</span>` : '';
+            const lockIcon = !canEdit ? `<span title="Apenas Leitura" style="font-size: 11px; margin-left: 6px; cursor: help; opacity: 0.8;">🔒</span>` : '';
+            const benefitLabel = BENEFIT_TYPES[acc.benefit_type] || 'Cartão Benefício';
+
+            return `
+              <div class="account-card">
+                <div style="position:absolute;top:0;left:0;right:0;height:4px;background:${b.color};border-radius:var(--radius) var(--radius) 0 0"></div>
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+                  ${bankLogo(acc.bank, 36)}
+                  <div>
+                    <div class="account-type-badge" style="background:${b.color}22;color:${b.color};border:1px solid ${b.color}44">${benefitLabel}</div>
+                    <div class="account-name" style="margin:0;font-size:14px;display:flex;align-items:center">${acc.name}${userBadge}${lockIcon}</div>
+                  </div>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Saldo Atual no Cartão</div>
+                <div class="account-balance" style="color:var(--accent-light)">${fmt.currency(acc.balance || 0)}</div>
+                
+                <div style="margin-top: 10px; margin-bottom: 12px; padding: 10px; border-radius: var(--radius-sm); background: var(--bg-surface); border: 1px solid var(--border);">
+                  <div style="font-size: 11px; display: flex; justify-content: space-between; margin-bottom: 4px;">
+                    <span style="color: var(--text-muted);">🏢 Recarga Mensal:</span>
+                    <span style="font-weight: 700; color: var(--text-primary);">${acc.benefit_monthly_credit ? fmt.currency(acc.benefit_monthly_credit) : 'Não informada'}</span>
+                  </div>
+                  <div style="font-size: 11px; display: flex; justify-content: space-between; margin-bottom: 4px;">
+                    <span style="color: var(--text-muted);">📅 Dia da Recarga:</span>
+                    <span style="font-weight: 600; color: var(--text-secondary);">Todo dia ${acc.benefit_credit_day || 1}</span>
+                  </div>
+                  ${acc.card_last_digits ? `
+                  <div style="font-size: 11px; display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-muted);">💳 Final do Cartão:</span>
+                    <span style="font-weight: 700; color: var(--accent-light);">•••• ${acc.card_last_digits}</span>
+                  </div>` : ''}
+                </div>
+
+                <div class="account-actions">
+                  ${canEdit 
+                    ? `<button class="btn btn-secondary btn-sm acc-edit" data-id="${acc.id}">✏️ Editar</button>
+                       <button class="btn btn-danger btn-sm acc-delete" data-id="${acc.id}">🗑</button>`
+                    : `<button class="btn btn-secondary btn-sm" disabled style="opacity:0.5; cursor:not-allowed; width: 100%;">🔒 Apenas Leitura</button>`
+                  }
+                </div>
+              </div>`;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- 💳 SEÇÃO 3: LIMITES DE CARTÕES (Fatura do período e limites disponíveis) -->
       <div style="margin-top: 32px; margin-bottom: 24px;">
         <h3 style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-          💳 Limites de Cartões <span style="font-size: 11px; font-weight: 500; text-transform: none; color: var(--text-muted); opacity: 0.85;">(Fatura do período e limites disponíveis)</span>
+          💳 Limites de Cartões de Crédito <span style="font-size: 11px; font-weight: 500; text-transform: none; color: var(--text-muted); opacity: 0.85;">(Fatura do período e limites disponíveis)</span>
         </h3>
         <div class="accounts-grid">
           ${creditAccounts.length === 0 ? `
@@ -2395,29 +4187,37 @@ async function renderAccounts() {
             const lockIcon = !canEdit ? `<span title="Apenas Leitura" style="font-size: 11px; margin-left: 6px; cursor: help; opacity: 0.8;">🔒</span>` : '';
             
             const spent = cardSpending[acc.id] || 0;
-            const available = Math.max(0, acc.credit_limit - spent);
+            const available = (acc.credit_limit || 0) - spent;
+            const isExceeded = (acc.credit_limit || 0) > 0 && spent > (acc.credit_limit || 0);
 
             return `
-              <div class="account-card">
-                <div style="position:absolute;top:0;left:0;right:0;height:4px;background:${b.color};border-radius:var(--radius) var(--radius) 0 0"></div>
+              <div class="account-card" style="${isExceeded ? 'border: 1px solid rgba(239, 68, 68, 0.4);' : ''}">
+                <div style="position:absolute;top:0;left:0;right:0;height:4px;background:${isExceeded ? '#ef4444' : b.color};border-radius:var(--radius) var(--radius) 0 0"></div>
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
                   ${bankLogo(acc.bank, 36)}
                   <div>
                     <div class="account-type-badge">${ACCOUNT_TYPES[acc.type]}</div>
-                    <div class="account-name" style="margin:0;font-size:14px;display:flex;align-items:center">${acc.name}${userBadge}${lockIcon}</div>
+                    <div class="account-name" style="margin:0;font-size:14px;display:flex;align-items:center">
+                      ${acc.name}${userBadge}${lockIcon}
+                    </div>
                   </div>
                 </div>
                 
                 <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
                   <div>
-                    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600;letter-spacing:0.02em;">Fatura do Mês</div>
+                    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600;letter-spacing:0.02em;">Fatura / Usado</div>
                     <div style="font-size:16px;font-weight:700;color:#f87171;">${fmt.currency(spent)}</div>
                   </div>
                   <div style="text-align: right;">
-                    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600;letter-spacing:0.02em;">Disponível</div>
-                    <div style="font-size:16px;font-weight:700;color:var(--accent-light);">${fmt.currency(available)}</div>
+                    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600;letter-spacing:0.02em;">${isExceeded ? 'Excedido / Negativo' : 'Disponível'}</div>
+                    <div style="font-size:16px;font-weight:700;color:${isExceeded ? '#f87171' : 'var(--accent-light)'};">${fmt.currency(available)}</div>
                   </div>
                 </div>
+
+                ${isExceeded ? `
+                <div style="margin-bottom:10px;padding:4px 8px;border-radius:6px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:#f87171;font-size:10px;font-weight:700;display:flex;align-items:center;gap:4px">
+                  <span>⚠️</span> Limite estourado em ${fmt.currency(Math.abs(available))}
+                </div>` : ''}
 
                 <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px;text-transform:uppercase;font-weight:600;letter-spacing:0.02em;">Limite total</div>
                 <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--text-secondary);">${fmt.currency(acc.credit_limit)}</div>
@@ -2438,23 +4238,33 @@ async function renderAccounts() {
     ${accounts.length > 1 ? `<div style="margin-top:16px"><button class="btn btn-secondary" id="btn-transfer">🔄 Transferência entre contas</button></div>` : ''}
   `;
 
-  // Mount Period Selector inside page-header
-  const periodHolder = document.getElementById('accounts-period-holder');
-  if (periodHolder) {
-    periodHolder.appendChild(buildPeriodSelector(() => renderAccounts()));
-  }
-
-  document.getElementById('btn-new-account').onclick = async () => await openAccountModal(null);
-  const btnTransfer = document.getElementById('btn-transfer');
-  if (btnTransfer) btnTransfer.onclick = () => openTransferModal(accounts);
-  document.querySelectorAll('.acc-edit').forEach(btn => {
-    btn.onclick = async () => await openAccountModal(accounts.find(a => a.id === parseInt(btn.dataset.id)));
-  });
-  document.querySelectorAll('.acc-delete').forEach(btn => {
-    btn.onclick = async () => {
-      if (confirm('Excluir esta conta?')) { await window.api.accounts.delete(parseInt(btn.dataset.id)); toast('Conta removida'); renderAccounts(); }
+  // Bind edit & delete buttons
+  page.querySelectorAll('.acc-edit').forEach(btn => {
+    btn.onclick = () => {
+      const acc = accounts.find(a => a.id === parseInt(btn.dataset.id));
+      openAccountModal(acc);
     };
   });
+  page.querySelectorAll('.acc-delete').forEach(btn => {
+    btn.onclick = async () => {
+      const id = parseInt(btn.dataset.id);
+      const acc = accounts.find(a => a.id === id);
+      const confirmDelete = await Modal.confirm(`Excluir conta "${acc?.name}"?`);
+      if (confirmDelete) {
+        await window.api.accounts.delete(id);
+        toast('Conta excluída com sucesso');
+        renderAccounts();
+      }
+    };
+  });
+
+  const btnNewAccount = page.querySelector('#btn-new-account');
+  if (btnNewAccount) btnNewAccount.onclick = () => openAccountModal();
+
+  const btnImportStatement = page.querySelector('#btn-import-statement');
+  if (btnImportStatement) btnImportStatement.onclick = () => openImportStatementModal(accounts);
+  const btnTransfer = document.getElementById('btn-transfer');
+  if (btnTransfer) btnTransfer.onclick = () => openTransferModal(accounts);
 }
 
 async function openAccountModal(acc) {
@@ -2468,32 +4278,34 @@ async function openAccountModal(acc) {
   }
   const users = await window.api.auth.getUsers();
 
-  Modal.open(isEdit ? 'Editar Conta' : 'Nova Conta / Cartão', `
+  Modal.open(isEdit ? 'Editar Conta / Cartão' : 'Nova Conta / Cartão', `
     <div class="form-group">
-      <label>Nome da conta</label>
-      <input type="text" id="acc-name" placeholder="Ex: Nubank, Itaú Corrente..." value="${acc?.name || ''}">
+      <label>Nome de Identificação</label>
+      <input type="text" id="acc-name" placeholder="Ex: Flash Jenny, VR Banrisul, Nubank..." value="${acc?.name || ''}">
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label>Tipo</label>
+        <label>Tipo de Conta / Cartão</label>
         <select id="acc-type">
           ${Object.entries(ACCOUNT_TYPES).map(([v,l]) => `<option value="${v}" ${acc?.type === v ? 'selected' : ''}>${l}</option>`).join('')}
         </select>
       </div>
       <div class="form-group">
-        <label>Banco</label>
+        <label>Banco / Operadora</label>
         <select id="acc-bank">
           ${Object.entries(BANKS).map(([v,b]) => `<option value="${v}" ${acc?.bank === v ? 'selected' : ''}>${b.emoji} ${b.name}</option>`).join('')}
         </select>
       </div>
     </div>
     <div class="form-group">
-      <label>Perfil / Dono</label>
+      <label>Perfil / Titular</label>
       <select id="acc-user-id">
         ${users.map(u => `<option value="${u.id}" ${(acc ? acc.user_id : State.user.id) === u.id ? 'selected' : ''}>${u.name} (@${u.username})</option>`).join('')}
       </select>
     </div>
-    <div id="acc-debit-fields" style="${acc?.type === 'credit' ? 'display:none' : ''}">
+
+    <!-- 🏦 CAMPOS ESPECÍFICOS PARA CONTA CORRENTE / POUPANÇA / CARTEIRA -->
+    <div id="acc-debit-fields" style="${(acc?.type === 'credit' || acc?.type === 'voucher') ? 'display:none' : ''}">
       <div class="form-row">
         <div class="form-group">
           <label>Saldo inicial (R$)</label>
@@ -2508,7 +4320,59 @@ async function openAccountModal(acc) {
         <label>Número da conta</label>
         <input type="text" id="acc-account-number" placeholder="00000-0" value="${acc?.account_number || ''}">
       </div>
+
+      <div style="background: var(--bg-surface); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-top: 12px;">
+        <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px;">
+          📋 Limites Integrados da Conta (Opcional)
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label style="font-size: 12px;">🔴 Cheque Especial (R$)</label>
+            <input type="number" id="acc-overdraft" step="0.01" min="0" placeholder="0,00" value="${acc?.overdraft_limit || ''}">
+          </div>
+          <div class="form-group">
+            <label style="font-size: 12px;">🛍️ Banricompras (R$)</label>
+            <input type="number" id="acc-banricompras" step="0.01" min="0" placeholder="0,00" value="${acc?.banricompras_limit || ''}">
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label style="font-size: 12px;">⚡ Crédito Minuto (R$)</label>
+          <input type="number" id="acc-credit-minuto" step="0.01" min="0" placeholder="0,00" value="${acc?.credit_minuto_limit || ''}">
+        </div>
+      </div>
     </div>
+
+    <!-- 🎟️ CAMPOS ESPECÍFICOS PARA CARTÃO BENEFÍCIO / VOUCHER -->
+    <div id="acc-benefit-fields" style="${acc?.type !== 'voucher' ? 'display:none' : ''}">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Modalidade do Benefício</label>
+          <select id="acc-benefit-type">
+            ${Object.entries(BENEFIT_TYPES).map(([v,l]) => `<option value="${v}" ${(acc?.benefit_type || 'va') === v ? 'selected' : ''}>${l}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Saldo atual no cartão (R$)</label>
+          <input type="number" id="acc-benefit-balance" step="0.01" placeholder="0,00" value="${acc?.type === 'voucher' ? (acc?.balance || 0) : ''}">
+        </div>
+      </div>
+      <div class="form-row form-row-3">
+        <div class="form-group">
+          <label>Recarga mensal (R$)</label>
+          <input type="number" id="acc-benefit-credit" step="0.01" placeholder="Ex: 800,00" value="${acc?.benefit_monthly_credit || ''}">
+        </div>
+        <div class="form-group">
+          <label>Dia da recarga</label>
+          <input type="number" id="acc-benefit-day" min="1" max="31" placeholder="Dia 01" value="${acc?.benefit_credit_day || 1}">
+        </div>
+        <div class="form-group">
+          <label>Final do Cartão (Opcional)</label>
+          <input type="text" id="acc-card-last-digits" maxlength="4" placeholder="Ex: 4321" value="${acc?.card_last_digits || ''}">
+        </div>
+      </div>
+    </div>
+
+    <!-- 💳 CAMPOS ESPECÍFICOS PARA CARTÃO DE CRÉDITO -->
     <div id="acc-credit-fields" style="${acc?.type !== 'credit' ? 'display:none' : ''}">
       <div class="form-row form-row-3">
         <div class="form-group">
@@ -2525,7 +4389,8 @@ async function openAccountModal(acc) {
         </div>
       </div>
     </div>
-    <div class="form-group">
+
+    <div class="form-group" style="margin-top:12px">
       <label>Cor de destaque</label>
       <div class="color-picker" id="acc-color-picker">
         ${COLORS.map(c => `<div class="color-swatch ${(acc?.color || '#10b981') === c ? 'selected' : ''}" style="background:${c}" data-color="${c}"></div>`).join('')}
@@ -2533,7 +4398,7 @@ async function openAccountModal(acc) {
     </div>
     <div class="modal-footer" style="padding:0;border:none;margin-top:4px">
       <button class="btn btn-secondary" id="acc-cancel">Cancelar</button>
-      <button class="btn btn-primary" id="acc-save">${isEdit ? 'Salvar' : 'Criar conta'}</button>
+      <button class="btn btn-primary" id="acc-save">${isEdit ? 'Salvar' : 'Criar conta / cartão'}</button>
     </div>
   `);
 
@@ -2541,34 +4406,65 @@ async function openAccountModal(acc) {
   document.querySelectorAll('#acc-color-picker .color-swatch').forEach(sw => {
     sw.onclick = () => { document.querySelectorAll('#acc-color-picker .color-swatch').forEach(s => s.classList.remove('selected')); sw.classList.add('selected'); selectedColor = sw.dataset.color; };
   });
-  document.getElementById('acc-type').onchange = (e) => {
-    const isCredit = e.target.value === 'credit';
+
+  const updateFormVisibility = (type) => {
+    const isCredit = type === 'credit';
+    const isVoucher = type === 'voucher';
     document.getElementById('acc-credit-fields').style.display = isCredit ? '' : 'none';
-    document.getElementById('acc-debit-fields').style.display = isCredit ? 'none' : '';
+    document.getElementById('acc-benefit-fields').style.display = isVoucher ? '' : 'none';
+    document.getElementById('acc-debit-fields').style.display = (!isCredit && !isVoucher) ? '' : 'none';
   };
+
+  document.getElementById('acc-type').onchange = (e) => updateFormVisibility(e.target.value);
 
   document.getElementById('acc-cancel').onclick = Modal.close;
   document.getElementById('acc-save').onclick = async () => {
     const name = document.getElementById('acc-name').value.trim();
     if (!name) { toast('Informe o nome', 'error'); return; }
 
-    const balanceVal = parseFloat(document.getElementById('acc-balance')?.value);
+    const type = document.getElementById('acc-type').value;
+
+    let balanceVal = 0;
+    if (type === 'voucher') {
+      const bVal = parseFloat(document.getElementById('acc-benefit-balance')?.value);
+      balanceVal = isNaN(bVal) ? 0 : bVal;
+    } else {
+      const bVal = parseFloat(document.getElementById('acc-balance')?.value);
+      balanceVal = isNaN(bVal) ? 0 : bVal;
+    }
+
     const limitVal = parseFloat(document.getElementById('acc-limit')?.value);
     const closingVal = parseInt(document.getElementById('acc-closing')?.value);
     const dueVal = parseInt(document.getElementById('acc-due')?.value);
 
+    const overdraftVal = parseFloat(document.getElementById('acc-overdraft')?.value);
+    const banricomprasVal = parseFloat(document.getElementById('acc-banricompras')?.value);
+    const creditMinutoVal = parseFloat(document.getElementById('acc-credit-minuto')?.value);
+
+    const benefitMonthlyCreditVal = parseFloat(document.getElementById('acc-benefit-credit')?.value);
+    const benefitCreditDayVal = parseInt(document.getElementById('acc-benefit-day')?.value);
+    const cardLastDigitsVal = document.getElementById('acc-card-last-digits')?.value.trim() || null;
+    const benefitTypeVal = document.getElementById('acc-benefit-type')?.value || 'va';
+
     const data = {
       user_id: parseInt(document.getElementById('acc-user-id').value),
       name,
-      type: document.getElementById('acc-type').value,
+      type,
       bank: document.getElementById('acc-bank').value,
-      balance: isNaN(balanceVal) ? 0 : balanceVal,
+      balance: balanceVal,
       color: selectedColor,
       credit_limit: isNaN(limitVal) ? null : limitVal,
       closing_day: isNaN(closingVal) ? null : closingVal,
       due_day: isNaN(dueVal) ? null : dueVal,
-      agency: document.getElementById('acc-agency')?.value.trim() || null,
-      account_number: document.getElementById('acc-account-number')?.value.trim() || null,
+      agency: type === 'voucher' ? null : (document.getElementById('acc-agency')?.value.trim() || null),
+      account_number: type === 'voucher' ? null : (document.getElementById('acc-account-number')?.value.trim() || null),
+      overdraft_limit: (type === 'credit' || type === 'voucher') ? 0 : (isNaN(overdraftVal) ? 0 : overdraftVal),
+      banricompras_limit: (type === 'credit' || type === 'voucher') ? 0 : (isNaN(banricomprasVal) ? 0 : banricomprasVal),
+      credit_minuto_limit: (type === 'credit' || type === 'voucher') ? 0 : (isNaN(creditMinutoVal) ? 0 : creditMinutoVal),
+      benefit_type: type === 'voucher' ? benefitTypeVal : null,
+      benefit_monthly_credit: type === 'voucher' ? (isNaN(benefitMonthlyCreditVal) ? 0 : benefitMonthlyCreditVal) : 0,
+      benefit_credit_day: type === 'voucher' ? (isNaN(benefitCreditDayVal) ? 1 : benefitCreditDayVal) : 1,
+      card_last_digits: cardLastDigitsVal,
     };
 
     let res;
@@ -2579,14 +4475,14 @@ async function openAccountModal(acc) {
         toast('Erro ao atualizar conta: ' + res.error, 'error');
         return;
       }
-      toast('Conta atualizada!');
+      toast('Conta / cartão atualizado com sucesso!');
     } else {
       res = await window.api.accounts.create(data);
       if (res && res.error) {
         toast('Erro ao criar conta: ' + res.error, 'error');
         return;
       }
-      toast('Conta criada!');
+      toast('Conta / cartão criado com sucesso!');
     }
     Modal.close();
     renderAccounts();
@@ -2619,6 +4515,563 @@ function openTransferModal(accounts) {
     Modal.close();
     renderAccounts();
   };
+}
+
+async function openImportStatementModal(accounts) {
+  const debitAccounts = (accounts || []).filter(a => a.type !== 'credit');
+  const allCategories = await window.api.categories.getAll(State.user.id);
+  let parsedTransactions = [];
+
+  Modal.open('📥 Importar Extrato Bancário (OFX / CSV)', `
+    <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.5;">
+      Importe arquivos <code>.ofx</code> ou <code>.csv</code> emitidos pelo seu banco (Nubank, Itaú, Inter, Bradesco, etc.) para conciliar despesas e receitas automaticamente.
+    </div>
+
+    <div class="form-row" style="margin-bottom: 14px;">
+      <div class="form-group" style="flex: 1;">
+        <label style="font-size: 12px; font-weight: 700;">Conta de Destino</label>
+        <select id="import-target-account" style="width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-primary);">
+          ${debitAccounts.map(a => `<option value="${a.id}">${a.name} (${fmt.currency(a.balance)})</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group" style="flex: 1;">
+        <label style="font-size: 12px; font-weight: 700;">Selecionar Arquivo (.ofx ou .csv)</label>
+        <input type="file" id="import-file-input" accept=".ofx,.csv,.txt" style="width: 100%; padding: 6px; font-size: 12px;">
+      </div>
+    </div>
+
+    <!-- PREVIEW CONTAINER -->
+    <div id="import-preview-container" style="display: none; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-surface); padding: 12px; max-height: 320px; overflow-y: auto; margin-bottom: 16px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <span id="import-count-badge" style="font-weight: 700; color: var(--text-primary); font-size: 12.5px;">0 lançamentos encontrados</span>
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-toggle-all-import" style="font-size: 11px;">Marcar / Desmarcar Todos</button>
+      </div>
+      <div id="import-table-wrapper" style="overflow-x: auto;"></div>
+    </div>
+
+    <div class="modal-footer" style="padding: 0; border: none; margin-top: 14px; display: flex; justify-content: flex-end; gap: 10px;">
+      <button class="btn btn-secondary" id="import-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="import-confirm" disabled style="opacity: 0.5;">Confirmar Importação (0)</button>
+    </div>
+  `, true);
+
+  const fileInput = document.getElementById('import-file-input');
+  const previewContainer = document.getElementById('import-preview-container');
+  const countBadge = document.getElementById('import-count-badge');
+  const tableWrapper = document.getElementById('import-table-wrapper');
+  const confirmBtn = document.getElementById('import-confirm');
+  const toggleAllBtn = document.getElementById('btn-toggle-all-import');
+
+  document.getElementById('import-cancel').onclick = Modal.close;
+
+  fileInput.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const content = event.target.result;
+      const isOfx = file.name.toLowerCase().endsWith('.ofx');
+      try {
+        let result;
+        if (isOfx) {
+          result = await window.api.importer.parseOfx(content);
+        } else {
+          result = await window.api.importer.parseCsv(content);
+        }
+
+        parsedTransactions = (result?.transactions || []).map((t, idx) => ({
+          ...t,
+          id_temp: idx,
+          selected: true,
+          category_id: (allCategories.find(c => c.name.toLowerCase() === (t.suggestedCategory || '').toLowerCase()) || allCategories[0])?.id || null
+        }));
+
+        if (parsedTransactions.length === 0) {
+          toast('Nenhuma transação identificada no arquivo.', 'warning');
+          return;
+        }
+
+        renderPreviewTable();
+        previewContainer.style.display = 'block';
+        updateConfirmButton();
+      } catch (err) {
+        console.error('Erro ao ler extrato:', err);
+        toast('Erro ao processar arquivo: ' + err.message, 'error');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  function renderPreviewTable() {
+    countBadge.textContent = `${parsedTransactions.length} lançamentos encontrados no extrato`;
+
+    tableWrapper.innerHTML = `
+      <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+        <thead>
+          <tr style="border-bottom: 1px solid var(--border); text-align: left; color: var(--text-muted);">
+            <th style="padding: 6px 8px; width: 30px;">✓</th>
+            <th style="padding: 6px 8px;">Data</th>
+            <th style="padding: 6px 8px;">Descrição</th>
+            <th style="padding: 6px 8px;">Categoria</th>
+            <th style="padding: 6px 8px;">Tipo</th>
+            <th style="padding: 6px 8px; text-align: right;">Valor</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${parsedTransactions.map(t => `
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); background: ${t.selected ? 'transparent' : 'rgba(0,0,0,0.2)'}; opacity: ${t.selected ? '1' : '0.5'};">
+              <td style="padding: 6px 8px;">
+                <input type="checkbox" class="import-chk" data-idx="${t.id_temp}" ${t.selected ? 'checked' : ''}>
+              </td>
+              <td style="padding: 6px 8px; white-space: nowrap; color: var(--text-muted);">${fmt.date(t.date)}</td>
+              <td style="padding: 6px 8px; font-weight: 500;">
+                <input type="text" class="import-desc-edit" data-idx="${t.id_temp}" value="${(t.description || '').replace(/"/g, '&quot;')}" style="background: transparent; border: 1px solid transparent; color: var(--text-primary); width: 100%; font-size: 12px;">
+              </td>
+              <td style="padding: 6px 8px;">
+                <select class="import-cat-select" data-idx="${t.id_temp}" style="padding: 3px 6px; font-size: 11px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary);">
+                  ${allCategories.map(c => `<option value="${c.id}" ${c.id === t.category_id ? 'selected' : ''}>${c.icon || ''} ${c.name}</option>`).join('')}
+                </select>
+              </td>
+              <td style="padding: 6px 8px;">
+                <span class="badge ${t.type === 'income' ? 'badge-green' : 'badge-red'}" style="font-size: 10px;">${t.type === 'income' ? 'Receita' : 'Despesa'}</span>
+              </td>
+              <td style="padding: 6px 8px; text-align: right; font-weight: 700; color: ${t.type === 'income' ? 'var(--accent-light)' : '#f87171'};">
+                ${t.type === 'income' ? '+' : '-'}${fmt.currency(t.amount)}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+
+    tableWrapper.querySelectorAll('.import-chk').forEach(chk => {
+      chk.onchange = (e) => {
+        const idx = parseInt(e.target.dataset.idx);
+        parsedTransactions[idx].selected = e.target.checked;
+        renderPreviewTable();
+        updateConfirmButton();
+      };
+    });
+
+    tableWrapper.querySelectorAll('.import-desc-edit').forEach(input => {
+      input.onchange = (e) => {
+        const idx = parseInt(e.target.dataset.idx);
+        parsedTransactions[idx].description = e.target.value.trim();
+      };
+    });
+
+    tableWrapper.querySelectorAll('.import-cat-select').forEach(sel => {
+      sel.onchange = (e) => {
+        const idx = parseInt(e.target.dataset.idx);
+        parsedTransactions[idx].category_id = parseInt(e.target.value);
+      };
+    });
+  }
+
+  function updateConfirmButton() {
+    const selectedCount = parsedTransactions.filter(t => t.selected).length;
+    confirmBtn.disabled = selectedCount === 0;
+    confirmBtn.style.opacity = selectedCount === 0 ? '0.5' : '1';
+    confirmBtn.textContent = `Confirmar Importação (${selectedCount} lançamentos)`;
+  }
+
+  toggleAllBtn.onclick = () => {
+    const anyUnchecked = parsedTransactions.some(t => !t.selected);
+    parsedTransactions.forEach(t => t.selected = anyUnchecked);
+    renderPreviewTable();
+    updateConfirmButton();
+  };
+
+  confirmBtn.onclick = async () => {
+    const selectedItems = parsedTransactions.filter(t => t.selected);
+    if (selectedItems.length === 0) return;
+
+    const targetAccId = parseInt(document.getElementById('import-target-account').value);
+    if (!targetAccId) {
+      toast('Selecione uma conta de destino válida.', 'error');
+      return;
+    }
+
+    try {
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = 'Importando...';
+
+      const res = await window.api.importer.importBatch({
+        userId: State.user.id,
+        accountId: targetAccId,
+        transactions: selectedItems
+      });
+
+      if (res && res.success) {
+        toast(`🎉 ${res.count} lançamentos importados com sucesso!`);
+        Modal.close();
+        renderAccounts();
+      } else {
+        toast('Erro ao importar: ' + (res?.error || 'Desconhecido'), 'error');
+      }
+    } catch (err) {
+      toast('Erro ao importar extrato: ' + err.message, 'error');
+    }
+  };
+}
+
+async function openDeduplicationModal() {
+  const familyId = State.user.family_id || State.user.familyId || 1;
+  const users = await window.api.auth.getUsers().catch(() => []);
+  const accounts = await window.api.accounts.getAll(State.user.id).catch(() => []);
+
+  let activeTab = 'pending'; // 'pending' or 'history'
+  let filterUser = 'all';
+  let filterConfidence = 'all';
+  let filterAccount = 'all';
+
+  async function loadData() {
+    const duplicates = await window.api.sync.findDuplicates({ familyId, daysWindow: 90, minScore: 65 });
+    const history = await window.api.sync.getHistory({ familyId, limit: 50 });
+    return { duplicates: duplicates || [], history: history || [] };
+  }
+
+  const { duplicates: initialDups, history: initialHistory } = await loadData();
+
+  function renderModalContent(dups, hist) {
+    // Apply client-side filters on duplicates
+    let filteredDups = dups.filter(d => {
+      if (filterConfidence === 'exact' && d.score < 95) return false;
+      if (filterConfidence === 'high' && (d.score < 80 || d.score >= 95)) return false;
+      if (filterConfidence === 'medium' && d.score >= 80) return false;
+
+      if (filterUser !== 'all') {
+        const uId = parseInt(filterUser, 10);
+        if (d.tx1.user_id !== uId && d.tx2.user_id !== uId) return false;
+      }
+
+      if (filterAccount !== 'all') {
+        const accId = parseInt(filterAccount, 10);
+        if (d.tx1.account_id !== accId && d.tx2.account_id !== accId) return false;
+      }
+
+      return true;
+    });
+
+    const exactCount = dups.filter(d => d.score >= 95).length;
+
+    return `
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <!-- Tab Switcher -->
+        <div style="display: flex; gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+          <button type="button" class="dedup-tab-btn ${activeTab === 'pending' ? 'active' : ''}" id="dedup-tab-pending">
+            <span>🔍 Lançamentos Suspeitos</span>
+            <span class="badge" style="font-size: 11px; padding: 2px 7px; background: rgba(0,0,0,0.2);">${dups.length}</span>
+          </button>
+          <button type="button" class="dedup-tab-btn ${activeTab === 'history' ? 'active' : ''}" id="dedup-tab-history">
+            <span>📜 Histórico de Conciliações</span>
+            <span class="badge" style="font-size: 11px; padding: 2px 7px; background: rgba(0,0,0,0.2);">${hist.length}</span>
+          </button>
+        </div>
+
+        ${activeTab === 'pending' ? `
+          <!-- Filters & Batch Actions Bar -->
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; background: var(--bg-surface); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border);">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <select id="filter-dedup-user" class="dedup-filter-select">
+                <option value="all">👥 Todos os Membros</option>
+                ${users.map(u => `<option value="${u.id}" ${filterUser == u.id ? 'selected' : ''}>${u.name}</option>`).join('')}
+              </select>
+
+              <select id="filter-dedup-confidence" class="dedup-filter-select">
+                <option value="all" ${filterConfidence === 'all' ? 'selected' : ''}>🎯 Todos os Níveis</option>
+                <option value="exact" ${filterConfidence === 'exact' ? 'selected' : ''}>🟢 Altíssima Certeza (95-100%)</option>
+                <option value="high" ${filterConfidence === 'high' ? 'selected' : ''}>🟡 Provável (80-94%)</option>
+                <option value="medium" ${filterConfidence === 'medium' ? 'selected' : ''}>🔵 Suspeito (65-79%)</option>
+              </select>
+
+              <select id="filter-dedup-account" class="dedup-filter-select">
+                <option value="all">🏦 Todas as Contas</option>
+                ${accounts.map(a => `<option value="${a.id}" ${filterAccount == a.id ? 'selected' : ''}>${a.name}</option>`).join('')}
+              </select>
+            </div>
+
+            <div style="display: flex; gap: 8px;">
+              ${exactCount > 0 ? `
+                <button type="button" class="btn btn-sm" id="btn-batch-exact-merge" style="background: #10b981; color: #000; font-weight: 700; border-color: #10b981; padding: 6px 12px;">
+                  ⚡ Mesclar Certezas (${exactCount})
+                </button>
+              ` : ''}
+              <button type="button" class="btn btn-sm btn-primary" id="btn-batch-selected-merge" style="padding: 6px 12px;" disabled>
+                🔗 Mesclar Selecionados (<span id="selected-dup-count">0</span>)
+              </button>
+            </div>
+          </div>
+
+          <!-- List of Duplicates -->
+          ${filteredDups.length === 0 ? `
+            <div style="text-align: center; padding: 36px 10px; background: rgba(255,255,255,0.01); border-radius: 8px; border: 1px dashed var(--border);">
+              <div style="font-size: 40px; margin-bottom: 8px;">✨</div>
+              <div style="font-size: 15px; font-weight: 700; color: var(--accent-light);">Nenhuma Duplicidade Pendente!</div>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+                ${dups.length > 0 ? 'Nenhum lançamento corresponde aos filtros selecionados acima.' : 'Todos os lançamentos do grupo familiar estão devidamente conciliados.'}
+              </div>
+            </div>
+          ` : `
+            <div style="display: flex; flex-direction: column; gap: 12px; max-height: 480px; overflow-y: auto; padding-right: 4px;">
+              ${filteredDups.map((dup, idx) => {
+                const t1 = dup.tx1;
+                const t2 = dup.tx2;
+                let badgeClass = 'dedup-badge-medium';
+                let badgeText = `🔵 Suspeito (${dup.score}%)`;
+                if (dup.score >= 95) {
+                  badgeClass = 'dedup-badge-exact';
+                  badgeText = `🟢 Altíssima Certeza (${dup.score}%)`;
+                } else if (dup.score >= 80) {
+                  badgeClass = 'dedup-badge-high';
+                  badgeText = `🟡 Provável (${dup.score}%)`;
+                }
+
+                return `
+                  <div class="card dedup-pair-card" style="border: 1px solid var(--border); background: var(--bg-surface); padding: 14px; border-radius: var(--radius-sm);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px dashed var(--border); padding-bottom: 8px;">
+                      <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" class="chk-dup-pair" data-pair-idx="${idx}" data-primary-id="${t1.id}" data-dup-id="${t2.id}" style="width: 16px; height: 16px; cursor: pointer;">
+                        <span class="badge ${badgeClass}" style="font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 12px;">
+                          ${badgeText}
+                        </span>
+                      </div>
+                      <span style="font-size: 11px; color: var(--text-muted); font-weight: 700;">Par #${idx + 1}</span>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                      <!-- Lançamento 1 -->
+                      <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 10px;">
+                        <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
+                          <span>Lançamento A</span>
+                          <span class="badge" style="font-size: 9px; padding: 1px 5px;">${t1.is_paid ? '✅ Pago' : '⏳ Pendente'}</span>
+                        </div>
+                        <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 2px;">${t1.description || 'Sem descrição'}</div>
+                        <div style="font-size: 14px; font-weight: 800; color: ${t1.type === 'expense' ? '#f87171' : 'var(--accent-light)'}; margin-bottom: 6px;">
+                          ${fmt.currency(t1.amount)}
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-muted);">📅 Data: <strong>${fmt.date(t1.date)}</strong></div>
+                        <div style="font-size: 11px; color: var(--text-muted);">👤 Autor: <strong>${t1.user_name || 'Usuário'}</strong></div>
+                        <div style="font-size: 11px; color: var(--text-muted);">🏦 Conta: <strong>${t1.account_name || 'Não informada'}</strong></div>
+                      </div>
+
+                      <!-- Lançamento 2 -->
+                      <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 10px;">
+                        <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
+                          <span>Lançamento B</span>
+                          <span class="badge" style="font-size: 9px; padding: 1px 5px;">${t2.is_paid ? '✅ Pago' : '⏳ Pendente'}</span>
+                        </div>
+                        <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 2px;">${t2.description || 'Sem descrição'}</div>
+                        <div style="font-size: 14px; font-weight: 800; color: ${t2.type === 'expense' ? '#f87171' : 'var(--accent-light)'}; margin-bottom: 6px;">
+                          ${fmt.currency(t2.amount)}
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-muted);">📅 Data: <strong>${fmt.date(t2.date)}</strong></div>
+                        <div style="font-size: 11px; color: var(--text-muted);">👤 Autor: <strong>${t2.user_name || 'Usuário'}</strong></div>
+                        <div style="font-size: 11px; color: var(--text-muted);">🏦 Conta: <strong>${t2.account_name || 'Não informada'}</strong></div>
+                      </div>
+                    </div>
+
+                    <!-- Ações -->
+                    <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                      <button type="button" class="btn btn-secondary btn-sm btn-dismiss-dup" data-primary-id="${t1.id}" data-dup-id="${t2.id}">
+                        ➕ Manter Ambos (Gastos Separados)
+                      </button>
+                      <button type="button" class="btn btn-primary btn-sm btn-merge-dup" data-primary-id="${t1.id}" data-dup-id="${t2.id}">
+                        🔗 Mesclar em 1 Lançamento
+                      </button>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `}
+        ` : `
+          <!-- History Tab -->
+          ${hist.length === 0 ? `
+            <div style="text-align: center; padding: 36px 10px; background: rgba(255,255,255,0.01); border-radius: 8px; border: 1px dashed var(--border);">
+              <div style="font-size: 40px; margin-bottom: 8px;">📜</div>
+              <div style="font-size: 15px; font-weight: 700; color: var(--text-secondary);">Nenhum Histórico de Conciliação</div>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+                As ações de mesclagem e descarte de duplicatas realizadas pela família ficarão registradas aqui para auditoria.
+              </div>
+            </div>
+          ` : `
+            <div style="display: flex; flex-direction: column; gap: 10px; max-height: 480px; overflow-y: auto; padding-right: 4px;">
+              ${hist.map(h => {
+                const isMerged = h.status === 'merged';
+                return `
+                  <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border); gap: 12px;">
+                    <div>
+                      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                        <span class="badge" style="font-size: 10px; font-weight: 700; background: ${isMerged ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 116, 139, 0.15)'}; color: ${isMerged ? '#10b981' : 'var(--text-muted)'}; border: 1px solid ${isMerged ? '#10b98144' : 'var(--border)'}">
+                          ${isMerged ? '🔗 Mesclado' : '➕ Mantido Separado'}
+                        </span>
+                        <span style="font-size: 11px; color: var(--text-muted);">${fmt.time(h.updated_at)} • ${fmt.date(h.updated_at)}</span>
+                      </div>
+                      <div style="font-size: 12px; color: var(--text-primary); line-height: 1.4;">
+                        <strong>${h.tx1_desc || 'Lançamento A'}</strong> (${fmt.currency(h.tx1_amount)}) 
+                        &nbsp;↔&nbsp; 
+                        <strong>${h.tx2_desc || 'Lançamento B'}</strong> (${fmt.currency(h.tx2_amount)})
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `}
+        `}
+      </div>
+    `;
+  }
+
+  function bindEvents(currentDups, currentHist) {
+    const modalEl = document.getElementById('modal-content');
+    if (!modalEl) return;
+
+    // Tabs
+    const tabPending = modalEl.querySelector('#dedup-tab-pending');
+    const tabHistory = modalEl.querySelector('#dedup-tab-history');
+
+    if (tabPending) {
+      tabPending.onclick = () => {
+        activeTab = 'pending';
+        refreshUI();
+      };
+    }
+    if (tabHistory) {
+      tabHistory.onclick = () => {
+        activeTab = 'history';
+        refreshUI();
+      };
+    }
+
+    // Filter changes
+    const userSelect = modalEl.querySelector('#filter-dedup-user');
+    const confSelect = modalEl.querySelector('#filter-dedup-confidence');
+    const accSelect = modalEl.querySelector('#filter-dedup-account');
+
+    if (userSelect) userSelect.onchange = () => { filterUser = userSelect.value; refreshUI(); };
+    if (confSelect) confSelect.onchange = () => { filterConfidence = confSelect.value; refreshUI(); };
+    if (accSelect) accSelect.onchange = () => { filterAccount = accSelect.value; refreshUI(); };
+
+    // Checkboxes selection
+    const chks = modalEl.querySelectorAll('.chk-dup-pair');
+    const batchSelectedBtn = modalEl.querySelector('#btn-batch-selected-merge');
+    const selectedCountSpan = modalEl.querySelector('#selected-dup-count');
+
+    const updateSelectionState = () => {
+      const selected = Array.from(chks).filter(c => c.checked);
+      if (selectedCountSpan) selectedCountSpan.textContent = selected.length;
+      if (batchSelectedBtn) batchSelectedBtn.disabled = selected.length === 0;
+    };
+
+    chks.forEach(chk => {
+      chk.onchange = updateSelectionState;
+    });
+
+    // Batch Exact Merge (100% / 95%+)
+    const batchExactBtn = modalEl.querySelector('#btn-batch-exact-merge');
+    if (batchExactBtn) {
+      batchExactBtn.onclick = async () => {
+        const exactPairs = currentDups.filter(d => d.score >= 95).map(d => ({
+          primaryTxId: d.tx1.id,
+          duplicateTxId: d.tx2.id
+        }));
+
+        if (exactPairs.length === 0) return;
+        batchExactBtn.disabled = true;
+        batchExactBtn.textContent = 'Mesclando...';
+
+        const res = await window.api.sync.mergeBatch({ pairs: exactPairs, userId: State.user.id });
+        if (res && res.success) {
+          toast(`⚡ ${res.mergedCount} pares com 100% de certeza mesclados com sucesso!`);
+          const refreshed = await loadData();
+          refreshUI(refreshed.duplicates, refreshed.history);
+          if (State.currentPage === 'dashboard') renderDashboard();
+          else if (State.currentPage === 'recurring') renderRecurring();
+        } else {
+          toast('Erro ao mesclar em lote', 'error');
+          batchExactBtn.disabled = false;
+        }
+      };
+    }
+
+    // Batch Selected Merge
+    if (batchSelectedBtn) {
+      batchSelectedBtn.onclick = async () => {
+        const selected = Array.from(chks).filter(c => c.checked);
+        const pairs = selected.map(c => ({
+          primaryTxId: parseInt(c.dataset.primaryId),
+          duplicateTxId: parseInt(c.dataset.dupId)
+        }));
+
+        if (pairs.length === 0) return;
+        batchSelectedBtn.disabled = true;
+        batchSelectedBtn.textContent = 'Mesclando...';
+
+        const res = await window.api.sync.mergeBatch({ pairs, userId: State.user.id });
+        if (res && res.success) {
+          toast(`🔗 ${res.mergedCount} pares mesclados com sucesso!`);
+          const refreshed = await loadData();
+          refreshUI(refreshed.duplicates, refreshed.history);
+          if (State.currentPage === 'dashboard') renderDashboard();
+          else if (State.currentPage === 'recurring') renderRecurring();
+        } else {
+          toast('Erro ao mesclar selecionados', 'error');
+          batchSelectedBtn.disabled = false;
+        }
+      };
+    }
+
+    // Individual Merge
+    modalEl.querySelectorAll('.btn-merge-dup').forEach(btn => {
+      btn.onclick = async () => {
+        const primaryTxId = parseInt(btn.dataset.primaryId);
+        const duplicateTxId = parseInt(btn.dataset.dupId);
+        btn.disabled = true;
+        btn.textContent = 'Mesclando...';
+        const res = await window.api.sync.mergeTransactions({ primaryTxId, duplicateTxId, userId: State.user.id });
+        if (res && res.success) {
+          toast('Lançamentos mesclados com sucesso!');
+          const refreshed = await loadData();
+          refreshUI(refreshed.duplicates, refreshed.history);
+          if (State.currentPage === 'dashboard') renderDashboard();
+          else if (State.currentPage === 'recurring') renderRecurring();
+        } else {
+          toast(res?.error || 'Erro ao mesclar lançamentos', 'error');
+          btn.disabled = false;
+          btn.textContent = '🔗 Mesclar em 1 Lançamento';
+        }
+      };
+    });
+
+    // Individual Dismiss
+    modalEl.querySelectorAll('.btn-dismiss-dup').forEach(btn => {
+      btn.onclick = async () => {
+        const primaryTxId = parseInt(btn.dataset.primaryId);
+        const duplicateTxId = parseInt(btn.dataset.dupId);
+        btn.disabled = true;
+        await window.api.sync.dismissDuplicate({ primaryTxId, duplicateTxId });
+        toast('Lançamentos mantidos como despesas separadas.');
+        const refreshed = await loadData();
+        refreshUI(refreshed.duplicates, refreshed.history);
+      };
+    });
+  }
+
+  let currentDuplicates = initialDups;
+  let currentHistory = initialHistory;
+
+  function refreshUI(newDups, newHist) {
+    if (newDups) currentDuplicates = newDups;
+    if (newHist) currentHistory = newHist;
+    const bodyHtml = renderModalContent(currentDuplicates, currentHistory);
+    Modal.open('🛡️ Central de Conciliação & Anti-Duplicidade', bodyHtml, true);
+    bindEvents(currentDuplicates, currentHistory);
+  }
+
+  refreshUI();
 }
 
 // ════════════════════════════════════════
@@ -2673,7 +5126,8 @@ async function renderBudget() {
   await loadBudgets();
 
   async function loadBudgets() {
-    const budgets = await window.api.budgets.getAll({ userId: State.budgetUserId, month: State.currentMonth, year: State.currentYear });
+    const budgetsRaw = await window.api.budgets.getAll({ userId: State.budgetUserId, month: State.currentMonth, year: State.currentYear });
+    const budgets = Array.isArray(budgetsRaw) ? budgetsRaw : [];
     const grid = document.getElementById('budget-grid');
     if (!grid) return;
     if (budgets.length === 0) {
@@ -2919,9 +5373,1010 @@ async function renderReports() {
 }
 
 // ════════════════════════════════════════
-// SETTINGS
+// MANUAL DO USUÁRIO & WIKI (PÁGINA DEDICADA)
+// ════════════════════════════════════════
+async function renderManual() {
+  const page = document.getElementById('page-manual');
+  if (!page) return;
+
+  page.innerHTML = `
+    <div class="page-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">
+      <div>
+        <h2 style="margin: 0; font-size: 22px; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 10px;">
+          <span>📖</span> Manual do Usuário & Central de Conhecimento
+        </h2>
+        <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+          Guia completo de operações, cartões de crédito, fluxo de caixa e metodologia financeira
+        </div>
+      </div>
+      <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <button class="btn btn-primary btn-sm" id="btn-download-manual-pdf" style="display: flex; align-items: center; gap: 8px; font-weight: 700; padding: 9px 18px; border-radius: var(--radius-md); box-shadow: 0 4px 14px rgba(16,185,129,0.3);">
+          <span>📥</span> Baixar Manual em PDF
+        </button>
+      </div>
+    </div>
+
+    <!-- BREADCRUMB / TRILHA DE NAVEGAÇÃO -->
+    <div id="manual-breadcrumb" style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px; background: var(--bg-surface); padding: 10px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); flex-wrap: wrap;">
+      <span style="font-weight: 700; color: var(--text-muted); cursor: pointer;" id="manual-crumb-root">📚 MANUAL</span>
+      <span style="opacity: 0.4;">›</span>
+      <span id="manual-crumb-cat" style="color: #60a5fa; font-weight: 600;">💳 Cartões de Crédito</span>
+      <span style="opacity: 0.4;">›</span>
+      <span id="manual-crumb-sub" style="color: var(--accent-light); font-weight: 700;">Competência vs Vencimento</span>
+    </div>
+
+    <!-- BUSCA GLOBAL NO MANUAL -->
+    <div style="margin-bottom: 14px; position: relative;">
+      <input type="text" id="manual-search-input" placeholder="🔍 Pesquisar em todos os tópicos, operações, termos e perguntas do manual..."
+             style="width: 100%; padding: 10px 16px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-primary); font-size: 13px; outline: none; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+    </div>
+
+    <!-- CONTAINER PRINCIPAL: MENU EM ÁRVORE (ESQUERDA) + CONTEÚDO (DIREITA) -->
+    <div style="display: flex; gap: 16px; height: calc(100vh - 230px); min-height: 520px;">
+      
+      <!-- MENU EM ÁRVORE DE ASSUNTOS E SUBMENUS -->
+      <div id="manual-tree-sidebar" style="width: 270px; min-width: 270px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; scrollbar-width: thin;">
+        
+        <!-- GRUPO 1: CARTÕES DE CRÉDITO -->
+        <div class="wiki-tree-group">
+          <div class="wiki-tree-header" data-cat="cartoes" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #60a5fa; background: rgba(59,130,246,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+            <span>💳 Cartões de Crédito</span>
+            <span class="wiki-tree-arrow">▾</span>
+          </div>
+          <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+            <div class="wiki-tree-item active" data-cat="cartoes" data-topic="cartao-competencia" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-primary); cursor: pointer; border-left: 2px solid var(--accent); background: var(--bg-raised);">
+              • Competência vs Vencimento
+            </div>
+            <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-ciclo" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • Ciclo & Melhor Dia de Compra
+            </div>
+            <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-limite" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • Limite Total vs Comprometido
+            </div>
+            <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-pagamento" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • Pagamento & Baixa Atômica
+            </div>
+            <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-destaque" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #38bdf8; font-weight: 600; cursor: pointer; border-left: 2px solid transparent;">
+              • ✨ Destaque Cromático de Parcelas (Novo)
+            </div>
+            <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-acordo" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • Renegociação & Acordo de Faturas
+            </div>
+            <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-reabertura" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • Reabertura & Desfazer Quitação
+            </div>
+          </div>
+        </div>
+
+        <!-- GRUPO 2: DASHBOARD & PAINEL DE CONTROLE -->
+        <div class="wiki-tree-group">
+          <div class="wiki-tree-header" data-cat="dashboard" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #fb923c; background: rgba(249,115,22,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+            <span>📊 Dashboard & Painel</span>
+            <span class="wiki-tree-arrow">▾</span>
+          </div>
+          <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+            <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-kpis" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • 📊 Indicadores Principais (KPIs)
+            </div>
+            <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-pendencias-anteriores" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #fbbf24; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+              • ⚠️ Pendências de Meses Anteriores (Novo)
+            </div>
+            <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-alertas-coloridos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #34d399; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+              • 🚦 Alertas Diferenciados (Receitas vs Despesas)
+            </div>
+            <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-cards-limites" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #fb923c; font-weight: 600; cursor: pointer; border-left: 2px solid transparent;">
+              • 💳 Cartões, Faturas & Limites Reais
+            </div>
+            <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-contas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • 🏦 Contas Bancárias & Cheque Especial
+            </div>
+            <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-links" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • 🚨 Faixa de Avisos & Links Diretos
+            </div>
+            <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-prioridades" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • ⭐ Prioritários, A Pagar & Pagas
+            </div>
+            <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-graficos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • 📈 Gráficos de Fluxo & Categorias
+            </div>
+            <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-consolidado" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • 🌐 Visão Geral, Metas & Patrimônio
+            </div>
+            <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-contraste" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • 🎨 Modos de Contraste & Usabilidade
+            </div>
+          </div>
+        </div>
+
+        <!-- GRUPO 3: DESPESAS & RECEITAS -->
+        <div class="wiki-tree-group">
+          <div class="wiki-tree-header" data-cat="lancamentos" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #34d399; background: rgba(16,185,129,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+            <span>📌 Despesas & Receitas</span>
+            <span class="wiki-tree-arrow">▾</span>
+          </div>
+          <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+            <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-competencia" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • Competência (Ref: MM/AAAA)
+            </div>
+            <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-fixas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • Despesas Fixas & Prioridade ⭐
+            </div>
+            <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-avulsos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • Despesas Variáveis (Avulsas)
+            </div>
+            <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-juros" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • Juros, Multas e Descontos
+            </div>
+          </div>
+        </div>
+
+        <!-- GRUPO 4: CONTAS & CARTEIRAS -->
+        <div class="wiki-tree-group">
+          <div class="wiki-tree-header" data-cat="contas" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #06b6d4; background: rgba(6,182,212,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+            <span>🏦 Contas, Vouchers & Bancos</span>
+            <span class="wiki-tree-arrow">▾</span>
+          </div>
+          <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+            <div class="wiki-tree-item" data-cat="contas" data-topic="contas-tipos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • Tipos de Contas Bancárias
+            </div>
+            <div class="wiki-tree-item" data-cat="contas" data-topic="contas-beneficio" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #06b6d4; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+              • 🎟️ Cartões Benefício & Vouchers (Novo)
+            </div>
+            <div class="wiki-tree-item" data-cat="contas" data-topic="contas-transf" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • Transferências sem Duplicação
+            </div>
+            <div class="wiki-tree-item" data-cat="contas" data-topic="contas-produtos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • Produtos da Conta & Limites
+            </div>
+          </div>
+        </div>
+
+        <!-- GRUPO 5: FAMÍLIA & PERMISSÕES -->
+        <div class="wiki-tree-group">
+          <div class="wiki-tree-header" data-cat="familia" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #a78bfa; background: rgba(167,139,250,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+            <span>👨‍👩‍👧 Família & Permissões</span>
+            <span class="wiki-tree-arrow">▾</span>
+          </div>
+          <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+            <div class="wiki-tree-item" data-cat="familia" data-topic="fam-perfis" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • Papéis de Usuário (ADM, etc)
+            </div>
+            <div class="wiki-tree-item" data-cat="familia" data-topic="fam-permissoes" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • Permissões Granulares por Menu
+            </div>
+          </div>
+        </div>
+
+        <!-- GRUPO 6: SINCRONIZAÇÃO & ANTI-DUPLICIDADE -->
+        <div class="wiki-tree-group">
+          <div class="wiki-tree-header" data-cat="sync" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #38bdf8; background: rgba(56,189,248,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+            <span>🛡️ Sincronização & Anti-Duplicidade</span>
+            <span class="wiki-tree-arrow">▾</span>
+          </div>
+          <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+            <div class="wiki-tree-item" data-cat="sync" data-topic="sync-uuid" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #38bdf8; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+              • 🔑 UUIDs & Multi-Aparelho
+            </div>
+            <div class="wiki-tree-item" data-cat="sync" data-topic="sync-dedup" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • 🧠 Motor Heurístico Anti-Duplicidade
+            </div>
+            <div class="wiki-tree-item" data-cat="sync" data-topic="sync-conciliacao" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • ⚖️ Central de Conciliação (Mesclar / Manter)
+            </div>
+          </div>
+        </div>
+
+        <!-- GRUPO 7: ORÇAMENTOS & METAS -->
+        <div class="wiki-tree-group">
+          <div class="wiki-tree-header" data-cat="orcamentos" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #f43f5e; background: rgba(244,63,94,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+            <span>🎯 Orçamentos & Metas</span>
+            <span class="wiki-tree-arrow">▾</span>
+          </div>
+          <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+            <div class="wiki-tree-item" data-cat="orcamentos" data-topic="orc-budgets" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • Tetos de Gastos por Categoria
+            </div>
+            <div class="wiki-tree-item" data-cat="orcamentos" data-topic="orc-metas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • Metas Financeiras & Aportes
+            </div>
+          </div>
+        </div>
+
+        <!-- GRUPO 8: METODOLOGIA 50-30-20 -->
+        <div class="wiki-tree-group">
+          <div class="wiki-tree-header" data-cat="metodologia" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #c084fc; background: rgba(192,132,252,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+            <span>💡 Metodologia 50-30-20</span>
+            <span class="wiki-tree-arrow">▾</span>
+          </div>
+          <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+            <div class="wiki-tree-item" data-cat="metodologia" data-topic="met-regra" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • Como Dividir o Orçamento Familiar
+            </div>
+          </div>
+        </div>
+
+        <!-- GRUPO 9: FAQ INTERATIVO -->
+        <div class="wiki-tree-group">
+          <div class="wiki-tree-header" data-cat="faq" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #f87171; background: rgba(248,113,113,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+            <span>❓ FAQ (Perguntas)</span>
+            <span class="wiki-tree-arrow">▾</span>
+          </div>
+          <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+            <div class="wiki-tree-item" data-cat="faq" data-topic="faq-interativo" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+              • Dúvidas Frequentes (Clique e Veja)
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- PAINEL DE CONTEÚDO (DIREITA) -->
+      <div id="manual-display-panel" style="flex: 1; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); overflow-y: auto; padding: 22px; scrollbar-width: thin;">
+
+        <!-- TÓPICO 1.1: CARTÕES > COMPETÊNCIA VS VENCIMENTO -->
+        <div class="manual-topic-content" id="topic-cartao-competencia" style="display: block;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #60a5fa; font-weight: 700;">
+            📅 Competência da Fatura vs Data de Vencimento
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <div style="background: rgba(59,130,246,0.08); border-left: 4px solid var(--blue); padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+              <strong>Conceito Fundamental:</strong> A <em>competência</em> é o mês em que a despesa ou o ciclo da fatura ocorreu (ex: compras feitas até 25/02 pertencem à competência <code>Ref: 02/2026</code>). O <em>vencimento</em> é o dia limite para pagar o boleto do banco (ex: <code>05/03/2026</code>).
+            </div>
+            <p style="margin-bottom: 10px;">No FinançasFamília, as faturas e compras são organizadas por <strong>Mês de Referência</strong> para que você saiba exatamente o quanto consumiu no período, mantendo o controle do fluxo de caixa e o cumprimento do orçamento.</p>
+          </div>
+        </div>
+
+        <!-- TÓPICO 1.2: CARTÕES > CICLO & MELHOR DIA -->
+        <div class="manual-topic-content" id="topic-cartao-ciclo" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #60a5fa; font-weight: 700;">
+            🛒 Ciclo de Fechamento & Melhor Dia de Compra
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <div style="background: rgba(59,130,246,0.08); border-left: 4px solid var(--blue); padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+              <strong>Como Funciona o Fechamento:</strong> Todo cartão possui um <em>Dia de Fechamento (Corte)</em> e um <em>Dia de Vencimento</em>.
+            </div>
+            <p style="margin-bottom: 8px;">• <strong>Antes do Fechamento:</strong> Compras feitas até o dia de corte entram na fatura do mês atual.</p>
+            <p style="margin-bottom: 8px;">• <strong>Melhor Dia de Compra (Após o Fechamento):</strong> Compras realizadas a partir do dia seguinte ao corte caem automaticamente na fatura do mês subsequente, dando até 40 dias para pagar!</p>
+            <p style="margin: 0;">• <strong>Cálculo Automático:</strong> O aplicativo calcula e projeta cada parcela no mês exato da fatura de acordo com o dia da compra.</p>
+          </div>
+        </div>
+
+        <!-- TÓPICO 1.3: CARTÕES > LIMITE TOTAL VS COMPROMETIDO -->
+        <div class="manual-topic-content" id="topic-cartao-limite" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #60a5fa; font-weight: 700;">
+            📊 Limite Total vs Limite Comprometido
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <p style="margin-bottom: 10px;">O limite do cartão é gerenciado de forma contínua:</p>
+            <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
+              <li><strong>Limite Total:</strong> Valor máximo liberado pelo banco (ex: R$ 5.000,00).</li>
+              <li><strong>Limite Comprometido:</strong> Soma de todas as compras parceladas futuras e faturas abertas que ainda não foram pagas.</li>
+              <li><strong>Limite Disponível:</strong> <code>Limite Total - Limite Comprometido</code>. Conforme as faturas são pagas, o limite é liberado proporcionalmente.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- TÓPICO 1.4: CARTÕES > PAGAMENTO DA FATURA -->
+        <div class="manual-topic-content" id="topic-cartao-pagamento" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #60a5fa; font-weight: 700;">
+            💳 Pagamento & Baixa Atômica da Fatura
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <p style="margin-bottom: 10px;">Ao quitar uma fatura de cartão de crédito:</p>
+            <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
+              <li>Clique no botão verde <strong>"Pagar Fatura"</strong> no card do cartão.</li>
+              <li>Selecione a <strong>Conta Bancária Pagadora</strong> de onde o dinheiro sairá.</li>
+              <li>Confirme a data de pagamento e o valor (total ou parcial).</li>
+            </ol>
+            <p style="margin: 0;">O sistema baixa a fatura, debita da sua conta bancária e <strong>marca atomicamente todas as compras e parcelas atreladas àquela fatura como pagas</strong>!</p>
+          </div>
+        </div>
+
+        <!-- TÓPICO 1.5: CARTÕES > DESTAQUE CROMÁTICO DE PARCELAS (NOVO) -->
+        <div class="manual-topic-content" id="topic-cartao-destaque" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #38bdf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span>✨ Destaque Cromático Inteligente de Parcelas</span>
+            <span class="badge badge-blue">Novo</span>
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <div style="background: rgba(56,189,248,0.08); border-left: 4px solid var(--accent); padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+              <strong>Auditoria Visual Instantânea:</strong> Chega de perder tempo procurando quais compras pertencem a qual fatura!
+            </div>
+            <p style="margin-bottom: 10px;">Ao clicar sobre qualquer card de fatura na tela de Planejamento:</p>
+            <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
+              <li>🎨 <strong>Realce de Cor Oficial:</strong> Todas as despesas e compras parceladas vinculadas àquela fatura são imediatamente iluminadas com a <strong>cor tema e borda personalizada do cartão/banco</strong>.</li>
+              <li>🔍 <strong>Foco Automático:</strong> Os lançamentos que não pertencem ao cartão são atenuados suavemente, e a tela rola automaticamente até a primeira parcela da fatura.</li>
+              <li>🏷️ <strong>Badge Explicativa:</strong> Um selo visual exibe <code>📍 Parcela desta Fatura</code> ao lado de cada item destacado.</li>
+              <li>↩️ <strong>Desativar:</strong> Basta clicar novamente no card da fatura para retornar à visualização normal.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- TÓPICO 1.6: CARTÕES > RENEGOCIAÇÃO E ACORDO -->
+        <div class="manual-topic-content" id="topic-cartao-acordo" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a78bfa; font-weight: 700;">
+            🤝 Renegociação & Acordo de Faturas
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <p style="margin-bottom: 10px;">Se você precisou parcelar a fatura com o banco ou fazer um acordo:</p>
+            <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
+              <li>Clique no botão roxo <strong>"Renegociar / Acordo"</strong> no card da fatura.</li>
+              <li>Informe o valor de entrada (se houver) e o número de parcelas acordadas com os juros.</li>
+              <li>A fatura atual é liquidada como <span class="badge badge-purple">Acordo / Renegociada</span> e o sistema <strong>injeta automaticamente as parcelas do acordo nos meses futuros</strong> como despesas recorrentes transparentes.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- TÓPICO 1.7: CARTÕES > REABERTURA DE FATURA -->
+        <div class="manual-topic-content" id="topic-cartao-reabertura" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #60a5fa; font-weight: 700;">
+            🔓 Reabertura de Fatura & Estorno Seguro
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <p style="margin-bottom: 10px;">Se você deu baixa ou renegociou uma fatura por engano:</p>
+            <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
+              <li>Clique em <strong>"Reabrir Fatura"</strong>.</li>
+              <li>O valor pago é <strong>estornado de volta para o saldo da sua conta bancária</strong>.</li>
+              <li>Se houve renegociação, as parcelas futuras geradas pelo acordo são canceladas e removidas.</li>
+              <li>A fatura volta para o estado <span class="badge badge-yellow">⏳ Aberta</span> e recalcula seu valor total automaticamente.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- TÓPICO 2.1: DASHBOARD > KPIS PRINCIPAIS -->
+        <div class="manual-topic-content" id="topic-dash-kpis" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span>📊 Indicadores Principais de Fluxo de Caixa (KPIs)</span>
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <div style="background: rgba(249,115,22,0.08); border-left: 4px solid #fb923c; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+              <strong>Visão Geral Instantânea da Saúde Financeira do Mês:</strong>
+            </div>
+            <p style="margin-bottom: 10px;">Os 4 cards de topo do Dashboard resumem com exatidão a competência financeira selecionada:</p>
+            <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+              <li>🟢 <strong>Receitas Totais:</strong> Soma de todas as entradas fixas (salários, pró-labore, pensões, aluguéis recebidos) e receitas variáveis já recebidas ou projetadas para o mês.</li>
+              <li>🔴 <strong>Despesas Totais:</strong> Soma consolidada de todas as despesas fixas, variáveis avulsas e faturas de cartão de crédito que vencem no mês.</li>
+              <li>⏳ <strong>À Pagar (Pendentes):</strong> Montante total das contas do mês que ainda não foram baixadas como pagas (<code>is_paid = 0</code>).</li>
+              <li>⚖️ <strong>Saldo Previsto:</strong> Diferença matemática <code>Receitas Totais - Despesas Totais</code>. Se positivo, indica sobra orçamentária; se negativo, alerta para necessidade de remanejar recursos.</li>
+            </ul>
+            <p style="margin: 0;">📊 <strong>Barra de Progresso:</strong> Logo abaixo dos KPIs, uma barra dinâmica indica a proporção de contas já quitadas no mês (ex: <em>7 de 10 contas pagas • 70%</em>).</p>
+          </div>
+        </div>
+
+        <!-- TÓPICO 2.2: DASHBOARD > PENDÊNCIAS DE MESES ANTERIORES (NOVO) -->
+        <div class="manual-topic-content" id="topic-dash-pendencias-anteriores" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fbbf24; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span>⚠️ Container de Pendências de Meses Anteriores Não Pagas</span>
+            <span class="badge badge-yellow">Novo Recurso</span>
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <div style="background: rgba(245, 158, 11, 0.08); border-left: 4px solid #f59e0b; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+              <strong>Rastreamento Ativo de Dívidas e Contas Esquecidas do Passado:</strong>
+            </div>
+            <p style="margin-bottom: 10px;">Sempre que você estiver visualizando o Dashboard de um mês (ex: <em>Agosto/2026</em>) e existirem lançamentos de meses anteriores (ex: <em>Julho, Junho ou Janeiro</em>) que ainda não foram pagos (<code>is_paid = 0</code>), o sistema exibe automaticamente um container temático de alerta:</p>
+            <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+              <li>🔢 <strong>Contador de Pendências & Total Acumulado:</strong> Informa a quantidade exata de itens em atraso e a soma monetária total das dívidas passadas em aberto.</li>
+              <li>📅 <strong>Identificação de Origem:</strong> Cada item exibe uma badge colorida com o mês/ano de competência original (ex: <code>📅 Julho/2026</code>), a descrição, o titular e o banco.</li>
+              <li>🎯 <strong>Navegação Direta com 1 Clique:</strong> Ao clicar em qualquer pendência, o aplicativo altera o seletor do mês para a data de origem, abre o Planejamento na aba correta e aplica um <strong>pulso de luz (*glow flash*)</strong> sobre o lançamento para você localizá-lo e dar baixa imediatamente!</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- TÓPICO 2.3: DASHBOARD > ALERTAS CROMÁTICOS (NOVO) -->
+        <div class="manual-topic-content" id="topic-dash-alertas-coloridos" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #34d399; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span>🚦 Diferenciação Cromática Inteligente na Faixa de Avisos</span>
+            <span class="badge badge-green">Novo Recurso</span>
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+              <strong>Separação Visual Clara entre o que Entra e o que Sai:</strong>
+            </div>
+            <p style="margin-bottom: 10px;">Para evitar confusão visual entre contas a pagar e receitas a receber:</p>
+            <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+              <li>🟢 <strong style="color: var(--accent-light);">💰 Faixa Verde (Recebimentos Próximos):</strong> Destaca exclusivamente salários, aluguéis, pro-labores e rendimentos previstos para os próximos dias, com chips verdes clicáveis.</li>
+              <li>🔴 <strong style="color: #f87171;">🚨 Faixa Vermelha (Vencimentos Próximos):</strong> Alerta sobre contas fixas, faturas e parcelas prestes a vencer para evitar atrasos e juros.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- TÓPICO 2.4: DASHBOARD > CARTÕES, FATURAS E LIMITES (NOVO) -->
+        <div class="manual-topic-content" id="topic-dash-cards-limites" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span>💳 Previsibilidade de Cartões, Faturas & Limites Reais</span>
+            <span class="badge badge-blue">Recurso Aprimorado</span>
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <div style="background: rgba(249,115,22,0.08); border-left: 4px solid #fb923c; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+              <strong>Auditoria e Previsibilidade de Limites Bancários:</strong>
+            </div>
+            <p style="margin-bottom: 10px;">Cada cartão de crédito exibido no quadro <strong>"🏦 Previsibilidade de Contas e Cartões"</strong> traz informações vitais e transparentes:</p>
+            <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+              <li>💳 <strong>Limite Total:</strong> O limite de crédito contratado e cadastrado no banco (ex: <code>R$ 5.000,00</code>).</li>
+              <li>🔴 <strong>Fatura do Mês:</strong> O valor exato das compras e parcelas que vencem na fatura do mês selecionado (ex: <code>R$ 1.004,05</code>).</li>
+              <li>🟠 <strong>Comprometido Total:</strong> A soma global de <strong>todas as compras e parcelas futuras em aberto</strong> que já consom o limite do seu cartão (ex: <code>R$ 5.824,30</code>).</li>
+              <li>🟢/🔴 <strong>Disponível / Excedido:</strong> Saldo livre real calculado como <code>Limite Total - Comprometido Total</code>. Se você realizou compras parceladas superiores ao limite, o saldo é exibido em <strong>vermelho com valor negativo</strong> (ex: <code>-R$ 824,30</code>) e badge <span class="badge badge-danger">⚠️ LIMITE EXCEDIDO</span>.</li>
+              <li>🍩 <strong>Spinner / Donut SVG Interativo:</strong> O gráfico de rosca exibe o percentual real de utilização do cartão (inclusive valores como <code>116% ULTRAPASSADO</code> ou <code>126% ULTRAPASSADO</code> envolto por anel tracejado de perigo).</li>
+              <li>🔒 <strong>Fechamento & Vencimento:</strong> Exibe os dias exatos de corte da fatura e data de débito.</li>
+              <li>✨ <strong>Clique no Card:</strong> Ao clicar sobre qualquer card de cartão no Dashboard, o aplicativo abre o Planejamento e <strong>destaca todas as parcelas da fatura com a cor oficial do banco</strong>!</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- TÓPICO 2.3: DASHBOARD > CONTAS BANCÁRIAS E CHEQUE ESPECIAL -->
+        <div class="manual-topic-content" id="topic-dash-contas" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700;">
+            <span>🏦 Previsibilidade de Contas Correntes, Poupanças & Cheque Especial</span>
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <p style="margin-bottom: 10px;">Os widgets de contas correntes, contas de pagamento e carteiras exibem:</p>
+            <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+              <li>💰 <strong>Saldo Atual em Conta:</strong> O saldo líquido real conciliado no banco.</li>
+              <li>🛡️ <strong>Limite de Cheque Especial (LIS):</strong> Limite de crédito rotativo configurado para a conta.</li>
+              <li>⚡ <strong>Saldo Disponível Operacional:</strong> Total utilizável imediatamente <code>(Saldo em Conta + Cheque Especial)</code>.</li>
+              <li>👤 <strong>Identificação de Titularidade:</strong> Cada conta traz o badge cromático do membro da família responsável (ex: <em>William, Jennifer, Isabel</em>).</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- TÓPICO 2.4: DASHBOARD > AVISOS & LINKS DIRETOS (NOVO) -->
+        <div class="manual-topic-content" id="topic-dash-links" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span>🚨 Faixa de Avisos & Links Diretos para Lançamentos</span>
+            <span class="badge badge-blue">Recurso Novo</span>
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <div style="background: rgba(249,115,22,0.08); border-left: 4px solid #fb923c; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+              <strong>Diferenciação Cromática de Alertas & Navegação Instantânea:</strong>
+            </div>
+            <p style="margin-bottom: 10px;">Os avisos de proximidade (próximos 3 dias) são separados visualmente por tipo de fluxo financeiro:</p>
+            <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+              <li>🟢 <strong>Recebimentos Próximos (Faixa Verde 💰):</strong> Salários, pró-labore, pensões e receitas a receber nos próximos dias aparecem em <strong>chips verdes esmeralda</strong>, transmitindo tranquilidade e previsão de caixa positivo.</li>
+              <li>🔴 <strong>Vencimentos Próximos (Faixa Vermelha 🚨):</strong> Boletos, contas fixas, faturas e despesas a pagar nos próximos dias aparecem em <strong>chips vermelhos de alerta</strong> para evitar atrasos e juros.</li>
+              <li>⚡ <strong>Navegação Instantânea:</strong> Cada chip é um link direto clicável. Ao clicar, o aplicativo abre o <strong>Planejamento</strong>, faz rolagem suave e aplica um <strong>efeito pulsante (*glow flash*)</strong> sobre a conta!</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- TÓPICO 2.5: DASHBOARD > PRIORIDADES, A PAGAR E PAGAS -->
+        <div class="manual-topic-content" id="topic-dash-prioridades" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700;">
+            <span>⭐ Quadros de Prioridades, Contas a Pagar e Contas Pagas</span>
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <p style="margin-bottom: 10px;">No centro do Dashboard, três colunas organizam a rotina operacional do mês:</p>
+            <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+              <li>⭐ <strong>Prioritários:</strong> Reúne todas as contas marcadas com estrela de prioridade indispensável no mês, facilitando que você não deixe passar compromissos críticos.</li>
+              <li>⏳ <strong>Contas a Pagar:</strong> Todas as despesas pendentes do mês ordenadas cronologicamente por proximidade da data de vencimento.</li>
+              <li>✓ <strong>Contas Pagas:</strong> Histórico de despesas já quitadas com indicação da conta bancária de onde o recurso saiu.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- TÓPICO 2.6: DASHBOARD > GRÁFICOS INTERATIVOS -->
+        <div class="manual-topic-content" id="topic-dash-graficos" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700;">
+            <span>📈 Gráficos de Fluxo de Caixa & Distribuição por Categoria</span>
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <p style="margin-bottom: 10px;">O Dashboard conta com gráficos interativos que facilitam a tomada de decisão:</p>
+            <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+              <li>📊 <strong>Evolução Mensal (Barras):</strong> Compara visualmente as Receitas vs. Despesas ao longo dos últimos meses, permitindo enxergar tendências de economia ou aperto financeiro.</li>
+              <li>🍩 <strong>Despesas por Categoria (Rosca):</strong> Aponta visualmente em que áreas o dinheiro da família está sendo alocado (ex: <em>Moradia, Alimentação, Educação, Transporte, Saúde, Lazer</em>), com valores e percentuais.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- TÓPICO 2.7: DASHBOARD > VISÃO GERAL, METAS E PATRIMÔNIO -->
+        <div class="manual-topic-content" id="topic-dash-consolidado" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700;">
+            <span>🌐 Aba Visão Geral, Metas & Patrimônio Líquido</span>
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <div style="background: rgba(249,115,22,0.08); border-left: 4px solid #fb923c; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+              <strong>Consolidação Patrimonial e Objetivos de Poupança:</strong>
+            </div>
+            <p style="margin-bottom: 10px;">Na aba <strong>"🌐 Visão Geral"</strong> no topo do Dashboard:</p>
+            <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+              <li>🏛️ <strong>Patrimônio Líquido Consolidado:</strong> Soma o saldo real de todas as contas correntes, poupanças e investimentos, deduzindo os compromissos em aberto nos cartões de crédito e cheques especiais.</li>
+              <li>🎯 <strong>Objetivos & Cofrinhos:</strong> Acompanhamento do progresso percentual e financeiro de cada meta de poupança (ex: <em>Reserva de Emergência, Viagem em Família, Reforma</em>).</li>
+              <li>🏦 <strong>Saldos e Faturas Reais Atuais:</strong> Exibição do estado patrimonial de cada conta do grupo familiar.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- TÓPICO 2.8: DASHBOARD > CONTRASTE & ACESSIBILIDADE -->
+        <div class="manual-topic-content" id="topic-dash-contraste" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span>🎨 Modos de Visualização & Alto Contraste</span>
+            <span class="badge badge-blue">Recurso Novo</span>
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <p style="margin-bottom: 10px;">O Dashboard e todos os controles foram projetados para alta legibilidade:</p>
+            <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
+              <li><strong>Modo Claro:</strong> Contornos nítidos (<code>border: 1.5px solid #94a3b8</code>), fundo sólido branco e tipografia em alto contraste sem desbotamento.</li>
+              <li><strong>Modo Escuro:</strong> Elementos em tons escuros refinados com brilho esmeralda e contrastes calibrados para não cansar a vista.</li>
+              <li><strong>Controles de Busca e Filtro:</strong> Bordas com feedback luminoso (*focus ring*) ao clicar para digitação ou ordenação.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- TÓPICO 3.1: LANÇAMENTOS > COMPETÊNCIA -->
+        <div class="manual-topic-content" id="topic-lanc-competencia" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #34d399; font-weight: 700;">
+            📋 Mês de Referência (Competência: Ref: MM/AAAA)
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <p style="margin-bottom: 10px;">O app permite controlar tanto a data de pagamento quanto o mês de competência:</p>
+            <div style="background: rgba(16,185,129,0.08); border-left: 4px solid #10b981; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 12px;">
+              <strong>Exemplo de Conta de Energia:</strong><br>
+              • Consumo do mês de <strong>Fevereiro</strong> (Competência: <code>Ref: 02/2026</code>).<br>
+              • Vencimento do boleto em <strong>10 de Março</strong> (Data de Pagamento: <code>10/03/2026</code>).
+            </div>
+            <p style="margin: 0;">Isso garante que ao emitir relatórios de gastos mensais, o custo seja computado no mês em que o consumo realmente ocorreu.</p>
+          </div>
+        </div>
+
+        <!-- TÓPICO 3.2: LANÇAMENTOS > FIXAS -->
+        <div class="manual-topic-content" id="topic-lanc-fixas" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #34d399; font-weight: 700;">
+            ⭐ Despesas Fixas (Recorrentes) & Prioridades
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <p style="margin-bottom: 10px;">Despesas fixas são aquelas que se repetem todo mês (Aluguel, Internet, Mensalidade Escolar, Financiamento):</p>
+            <p style="margin-bottom: 8px;">• <strong>Estrela de Prioridade ⭐:</strong> Marque despesas essenciais com estrela para que fiquem no topo da lista.</p>
+            <p style="margin: 0;">• <strong>Adiar Vencimento:</strong> Permite empurrar o vencimento de uma conta para frente se o orçamento do mês estiver apertado.</p>
+          </div>
+        </div>
+
+        <!-- TÓPICO 3.3: LANÇAMENTOS > AVULSOS -->
+        <div class="manual-topic-content" id="topic-lanc-avulsos" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #34d399; font-weight: 700;">
+            🛍️ Despesas Variáveis do Mês (Avulsas)
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <p style="margin-bottom: 10px;">Gastos esporádicos do dia a dia (Supermercado, Farmácia, Restaurante, Combustível):</p>
+            <p style="margin: 0;">Clique no botão roxo <code>+ Nova Variável</code> em qualquer momento para registrar uma compra rápida, escolhendo a categoria, conta/cartão e quem realizou o gasto.</p>
+          </div>
+        </div>
+
+        <!-- TÓPICO 3.4: LANÇAMENTOS > JUROS & DESCONTOS -->
+        <div class="manual-topic-content" id="topic-lanc-juros" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #34d399; font-weight: 700;">
+            🏷️ Juros, Multas e Descontos Antecipados
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <p style="margin-bottom: 8px;">• <strong>Desconto:</strong> Ao pagar antecipado com desconto, o sistema debita do saldo da conta apenas o valor líquido real.</p>
+            <p style="margin: 0;">• <strong>Juros / Multa:</strong> Ao pagar em atraso, registre o acréscimo para que o valor real debitado corresponda exatamente ao extrato do banco.</p>
+          </div>
+        </div>
+
+        <!-- TÓPICO 4.1: CONTAS > TIPOS -->
+        <div class="manual-topic-content" id="topic-contas-tipos" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #06b6d4; font-weight: 700;">
+            🏦 Tipos de Contas Bancárias & Carteiras
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <p style="margin-bottom: 8px;">• <span class="badge badge-blue">Conta Corrente</span>: Banco do Brasil, Itaú, Nubank, etc.</p>
+            <p style="margin-bottom: 8px;">• <span class="badge badge-green">Poupança / Investimentos</span>: Reserva de emergência e aplicações.</p>
+            <p style="margin-bottom: 8px;">• <span class="badge badge-yellow">Carteira Física</span>: Dinheiro em espécie na mão.</p>
+            <p style="margin: 0;">• <span class="badge badge-cyan">Voucher</span>: Vale Refeição / Alimentação (Alelo, Ticket, Sodexo).</p>
+          </div>
+        </div>
+
+        <!-- TÓPICO 4.2: CONTAS > CARTÕES BENEFÍCIO & VOUCHERS (NOVO) -->
+        <div class="manual-topic-content" id="topic-contas-beneficio" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #06b6d4; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span>🎟️ Cartões Benefício, Vouchers e Alimentação</span>
+            <span class="badge badge-cyan">Novo Recurso</span>
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <div style="background: rgba(6, 182, 212, 0.08); border-left: 4px solid #06b6d4; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+              <strong>Controle Completo de Saldos e Recargas Mensais de Benefícios:</strong>
+            </div>
+            <p style="margin-bottom: 10px;">O FinançasFamília possui suporte nativo para operadoras de benefícios corporativos e flexíveis:</p>
+            <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+              <li>🏷️ <strong>Operadoras Suportadas:</strong> Flash, Caju, Alelo, Banricard, Swile, Ticket, Sodexo, VR, Ben Visa Vale, etc.</li>
+              <li>🍴 <strong>Modalidades Específicas:</strong> Alimentação (VA), Refeição (VR), Transporte (VT), Flexível / Multibenefícios, Combustível, Saúde/Farmácia e Educação.</li>
+              <li>💵 <strong>Recarga Mensal Automática:</strong> Defina o valor previsto da recarga (ex: <code>R$ 800,00</code>) e o dia do crédito (ex: <code>Dia 10</code>) para previsibilidade orçamentária.</li>
+              <li>💳 <strong>Final do Cartão:</strong> Identificação rápida pelos 4 últimos dígitos (ex: <code>Final 4920</code>).</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- TÓPICO 4.3: CONTAS > TRANSFERÊNCIAS -->
+        <div class="manual-topic-content" id="topic-contas-transf" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #06b6d4; font-weight: 700;">
+            🔁 Transferências entre Contas sem Duplicação
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <p style="margin: 0;">Ao usar o botão <strong>"Nova Transferência"</strong> na tela de Contas, o saldo é transferido da conta de origem para a de destino sem gerar receitas ou despesas artificiais no balanço familiar.</p>
+          </div>
+        </div>
+
+        <!-- TÓPICO 4.4: CONTAS > PRODUTOS -->
+        <div class="manual-topic-content" id="topic-contas-produtos" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #06b6d4; font-weight: 700;">
+            💳 Produtos da Conta (Banricompras, Cheque Especial)
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <p style="margin: 0;">O aplicativo suporta produtos acoplados à conta corrente, permitindo parcelar despesas em débito pré-datado ou controlar o uso do cheque especial com visibilidade total.</p>
+          </div>
+        </div>
+
+        <!-- TÓPICO 5.1: FAMÍLIA > PERFIS -->
+        <div class="manual-topic-content" id="topic-fam-perfis" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a78bfa; font-weight: 700;">
+            👑 Papéis de Usuário (ADM, Responsável, Colaborador, Caçula)
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <p style="margin-bottom: 8px;">• 👑 <strong>ADM Geral:</strong> Gestão técnica, auditoria e backups globais.</p>
+            <p style="margin-bottom: 8px;">• ⭐ <strong>Responsável:</strong> Gestão financeira da casa, membros e permissões.</p>
+            <p style="margin-bottom: 8px;">• 👤 <strong>Colaborador:</strong> Membro adulto com acesso às suas finanças e menus autorizados.</p>
+            <p style="margin: 0;">• 🧸 <strong>Caçula:</strong> Interface especial para crianças e controle de mesada.</p>
+          </div>
+        </div>
+
+        <!-- TÓPICO 5.2: FAMÍLIA > PERMISSÕES -->
+        <div class="manual-topic-content" id="topic-fam-permissoes" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a78bfa; font-weight: 700;">
+            🛡️ Permissões Granulares por Módulo
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <p style="margin: 0;">Defina exatamente quem pode visualizar ou editar lançamentos fixos, avulsos, contas bancárias, cartões de crédito e relatórios gerais.</p>
+          </div>
+        </div>
+
+        <!-- TÓPICO 6.1: SYNC > UUIDS & MULTI-APARELHO (NOVO) -->
+        <div class="manual-topic-content" id="topic-sync-uuid" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #38bdf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span>🔑 Identificadores Globais Universais (UUID v4) & Multi-Dispositivo</span>
+            <span class="badge badge-blue">Smart Sync</span>
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <div style="background: rgba(56, 189, 248, 0.08); border-left: 4px solid #38bdf8; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+              <strong>Arquitetura Resiliente para Sincronização Desktop e Web:</strong>
+            </div>
+            <p style="margin-bottom: 10px;">Para permitir que membros da família usem o app no notebook (Desktop) e no celular (Web) simultaneamente sem conflitos:</p>
+            <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+              <li>🌐 <strong>UUID Global (128 bits):</strong> Todo lançamento ganha um identificador único universal (<code>sync_id</code>). Isso impede colisões de ID numérico (ex: Desktop e Web criando o ID #1506).</li>
+              <li>⏱️ <strong>Last-Write-Wins:</strong> Atualizações em um mesmo lançamento são resolvidas automaticamente com base no carimbo de data/hora mais recente (<code>updated_at</code>).</li>
+              <li>🗑️ <strong>Soft-Delete:</strong> Exclusões são sincronizadas de forma limpa sem deixar registros fantasmas em outros aparelhos.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- TÓPICO 6.2: SYNC > MOTOR HEURÍSTICO (ATUALIZADO) -->
+        <div class="manual-topic-content" id="topic-sync-dedup" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #38bdf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span>🧠 Motor Heurístico Anti-Duplicidade & Alertas em Tempo Real</span>
+            <span class="badge badge-purple">Inteligência Familiar</span>
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <div style="background: rgba(139, 92, 246, 0.08); border-left: 4px solid #8b5cf6; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+              <strong>Prevenção Imediata e Detecção Ativa de Lançamentos Duplicados:</strong>
+            </div>
+            <p style="margin-bottom: 10px;">Quando múltiplos membros da família inserem despesas, o motor atua em duas etapas:</p>
+            <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+              <li>⚡ <strong>Alerta em Tempo Real no Formulário:</strong> Conforme você digita o valor, data ou descrição nos formulários de despesas ou contas fixas, o sistema pesquisa instantaneamente e avisa: <em>"Atenção: Já existe um lançamento similar registrado por Maria em 15/08..."</em>.</li>
+              <li>🔤 <strong>NLP & Stopwords Bancárias:</strong> O sistema ignora termos genéricos como <code>PIX</code>, <code>TED</code>, <code>PAGTO</code>, <code>COMPRA</code>, <code>CARTÃO</code>, comparando apenas o nome do estabelecimento (ex: <em>"PIX PAGTO SUPERMERCADO ZAFFARI"</em> vira <em>"Supermercado Zaffari"</em>).</li>
+              <li>📅 <strong>Compensação de Fim de Semana:</strong> Tolera compras feitas na sexta/sábado/domingo que são registradas ou compensadas na segunda/terça.</li>
+              <li>🔢 <strong>Detecção de Parcelamentos Duplicados:</strong> Identifica compras parceladas coincidentes (ex: <em>"Sofá 3/10"</em> vs <em>"Sofá 3 de 10"</em>).</li>
+              <li>🤖 <strong>Auto-Merge Inteligente:</strong> Duplicatas com 100% de similaridade (mesmo valor, mesma data, mesma descrição e mesma conta) são unificadas com segurança e registradas no histórico.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- TÓPICO 6.3: SYNC > CONCILIAÇÃO VISUAL (ATUALIZADO) -->
+        <div class="manual-topic-content" id="topic-sync-conciliacao" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #38bdf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+            <span>⚖️ Central Avançada de Conciliação, Filtros e Ações em Lote</span>
+            <span class="badge badge-cyan">Painel Completo</span>
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <div style="background: rgba(56, 189, 248, 0.08); border-left: 4px solid #38bdf8; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+              <strong>Painel Dedicado de Auditoria & Conciliação Familiar:</strong>
+            </div>
+            <p style="margin-bottom: 10px;">Ao clicar no botão <code>🛡️</code> na barra lateral ou no banner de alerta do Dashboard, você acessa a central:</p>
+            <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+              <li>🎯 <strong>Classificação por Nível de Certeza:</strong> Badges cromáticos informam o grau de confiança: <span class="badge badge-success">🟢 Altíssima Certeza (95-100%)</span>, <span class="badge badge-danger">🟡 Provável (80-94%)</span> e <span class="badge badge-warning">🔵 Suspeito (65-79%)</span>.</li>
+              <li>🎛️ <strong>Filtros Interativos:</strong> Filtre a lista por membro da família, nível de certeza ou conta bancária pagadora.</li>
+              <li>⚡ <strong>Ações em Lote:</strong> Botão <code>[ ⚡ Mesclar Certezas (100%) ]</code> e <code>[ 🔗 Mesclar Selecionados ]</code> para resolver dezenas de duplicidades com 1 único clique.</li>
+              <li>📜 <strong>Aba de Histórico:</strong> Registra todas as conciliações e desfechos anteriores para prestação de contas e auditoria.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- TÓPICO 7.1: ORÇAMENTOS > BUDGETS -->
+        <div class="manual-topic-content" id="topic-orc-budgets" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f43f5e; font-weight: 700;">
+            🎯 Tetos de Gastos por Categoria (Orçamento)
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <p style="margin: 0;">Estabeleça um limite mensal máximo para categorias como Alimentação, Lazer e Transporte. A barra de progresso avisa com cores quando o teto estiver próximo de ser atingido.</p>
+          </div>
+        </div>
+
+        <!-- TÓPICO 7.2: ORÇAMENTOS > METAS -->
+        <div class="manual-topic-content" id="topic-orc-metas" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f43f5e; font-weight: 700;">
+            🏆 Metas Financeiras & Cofrinhos de Economia
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <p style="margin: 0;">Crie objetivos como Viagem de Férias, Reserva de Emergência ou Troca de Carro, registrando aportes mensais com cálculo automático da data estimada de conclusão.</p>
+          </div>
+        </div>
+
+        <!-- TÓPICO 8.1: METODOLOGIA 50-30-20 -->
+        <div class="manual-topic-content" id="topic-met-regra" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #c084fc; font-weight: 700;">
+            💡 A Metodologia 50-30-20 Aplicada à Família
+          </h4>
+          <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+            <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px;">
+              <div style="flex: 1; min-width: 150px; background: rgba(59,130,246,0.1); border-left: 4px solid var(--blue); padding: 12px; border-radius: 6px;">
+                <div style="font-weight: 700; color: #60a5fa;">50% — Necessidades</div>
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Aluguel, condomínio, luz, água, alimentação básica e saúde.</div>
+              </div>
+              <div style="flex: 1; min-width: 150px; background: rgba(16,185,129,0.1); border-left: 4px solid var(--green); padding: 12px; border-radius: 6px;">
+                <div style="font-weight: 700; color: #34d399;">30% — Desejos / Lazer</div>
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Restaurantes, assinaturas, passeios, compras e hobbies.</div>
+              </div>
+              <div style="flex: 1; min-width: 150px; background: rgba(139,92,246,0.1); border-left: 4px solid var(--purple); padding: 12px; border-radius: 6px;">
+                <div style="font-weight: 700; color: #c084fc;">20% — Futuro & Metas</div>
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Reserva de emergência, investimentos e quitação antecipada.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TÓPICO 9.1: FAQ INTERATIVO -->
+        <div class="manual-topic-content" id="topic-faq-interativo" style="display: none;">
+          <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f87171; font-weight: 700;">
+            ❓ Perguntas Frequentes (FAQ Interativo — Clique para abrir a resposta)
+          </h4>
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            
+            <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
+              <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
+                <span>💳 Como funciona o destaque de parcelas ao clicar na fatura?</span>
+                <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
+              </div>
+              <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
+                Ao clicar no card de qualquer fatura na tela de Planejamento (ex: <code>FATURA CARTÃO CARREFOUR</code>), todas as compras e parcelas correspondentes na lista de Despesas são imediatamente destacadas com a cor oficial do cartão/banco (borda, fundo luminoso e badge explicativa). Os itens que não fazem parte dessa fatura são atenuados, e a tela rola suavemente até o primeiro item para facilitar a conferência. Clicar novamente no card da fatura desativa o destaque.
+              </div>
+            </div>
+
+            <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
+              <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
+                <span>🚨 Como usar os avisos de vencimento do Dashboard como links diretos?</span>
+                <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
+              </div>
+              <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
+                Basta clicar em qualquer chip de alerta na faixa vermelha <code>🚨 Vencimentos próximos</code> ou nos cartões das colunas <code>⭐ Prioritários</code> e <code>Contas a Pagar</code>. O aplicativo abre a tela de Planejamento no mês exato e aplica um destaque luminoso pulsante (*glow flash*) sobre o lançamento selecionado.
+              </div>
+            </div>
+
+            <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
+              <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
+                <span>💳 Qual a diferença entre Competência e Vencimento do Cartão?</span>
+                <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
+              </div>
+              <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
+                A <strong>competência</strong> refere-se ao mês em que o consumo ou o ciclo da fatura ocorreu (ex: compras feitas até o fechamento de 25 de Fevereiro pertencem à competência 02/2026). O <strong>vencimento</strong> é o dia em que o pagamento do boleto é realizado (ex: 05 de Março).
+              </div>
+            </div>
+
+            <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
+              <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
+                <span>🤝 O que acontece quando clico em 'Renegociar / Acordo' em uma fatura?</span>
+                <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
+              </div>
+              <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
+                A fatura é marcada como <span class="badge badge-purple">Renegociada</span>, a entrada (se informada) é debitada da conta bancária e o sistema gera automaticamente as parcelas do acordo como despesas recorrentes nos meses subsequentes. Caso tenha feito por engano, você pode clicar em "Desfazer Acordo / Reabrir" para restaurar a fatura original.
+              </div>
+            </div>
+
+            <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
+              <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
+                <span>🛡️ O que acontece se dois membros da família lançarem o mesmo gasto (Web e Desktop)?</span>
+                <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
+              </div>
+              <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
+                O <strong>Motor Anti-Duplicidade</strong> entra em ação imediatamente! Ele cruza a data (com margem de ±2 dias), o valor (com tolerância de centavos/gorjetas) e o nome do estabelecimento. Se for muito parecido, o Dashboard exibe um alerta temático e o botão <code>🛡️</code> abre o modal comparativo permitindo que você escolha com 1 clique entre <strong>[Mesclar em 1 Lançamento]</strong> (unificando saldos e removendo a duplicata) ou <strong>[Manter Ambos]</strong> caso sejam dois gastos legítimos.
+              </div>
+            </div>
+
+            <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
+              <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
+                <span>🎟️ Como cadastrar um Cartão Benefício (Flash, Caju, Alelo, Sodexo, VR)?</span>
+                <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
+              </div>
+              <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
+                Vá até a aba <strong>Contas</strong>, clique em <code>+ Nova Conta</code>, selecione o tipo <strong>Voucher / Benefício</strong> e escolha a operadora (Flash, Caju, Alelo, Banricard, Swile, Sodexo, VR, etc.). Você pode informar a modalidade (ex: Alimentação, Refeição, Mobilidade ou Flexível), o saldo atual disponível e configurar o valor e o dia da recarga mensal automática!
+              </div>
+            </div>
+
+            <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
+              <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
+                <span>⚠️ Como quitar pendências de meses anteriores diretamente pelo Dashboard?</span>
+                <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
+              </div>
+              <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
+                No topo do Dashboard, o container <strong>"⚠️ Pendências de Meses Anteriores Não Pagas"</strong> lista todas as contas passadas em aberto. Ao clicar sobre qualquer uma delas, o sistema abre automaticamente a tela de Planejamento no mês exato em que a dívida foi gerada e destaca a linha com um efeito luminoso, permitindo dar baixa ou editar imediatamente.
+              </div>
+            </div>
+
+            <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
+              <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
+                <span>🔒 Meus dados financeiros ficam salvos na nuvem ou são compartilhados?</span>
+                <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
+              </div>
+              <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
+                Não! Todos os dados são gravados exclusivamente no banco de dados local SQLite no seu computador com criptografia AES-256 e conformidade integral com a LGPD. Nenhuma informação financeira sai da sua rede local.
+              </div>
+            </div>
+
+            <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
+              <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
+                <span>🔒 Meus dados financeiros ficam salvos na nuvem ou são compartilhados?</span>
+                <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
+              </div>
+              <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
+                Não! Todos os dados são gravados exclusivamente no banco de dados local SQLite no seu computador com criptografia AES-256 e conformidade integral com a LGPD. Nenhuma informação financeira sai da sua rede local.
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  `;
+
+  setupManualEvents(page);
+}
+
+function setupManualEvents(container) {
+  if (!container) return;
+
+  const treeHeaders = container.querySelectorAll('.wiki-tree-header');
+  const treeItems = container.querySelectorAll('.wiki-tree-item');
+  const topicContents = container.querySelectorAll('.manual-topic-content');
+  const crumbCat = container.querySelector('#manual-crumb-cat');
+  const crumbSub = container.querySelector('#manual-crumb-sub');
+
+  // Category headers accordion toggle
+  treeHeaders.forEach(header => {
+    header.onclick = () => {
+      const subs = header.nextElementSibling;
+      const arrow = header.querySelector('.wiki-tree-arrow');
+      if (subs) {
+        if (subs.style.display === 'none') {
+          subs.style.display = 'flex';
+          if (arrow) arrow.textContent = '▾';
+        } else {
+          subs.style.display = 'none';
+          if (arrow) arrow.textContent = '▸';
+        }
+      }
+    };
+  });
+
+  // Topic items click to switch active content
+  treeItems.forEach(item => {
+    item.onclick = () => {
+      treeItems.forEach(i => {
+        i.classList.remove('active');
+        i.style.color = 'var(--text-muted)';
+        i.style.fontWeight = 'normal';
+        i.style.borderLeftColor = 'transparent';
+        i.style.background = 'transparent';
+      });
+      item.classList.add('active');
+      item.style.color = 'var(--text-primary)';
+      item.style.fontWeight = '700';
+      item.style.borderLeftColor = 'var(--accent)';
+      item.style.background = 'var(--bg-raised)';
+
+      const topicId = item.dataset.topic;
+      const catName = item.closest('.wiki-tree-group')?.querySelector('.wiki-tree-header span')?.textContent || 'Manual';
+      const subName = item.textContent.replace('•', '').trim();
+
+      if (crumbCat) crumbCat.textContent = catName;
+      if (crumbSub) crumbSub.textContent = subName;
+
+      topicContents.forEach(tc => {
+        tc.style.display = tc.id === `topic-${topicId}` ? 'block' : 'none';
+      });
+
+      const displayPanel = container.querySelector('#manual-display-panel');
+      if (displayPanel) displayPanel.scrollTop = 0;
+    };
+  });
+
+  // FAQ interactive accordion clicks
+  container.querySelectorAll('.wiki-faq-q').forEach(qEl => {
+    qEl.onclick = () => {
+      const aEl = qEl.nextElementSibling;
+      const chevron = qEl.querySelector('.faq-chevron');
+      if (aEl) {
+        const isHidden = aEl.style.display === 'none';
+        aEl.style.display = isHidden ? 'block' : 'none';
+        if (chevron) chevron.textContent = isHidden ? '➖' : '➕';
+      }
+    };
+  });
+
+  // Global search inside manual
+  const searchInput = container.querySelector('#manual-search-input');
+  if (searchInput) {
+    searchInput.oninput = (e) => {
+      const q = e.target.value.toLowerCase().trim();
+      if (q) {
+        if (crumbCat) crumbCat.textContent = 'Busca no Manual';
+        if (crumbSub) crumbSub.textContent = `Resultados para "${q}"`;
+        topicContents.forEach(tc => {
+          const text = tc.textContent.toLowerCase();
+          const matches = text.includes(q);
+          tc.style.display = matches ? 'block' : 'none';
+        });
+        container.querySelectorAll('.wiki-faq-accordion').forEach(acc => {
+          const text = acc.textContent.toLowerCase();
+          const aEl = acc.querySelector('.wiki-faq-a');
+          const chevron = acc.querySelector('.faq-chevron');
+          if (text.includes(q)) {
+            acc.style.display = 'block';
+            if (aEl) aEl.style.display = 'block';
+            if (chevron) chevron.textContent = '➖';
+          } else {
+            acc.style.display = 'none';
+          }
+        });
+      } else {
+        const activeItem = container.querySelector('.wiki-tree-item.active');
+        if (activeItem) activeItem.click();
+        container.querySelectorAll('.wiki-faq-accordion').forEach(acc => {
+          acc.style.display = 'block';
+          const aEl = acc.querySelector('.wiki-faq-a');
+          const chevron = acc.querySelector('.faq-chevron');
+          if (aEl) aEl.style.display = 'none';
+          if (chevron) chevron.textContent = '➕';
+        });
+      }
+    };
+  }
+
+  // Download PDF button
+  const downloadBtn = container.querySelector('#btn-download-manual-pdf');
+  if (downloadBtn) {
+    downloadBtn.onclick = () => {
+      try {
+        const link = document.createElement('a');
+        link.href = 'Manual_do_Usuario.pdf';
+        link.download = 'Manual_do_Usuario_FinancasFamilia.pdf';
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        toast('📥 Abrindo download do Manual do Usuário em PDF...');
+      } catch (err) {
+        window.open('Manual_do_Usuario.pdf', '_blank');
+      }
+    };
+  }
+}
+
+// ════════════════════════════════════════
+// SETTINGS POPUP WITH TABS
 // ════════════════════════════════════════
 async function renderSettings() {
+  await openSettingsModal('profile');
+}
+
+async function openSettingsModal(activeTab = 'profile') {
   const PROFILE_LABELS = {
     1: 'ADM Dono do APP',
     2: 'Adm da Família',
@@ -2930,7 +6385,6 @@ async function renderSettings() {
     5: 'Filho Caçula'
   };
 
-  const page = document.getElementById('page-settings');
   const [categories, users, settings] = await Promise.all([
     window.api.categories.getAll(State.user.id),
     window.api.auth.getUsers(),
@@ -2950,120 +6404,150 @@ async function renderSettings() {
 
   const currentMonthName = new Date(State.currentYear, State.currentMonth - 1, 1).toLocaleDateString('pt-BR', { month: 'long' });
   const capitalizedMonth = currentMonthName.charAt(0).toUpperCase() + currentMonthName.slice(1);
+  const currentTheme = localStorage.getItem('financas_theme') || 'dark-emerald';
+  const isFamilyAdmin = currentFamily && (State.user.profile_type === 1 || State.user.profile_type === 2);
 
-  let familySectionHtml = '';
-  if (currentFamily && (State.user.profile_type === 1 || State.user.profile_type === 2)) {
-    familySectionHtml = `
-      <div class="settings-section">
-        <div class="settings-section-title">🏠 Minha Família</div>
-        <div class="card" style="padding:20px">
-          <div class="form-group" style="margin-bottom:0">
-            <label>Nome da Família</label>
-            <div style="display:flex;align-items:center;gap:12px;margin-top:8px">
-              <input type="text" id="family-name-input" value="${currentFamily.name}" style="flex-grow:1; padding: 10px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px;">
-              <button class="btn btn-primary btn-sm" id="save-family-name" style="padding: 10px 16px;">Salvar Nome</button>
-            </div>
-            <p style="font-size:12px;color:var(--text-muted);margin-top:8px">Isso mudará o nome da sua família no topo e nos relatórios de todos os membros.</p>
+  const modalHtml = `
+    <div class="settings-modal-dialog">
+      <!-- SIDEBAR DE ABAS DE NAVEGAÇÃO -->
+      <div class="settings-modal-sidebar">
+        <div>
+          <div class="settings-modal-group-title">👤 PESSOAL</div>
+          <div class="settings-modal-nav">
+            <button class="settings-modal-tab-btn ${activeTab === 'profile' ? 'active' : ''}" data-tab="profile">
+              <span>👤</span> Meu Perfil
+            </button>
+            ${isFamilyAdmin ? `
+            <button class="settings-modal-tab-btn ${activeTab === 'family' ? 'active' : ''}" data-tab="family">
+              <span>🏠</span> Minha Família
+            </button>` : ''}
           </div>
         </div>
-      </div>
-    `;
-  }
 
-  page.innerHTML = `
-    <div class="page-header"><div><h2 class="page-title">Configurações</h2></div></div>
-    <div style="max-width:720px">
+        <div>
+          <div class="settings-modal-group-title">⚙️ APLICATIVO</div>
+          <div class="settings-modal-nav">
+            <button class="settings-modal-tab-btn ${activeTab === 'appearance' ? 'active' : ''}" data-tab="appearance">
+              <span>🎨</span> Aparência & Temas
+            </button>
+            <button class="settings-modal-tab-btn ${activeTab === 'categories' ? 'active' : ''}" data-tab="categories">
+              <span>🏷️</span> Categorias
+            </button>
+            <button class="settings-modal-tab-btn ${activeTab === 'backups' ? 'active' : ''}" data-tab="backups">
+              <span>💾</span> Backups & Dados
+            </button>
+          </div>
+        </div>
 
-      <!-- Card de Apoio (Doação PagBank) -->
-      <div class="settings-section">
-        <div class="card" style="padding: 24px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(59, 130, 246, 0.05) 100%); border: 1px solid rgba(16, 185, 129, 0.2); position: relative; overflow: hidden; margin-bottom: 24px;">
-          <div style="position: absolute; top: -50px; right: -50px; width: 150px; height: 150px; background: rgba(16, 185, 129, 0.1); border-radius: 50%; filter: blur(30px); pointer-events: none;"></div>
-          <div style="display: flex; gap: 16px; align-items: flex-start;">
-            <div style="font-size: 32px; background: var(--accent-dim); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 12px; width: 54px; height: 54px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">☕</div>
-            <div style="flex-grow: 1;">
-              <h3 style="margin: 0 0 6px 0; font-size: 16px; font-weight: 700; color: var(--accent-light); display: flex; align-items: center; gap: 8px;">
-                <span>Apoie o FinançasFamília</span>
-              </h3>
-              <p style="margin: 0 0 16px 0; font-size: 13px; color: var(--text-secondary); line-height: 1.5;">
-                Este é um projeto independente e gratuito. Se o aplicativo está ajudando a sua família a gerenciar as finanças e planejar o futuro, considere nos apoiar com uma contribuição única de R$ 9,99!
-              </p>
-              <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 12px;">
-                <a href="https://pag.ae/81ZdpUAX7" target="_blank" style="text-decoration: none; display: inline-flex; align-items: center; gap: 14px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #ffffff; padding: 12px 24px; border-radius: 30px; font-weight: 600; font-size: 13px; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); transition: all 0.3s; border: 1px solid rgba(255,255,255,0.1); cursor: pointer;" onmouseover="this.style.transform='translateY(-2px) scale(1.02)'; this.style.boxShadow='0 8px 22px rgba(16, 185, 129, 0.5)';" onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 15px rgba(16, 185, 129, 0.3)';">
-                  <span style="font-size: 18px; background: rgba(255,255,255,0.15); border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">☕</span>
-                  <span style="display: flex; flex-direction: column; align-items: flex-start; line-height: 1.2;">
-                    <span style="font-weight: 700;">Apoiar com R$ 9,99</span>
-                    <span style="font-size: 10px; opacity: 0.85;">Via PagBank (Cartão, Boleto ou PIX)</span>
-                  </span>
-                </a>
-              </div>
-            </div>
+        <div>
+          <div class="settings-modal-group-title">📚 CONHECIMENTO & LEI</div>
+          <div class="settings-modal-nav">
+            <button class="settings-modal-tab-btn ${activeTab === 'wiki' ? 'active' : ''}" data-tab="wiki">
+              <span>📚</span> Wiki do Aplicativo
+            </button>
+            <button class="settings-modal-tab-btn ${activeTab === 'lgpd' ? 'active' : ''}" data-tab="lgpd">
+              <span>⚖️</span> Privacidade & LGPD
+            </button>
           </div>
         </div>
       </div>
 
-      <div class="settings-section">
-        <div class="settings-section-title">👤 Meu Perfil (Dados Cadastrais)</div>
-        <div class="card" style="padding:24px; display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px;">
-          
-          <div style="display: flex; align-items: center; gap: 16px; border-bottom: 1px solid var(--border); padding-bottom: 16px;">
-            ${renderAvatarHtml(State.user, 54)}
-            <div>
-              <h3 style="margin: 0; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-                <span>${State.user.name}</span>
-                <span class="badge badge-purple" style="font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px; background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3);">${PROFILE_LABELS[State.user.profile_type] || 'Membro'}</span>
-              </h3>
-              <p style="margin: 6px 0 0 0; font-size: 12px; color: var(--text-muted);">Usuário: @${State.user.username}</p>
-            </div>
-          </div>
+      <!-- CORPO DE CONTEÚDO DA ABA ATIVA -->
+      <div class="settings-modal-body" id="settings-modal-tab-body">
+      </div>
+    </div>
+  `;
 
-          <div class="form-row">
+  Modal.open('⚙️ Configurações do Aplicativo', modalHtml, true, true);
+
+  const bodyEl = document.getElementById('settings-modal-tab-body');
+
+  const renderTabContent = async (tab) => {
+    document.querySelectorAll('.settings-modal-tab-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+
+    if (tab === 'profile') {
+      bodyEl.innerHTML = `
+        <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+          👤 Meu Perfil (Dados Cadastrais)
+        </h3>
+        
+        <!-- Header com Avatar e Nome -->
+        <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px; padding: 14px 18px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md);">
+          ${renderAvatarHtml(State.user, 54)}
+          <div>
+            <h3 style="margin: 0; font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+              <span>${State.user.name}</span>
+              <span class="badge badge-purple" style="font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px; background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3);">${PROFILE_LABELS[State.user.profile_type] || 'Membro'}</span>
+            </h3>
+            <p style="margin: 4px 0 0 0; font-size: 12px; color: var(--text-muted);">Usuário: @${State.user.username}</p>
+          </div>
+        </div>
+
+        <!-- GRUPO 1: DADOS PESSOAIS -->
+        <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px; margin-bottom: 16px;">
+          <div style="font-size: 12px; font-weight: 700; color: var(--accent-light); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.05em;">
+            <span>👤</span> Identificação Pessoal
+          </div>
+          <div class="form-row" style="margin-bottom: 12px;">
             <div class="form-group">
               <label>Nome <span style="color: #ef4444;">*</span></label>
-              <input type="text" id="prof-first-name" value="${State.user.first_name || ''}" style="width: 100%; padding: 10px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px;">
+              <input type="text" id="prof-first-name" value="${State.user.first_name || ''}">
             </div>
             <div class="form-group">
               <label>Sobrenome <span style="color: #ef4444;">*</span></label>
-              <input type="text" id="prof-last-name" value="${State.user.last_name || ''}" style="width: 100%; padding: 10px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px;">
+              <input type="text" id="prof-last-name" value="${State.user.last_name || ''}">
             </div>
           </div>
-
           <div class="form-row">
             <div class="form-group">
               <label>CPF <span style="color: #ef4444;">*</span></label>
-              <input type="text" id="prof-cpf" placeholder="000.000.000-00" value="${State.user.cpf || ''}" maxlength="14" style="width: 100%; padding: 10px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px;">
+              <input type="text" id="prof-cpf" placeholder="000.000.000-00" value="${State.user.cpf || ''}" maxlength="14">
             </div>
             <div class="form-group">
               <label>Data de Nascimento <span style="color: #ef4444;">*</span></label>
-              <input type="date" id="prof-birth-date" value="${State.user.birth_date || ''}" style="width: 100%; padding: 10px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px;">
+              <input type="date" id="prof-birth-date" value="${State.user.birth_date || ''}">
             </div>
           </div>
+        </div>
 
+        <!-- GRUPO 2: CONTATO -->
+        <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px; margin-bottom: 16px;">
+          <div style="font-size: 12px; font-weight: 700; color: #3b82f6; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.05em;">
+            <span>📱</span> Contato & Comunicação
+          </div>
           <div class="form-row">
             <div class="form-group">
               <label>E-mail <span style="color: #ef4444;">*</span></label>
-              <input type="email" id="prof-email" placeholder="seu-email@provedor.com" value="${State.user.email || ''}" style="width: 100%; padding: 10px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px;">
+              <input type="email" id="prof-email" placeholder="seu-email@provedor.com" value="${State.user.email || ''}">
             </div>
             <div class="form-group">
               <label>Celular (WhatsApp) <span style="color: #ef4444;">*</span></label>
-              <input type="text" id="prof-phone" placeholder="(00) 00000-0000" value="${State.user.phone || ''}" maxlength="15" style="width: 100%; padding: 10px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px;">
+              <input type="text" id="prof-phone" placeholder="(00) 00000-0000" value="${State.user.phone || ''}" maxlength="15">
             </div>
           </div>
+        </div>
 
-          <div class="form-row">
+        <!-- GRUPO 3: ACESSO E SEGURANÇA -->
+        <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px; margin-bottom: 16px;">
+          <div style="font-size: 12px; font-weight: 700; color: #8b5cf6; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.05em;">
+            <span>🔒</span> Credenciais & Segurança de Acesso
+          </div>
+          <div class="form-row" style="margin-bottom: 12px;">
             <div class="form-group">
               <label>Usuário (@username) <span style="color: #ef4444;">*</span></label>
-              <input type="text" id="prof-username" value="${State.user.username}" style="width: 100%; padding: 10px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px;" ${State.user.username === 'adm' ? 'disabled' : ''}>
+              <input type="text" id="prof-username" value="${State.user.username}" ${State.user.username === 'adm' ? 'disabled' : ''}>
             </div>
             <div class="form-group">
               <label>Alterar Senha (Opcional)</label>
-              <input type="password" id="prof-password" placeholder="Deixe em branco para manter a atual" style="width: 100%; padding: 10px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px;">
+              <input type="password" id="prof-password" placeholder="Deixe em branco para manter a atual">
             </div>
           </div>
-
           <div class="form-row">
             <div class="form-group">
               <label>Pergunta de Segurança <span style="color: #ef4444;">*</span></label>
-              <select id="prof-recovery-question" style="width: 100%; padding: 10px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px;">
+              <select id="prof-recovery-question">
                 <option value="Qual o nome de solteira da sua mãe?" ${State.user.recovery_question === 'Qual o nome de solteira da sua mãe?' ? 'selected' : ''}>Qual o nome de solteira da sua mãe?</option>
                 <option value="Qual o nome do seu primeiro animal de estimação?" ${State.user.recovery_question === 'Qual o nome do seu primeiro animal de estimação?' ? 'selected' : ''}>Qual o nome do seu primeiro animal de estimação?</option>
                 <option value="Em qual cidade você nasceu?" ${State.user.recovery_question === 'Em qual cidade você nasceu?' ? 'selected' : ''}>Em qual cidade você nasceu?</option>
@@ -3073,41 +6557,37 @@ async function renderSettings() {
             </div>
             <div class="form-group">
               <label>Resposta de Segurança (Opcional)</label>
-              <input type="text" id="prof-recovery-answer" placeholder="Deixe em branco para manter a atual" style="width: 100%; padding: 10px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px;">
+              <input type="text" id="prof-recovery-answer" placeholder="Deixe em branco para manter a atual">
             </div>
           </div>
-
-          <div style="font-size: 11px; color: var(--text-muted); margin-top: -6px;"><span style="color: #ef4444;">*</span> Indica campos obrigatórios</div>
-
-          <p class="auth-error" id="prof-error-text" style="margin: 0; font-size: 12px;"></p>
-
-          <div style="display: flex; justify-content: flex-end;">
-            <button class="btn btn-primary" id="save-my-profile" style="padding: 10px 24px; font-weight: 600;">Salvar Alterações</button>
-          </div>
-
         </div>
-      </div>
 
-      <div class="settings-section">
-        <div class="settings-section-title">⏰ Alertas de Vencimento</div>
-        <div class="card" style="padding:20px">
-          <div class="form-group">
-            <label>Avisar com quantos dias de antecedência?</label>
-            <div style="display:flex;align-items:center;gap:12px;margin-top:8px">
-              <input type="number" id="alert-days" min="1" max="30" value="${settings.alert_days_before || 3}" style="width:100px">
-              <span style="color:var(--text-muted);font-size:13px">dia(s) antes do vencimento</span>
-              <button class="btn btn-primary btn-sm" id="save-alert-days">Salvar</button>
-            </div>
-            <p style="font-size:12px;color:var(--text-muted);margin-top:8px">Itens recorrentes serão destacados com 🚨 quando estiverem a ${settings.alert_days_before || 3} dia(s) do vencimento.</p>
+        <p class="auth-error" id="prof-error-text" style="margin: 0; font-size: 12px;"></p>
+
+        <div style="display: flex; justify-content: flex-end; margin-top: 12px; margin-bottom: 24px;">
+          <button class="btn btn-primary" id="save-my-profile" style="padding: 10px 24px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+            <span>💾</span> Salvar Alterações
+          </button>
+        </div>
+
+        <!-- Alertas de Vencimento -->
+        <h4 style="margin: 16px 0 10px 0; font-size: 14px; font-weight: 700; color: var(--text-primary); border-top: 1px solid var(--border); padding-top: 16px;">
+          ⏰ Alertas de Vencimento
+        </h4>
+        <div class="form-group">
+          <label>Avisar com quantos dias de antecedência?</label>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:8px">
+            <input type="number" id="alert-days" min="1" max="30" value="${settings.alert_days_before || 3}" style="width:100px; padding:8px; border-radius:var(--radius-sm); border:1px solid var(--border); background:var(--bg-surface); color:var(--text-primary)">
+            <span style="color:var(--text-muted);font-size:13px">dia(s) antes do vencimento</span>
+            <button class="btn btn-primary btn-sm" id="save-alert-days">Salvar Alerta</button>
           </div>
         </div>
-      </div>
 
-      ${familySectionHtml}
-
-      <div class="settings-section">
-        <div class="settings-section-title">👥 Usuários</div>
-        <div class="settings-list">
+        <!-- Gestão de Usuários da Família -->
+        <h4 style="margin: 24px 0 10px 0; font-size: 14px; font-weight: 700; color: var(--text-primary); border-top: 1px solid var(--border); padding-top: 16px;">
+          👥 Membros da Família
+        </h4>
+        <div class="settings-list" style="margin-bottom: 12px;">
           ${users.map(u => `
             <div class="settings-item" data-id="${u.id}" ${State.permissions.can_edit_all === 1 ? 'draggable="true"' : ''} style="justify-content: space-between; ${State.permissions.can_edit_all === 1 ? 'cursor: grab;' : ''}">
               <div style="display: flex; align-items: center; gap: 12px;">
@@ -3121,14 +6601,97 @@ async function renderSettings() {
               </div>
             </div>`).join('')}
         </div>
-        <div style="margin-top:12px"><button class="btn btn-secondary btn-sm" id="btn-add-user">+ Adicionar usuário</button></div>
-      </div>
+        ${State.permissions.can_edit_all === 1 ? `<button class="btn btn-secondary btn-sm" id="btn-add-user" style="align-self: flex-start;">+ Adicionar usuário</button>` : ''}
+      `;
 
-      <div class="settings-section">
-        <div class="settings-section-title">🏷️ Categorias</div>
-        
-        <div class="categories-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+      bindProfileTabEvents(categories, users);
+
+    } else if (tab === 'family') {
+      bodyEl.innerHTML = `
+        <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+          🏠 Minha Família
+        </h3>
+        ${currentFamily ? `
+        <div class="card" style="padding:20px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md);">
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-weight:600; font-size:13px;">Nome da Família</label>
+            <div style="display:flex;align-items:center;gap:12px;margin-top:8px">
+              <input type="text" id="family-name-input" value="${currentFamily.name}" style="flex-grow:1; padding: 10px; background: var(--bg-base); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px;">
+              <button class="btn btn-primary btn-sm" id="save-family-name" style="padding: 10px 16px;">Salvar Nome</button>
+            </div>
+            <p style="font-size:12px;color:var(--text-muted);margin-top:8px">Isso mudará o nome da sua família no topo e nos relatórios de todos os membros.</p>
+          </div>
+        </div>
+        ` : `<div style="color:var(--text-muted); font-size:13px;">Nenhuma família associada.</div>`}
+      `;
+      if (document.getElementById('save-family-name')) {
+        document.getElementById('save-family-name').onclick = async () => {
+          const newName = document.getElementById('family-name-input').value.trim();
+          if (!newName) { toast('Informe o nome da família', 'error'); return; }
+          const res = await window.api.families.update({ id: currentFamily.id, name: newName, quota_users: currentFamily.quota_users, quota_accounts: currentFamily.quota_accounts });
+          if (res && res.success) {
+            State.familyName = newName;
+            toast('Nome da família atualizado!');
+            openSettingsModal('family');
+          } else {
+            toast(res?.error || 'Erro ao atualizar família', 'error');
+          }
+        };
+      }
+
+    } else if (tab === 'appearance') {
+      bodyEl.innerHTML = `
+        <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+          🎨 Aparência e Temas do App
+        </h3>
+        <p style="font-size:13px; color:var(--text-muted); margin-bottom:20px">
+          Selecione a aparência visual de sua preferência para o aplicativo:
+        </p>
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:16px" id="settings-theme-container">
           
+          <div class="theme-card-option ${currentTheme === 'dark-emerald' || currentTheme === 'high-contrast-dark' ? 'active' : ''}" data-theme-val="dark-emerald" style="padding:16px; border-radius:var(--radius-md); border:2px solid ${(currentTheme === 'dark-emerald' || currentTheme === 'high-contrast-dark') ? 'var(--accent)' : 'var(--border)'}; background:var(--bg-raised); cursor:pointer; transition:all 0.2s; display:flex; flex-direction:column; gap:12px">
+            <div style="display:flex; align-items:center; justify-content:space-between">
+              <span style="font-size:24px">🌙</span>
+              <span class="theme-preview-dot dark-emerald" style="width:20px; height:20px"></span>
+            </div>
+            <div>
+              <div style="font-weight:700; font-size:14px; color:var(--text-primary)">Tema Escuro</div>
+              <div style="font-size:11px; color:var(--text-muted); margin-top:2px">Visual escuro moderno, equilibrado e elegante.</div>
+            </div>
+          </div>
+
+          <div class="theme-card-option ${currentTheme === 'light' || currentTheme === 'high-contrast-light' ? 'active' : ''}" data-theme-val="light" style="padding:16px; border-radius:var(--radius-md); border:2px solid ${(currentTheme === 'light' || currentTheme === 'high-contrast-light') ? 'var(--accent)' : 'var(--border)'}; background:var(--bg-raised); cursor:pointer; transition:all 0.2s; display:flex; flex-direction:column; gap:12px">
+            <div style="display:flex; align-items:center; justify-content:space-between">
+              <span style="font-size:24px">☀️</span>
+              <span class="theme-preview-dot light-theme-dot" style="width:20px; height:20px"></span>
+            </div>
+            <div>
+              <div style="font-weight:700; font-size:14px; color:var(--text-primary)">Tema Claro</div>
+              <div style="font-size:11px; color:var(--text-muted); margin-top:2px">Visual claro descansado, limpo e profissional.</div>
+            </div>
+          </div>
+
+        </div>
+      `;
+
+      document.querySelectorAll('#settings-theme-container .theme-card-option').forEach(card => {
+        card.onclick = () => {
+          const tVal = card.dataset.themeVal;
+          if (typeof setAppTheme === 'function') {
+            setAppTheme(tVal);
+          }
+          openSettingsModal('appearance');
+        };
+      });
+
+    } else if (tab === 'categories') {
+      bodyEl.innerHTML = `
+        <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid var(--border); padding-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+          <span>🏷️ Categorias</span>
+          <button class="btn btn-secondary btn-sm" id="btn-add-category">+ Nova Categoria</button>
+        </h3>
+
+        <div class="categories-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px;">
           <!-- Coluna Despesas -->
           <div class="category-column">
             <div style="font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
@@ -3170,64 +6733,742 @@ async function renderSettings() {
                 </div>`).join('') || '<div style="color:var(--text-muted);font-size:13px;padding:16px;background:var(--bg-surface);border:1px dashed var(--border);border-radius:var(--radius-sm);text-align:center">Nenhuma categoria de receita</div>'}
             </div>
           </div>
+        </div>
+      `;
+
+      document.getElementById('btn-add-category').onclick = () => openCategoryModal(categories);
+      document.querySelectorAll('.cat-delete').forEach(btn => {
+        btn.onclick = async () => {
+          if (confirm('Excluir esta categoria?')) {
+            await window.api.categories.delete(parseInt(btn.dataset.id));
+            toast('Categoria excluída');
+            openSettingsModal('categories');
+          }
+        };
+      });
+      document.querySelectorAll('.cat-edit').forEach(btn => {
+        btn.onclick = () => {
+          const catId = parseInt(btn.dataset.id);
+          const cat = categories.find(c => c.id === catId);
+          if (cat) openCategoryModal(categories, cat);
+        };
+      });
+
+    } else if (tab === 'backups') {
+      bodyEl.innerHTML = `
+        <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+          💾 Gestão de Backups & Exportação de Dados
+        </h3>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
+          Exporte ou restaure suas informações financeiras em múltiplos formatos seguros e compatíveis com planilhas e sistemas externos:
+        </p>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;">
+          
+          <!-- CARD 1: BANCO SQLITE (.db) -->
+          <div style="padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-surface); display: flex; flex-direction: column; justify-content: space-between; gap: 12px;">
+            <div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                <span style="font-weight: 700; font-size: 14px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                  <span>📦 Banco SQLite</span>
+                </span>
+                <span class="badge badge-purple" style="font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 12px; background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3);">.DB</span>
+              </div>
+              <p style="font-size: 12px; color: var(--text-muted); margin: 0; line-height: 1.4;">
+                Cópia de segurança nativa do arquivo de banco de dados do sistema contendo todas as tabelas.
+              </p>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+              <button class="btn btn-secondary btn-sm" id="btn-backup" style="flex: 1; min-width: 110px; font-size: 12px;">
+                💾 Exportar .db
+              </button>
+              ${(State.user.profile_type === 1 || State.user.is_system_admin === 1) ? `
+              <button class="btn btn-secondary btn-sm" id="btn-restore-backup" style="flex: 1; min-width: 110px; font-size: 12px; border: 1px dashed var(--border);">
+                📂 Restaurar .db
+              </button>
+              <input type="file" id="input-restore-backup" accept=".db" style="display:none">
+              ` : ''}
+            </div>
+          </div>
+
+          <!-- CARD 2: EXCEL (.xlsx) -->
+          <div style="padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-surface); display: flex; flex-direction: column; justify-content: space-between; gap: 12px;">
+            <div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                <span style="font-weight: 700; font-size: 14px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                  <span>📊 Planilhas Excel</span>
+                </span>
+                <span class="badge badge-success" style="font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 12px; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">.XLSX</span>
+              </div>
+              <p style="font-size: 12px; color: var(--text-muted); margin: 0; line-height: 1.4;">
+                Relatórios financeiros formatados com abas separadas de Resumo, Lançamentos e Planejamento.
+              </p>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+              <button class="btn btn-primary btn-sm" id="btn-export-month" style="flex: 1; min-width: 110px; font-size: 12px;">
+                📅 Excel Mês (${capitalizedMonth})
+              </button>
+              <button class="btn btn-primary btn-sm" id="btn-export-year" style="flex: 1; min-width: 110px; font-size: 12px;">
+                📊 Excel Anual (${State.currentYear})
+              </button>
+            </div>
+          </div>
+
+          <!-- CARD 3: EXTRATO CSV (.csv) -->
+          <div style="padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-surface); display: flex; flex-direction: column; justify-content: space-between; gap: 12px;">
+            <div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                <span style="font-weight: 700; font-size: 14px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                  <span>📋 Extrato CSV</span>
+                </span>
+                <span class="badge badge-warning" style="font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 12px; background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3);">.CSV</span>
+              </div>
+              <p style="font-size: 12px; color: var(--text-muted); margin: 0; line-height: 1.4;">
+                Extrato leve de lançamentos em texto separado por ponto-e-vírgula (compatível com Excel).
+              </p>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+              <button class="btn btn-secondary btn-sm" id="btn-export-csv-month" style="flex: 1; min-width: 110px; font-size: 12px;">
+                📋 CSV Mensal
+              </button>
+              <button class="btn btn-secondary btn-sm" id="btn-export-csv-year" style="flex: 1; min-width: 110px; font-size: 12px;">
+                📅 CSV Anual
+              </button>
+            </div>
+          </div>
+
+          <!-- CARD 4: BACKUP ESTRUTURADO JSON (.json) -->
+          <div style="padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-surface); display: flex; flex-direction: column; justify-content: space-between; gap: 12px;">
+            <div>
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                <span style="font-weight: 700; font-size: 14px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+                  <span>📑 Backup Portátil</span>
+                </span>
+                <span class="badge badge-info" style="font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 12px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);">.JSON</span>
+              </div>
+              <p style="font-size: 12px; color: var(--text-muted); margin: 0; line-height: 1.4;">
+                Arquivo estruturado completo com todas as entidades para exportação e inspeção de dados.
+              </p>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+              <button class="btn btn-secondary btn-sm" id="btn-export-json" style="flex: 1; min-width: 110px; font-size: 12px;">
+                📑 Exportar JSON
+              </button>
+            </div>
+          </div>
 
         </div>
-        
-        <div style="margin-top:20px"><button class="btn btn-secondary btn-sm" id="btn-add-category">+ Nova categoria</button></div>
-      </div>
+      `;
 
-      <div class="settings-section">
-        <div class="settings-section-title">💾 Dados & Exportação</div>
-        <div style="display: flex; flex-direction: column; gap: 12px; max-width: 320px; margin-top: 10px;">
-          <button class="btn btn-secondary" id="btn-backup" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
-            💾 Exportar Backup do Banco (.db)
-          </button>
-          ${(State.user.profile_type === 1 || State.user.is_system_admin === 1) ? `
-          <button class="btn btn-secondary" id="btn-restore-backup" style="display: flex; align-items: center; justify-content: center; gap: 8px; background: rgba(255,255,255,0.03); border: 1px dashed var(--border);">
-            📂 Restaurar Banco de Dados (.db)
-          </button>
-          <input type="file" id="input-restore-backup" accept=".db" style="display:none">
-          ` : ''}
-          <div style="border-top: 1px dashed var(--border); margin: 8px 0;"></div>
-          <button class="btn btn-primary" id="btn-export-month" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
-            📊 Exportar Excel (Mês Atual: ${capitalizedMonth}/${State.currentYear})
-          </button>
-          <button class="btn btn-primary" id="btn-export-year" style="display: flex; align-items: center; justify-content: center; gap: 8px;">
-            📅 Exportar Excel (Ano Inteiro: ${State.currentYear})
+      bindBackupTabEvents(capitalizedMonth);
+
+    } else if (tab === 'wiki') {
+      bodyEl.innerHTML = `
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+          <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+            <span>📚 Base de Conhecimento (Wiki)</span>
+          </h3>
+          <span class="badge badge-purple" style="font-size: 10px; padding: 2px 8px; border-radius: 10px; background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3);">Guia Oficial</span>
+        </div>
+
+        <!-- BREADCRUMB / TRILHA DE NAVEGAÇÃO -->
+        <div id="wiki-breadcrumb" style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); margin-bottom: 12px; background: rgba(255,255,255,0.03); padding: 8px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); flex-wrap: wrap;">
+          <span style="font-weight: 700; color: var(--text-muted); cursor: pointer;" id="wiki-crumb-root">📚 WIKI</span>
+          <span style="opacity: 0.4;">›</span>
+          <span id="wiki-crumb-cat" style="color: #60a5fa; font-weight: 600;">💳 Cartões de Crédito</span>
+          <span style="opacity: 0.4;">›</span>
+          <span id="wiki-crumb-sub" style="color: var(--accent-light); font-weight: 700;">Competência vs Vencimento</span>
+        </div>
+
+        <!-- BUSCA GLOBAL NA WIKI -->
+        <div style="margin-bottom: 12px; position: relative;">
+          <input type="text" id="wiki-search-input" placeholder="🔍 Pesquisar em todos os tópicos da Wiki..."
+                 style="width: 100%; padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-primary); font-size: 12.5px; outline: none;">
+        </div>
+
+        <!-- CONTAINER PRINCIPAL: MENU EM ÁRVORE (ESQUERDA) + CONTEÚDO (DIREITA) -->
+        <div style="display: flex; gap: 14px; height: 430px; overflow: hidden;">
+          
+          <!-- MENU EM ÁRVORE DE ASSUNTOS E SUBMENUS -->
+          <div id="wiki-tree-sidebar" style="width: 240px; min-width: 240px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 6px; scrollbar-width: thin;">
+            
+            <!-- GRUPO 1: CARTÕES DE CRÉDITO -->
+            <div class="wiki-tree-group">
+              <div class="wiki-tree-header" data-cat="cartoes" style="padding: 8px 10px; border-radius: 6px; font-weight: 700; font-size: 12px; color: #60a5fa; background: rgba(59,130,246,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+                <span>💳 Cartões de Crédito</span>
+                <span class="wiki-tree-arrow">▾</span>
+              </div>
+              <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+                <div class="wiki-tree-item active" data-cat="cartoes" data-topic="cartao-competencia" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-primary); cursor: pointer; border-left: 2px solid var(--accent); background: var(--bg-raised);">
+                  • Competência vs Vencimento
+                </div>
+                <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-ciclo" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+                  • Ciclo & Melhor Dia
+                </div>
+                <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-limite" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+                  • Limite Comprometido
+                </div>
+                <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-pagamento" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+                  • Pagamento & Baixa Atômica
+                </div>
+                <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-acordo" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+                  • Renegociação & Acordos
+                </div>
+                <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-reabertura" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+                  • Reabertura & Estorno
+                </div>
+              </div>
+            </div>
+
+            <!-- GRUPO 2: DESPESAS & RECEITAS -->
+            <div class="wiki-tree-group">
+              <div class="wiki-tree-header" data-cat="lancamentos" style="padding: 8px 10px; border-radius: 6px; font-weight: 700; font-size: 12px; color: #34d399; background: rgba(16,185,129,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+                <span>📌 Despesas & Receitas</span>
+                <span class="wiki-tree-arrow">▾</span>
+              </div>
+              <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+                <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-competencia" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+                  • Competência (Ref: MM/AAAA)
+                </div>
+                <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-fixas" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+                  • Despesas Fixas & Prioridade ⭐
+                </div>
+                <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-avulsos" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+                  • Despesas Variáveis (Avulsas)
+                </div>
+                <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-juros" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+                  • Juros, Multas e Descontos
+                </div>
+              </div>
+            </div>
+
+            <!-- GRUPO 3: CONTAS & CARTEIRAS -->
+            <div class="wiki-tree-group">
+              <div class="wiki-tree-header" data-cat="contas" style="padding: 8px 10px; border-radius: 6px; font-weight: 700; font-size: 12px; color: #06b6d4; background: rgba(6,182,212,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+                <span>🏦 Contas & Transferências</span>
+                <span class="wiki-tree-arrow">▾</span>
+              </div>
+              <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+                <div class="wiki-tree-item" data-cat="contas" data-topic="contas-tipos" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+                  • Tipos de Contas Bancárias
+                </div>
+                <div class="wiki-tree-item" data-cat="contas" data-topic="contas-transf" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+                  • Transferências sem Duplicação
+                </div>
+                <div class="wiki-tree-item" data-cat="contas" data-topic="contas-produtos" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+                  • Produtos da Conta & Limites
+                </div>
+              </div>
+            </div>
+
+            <!-- GRUPO 4: FAMÍLIA & PERMISSÕES -->
+            <div class="wiki-tree-group">
+              <div class="wiki-tree-header" data-cat="familia" style="padding: 8px 10px; border-radius: 6px; font-weight: 700; font-size: 12px; color: #a78bfa; background: rgba(167,139,250,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+                <span>👨‍👩‍👧 Família & Permissões</span>
+                <span class="wiki-tree-arrow">▾</span>
+              </div>
+              <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+                <div class="wiki-tree-item" data-cat="familia" data-topic="fam-perfis" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+                  • Papéis de Usuário (ADM, etc)
+                </div>
+                <div class="wiki-tree-item" data-cat="familia" data-topic="fam-permissoes" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+                  • Permissões Granulares por Menu
+                </div>
+              </div>
+            </div>
+
+            <!-- GRUPO 5: ORÇAMENTOS & METAS -->
+            <div class="wiki-tree-group">
+              <div class="wiki-tree-header" data-cat="orcamentos" style="padding: 8px 10px; border-radius: 6px; font-weight: 700; font-size: 12px; color: #f43f5e; background: rgba(244,63,94,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+                <span>🎯 Orçamentos & Metas</span>
+                <span class="wiki-tree-arrow">▾</span>
+              </div>
+              <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+                <div class="wiki-tree-item" data-cat="orcamentos" data-topic="orc-budgets" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+                  • Tetos de Gastos por Categoria
+                </div>
+                <div class="wiki-tree-item" data-cat="orcamentos" data-topic="orc-metas" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+                  • Metas Financeiras & Aportes
+                </div>
+              </div>
+            </div>
+
+            <!-- GRUPO 6: METODOLOGIA 50-30-20 -->
+            <div class="wiki-tree-group">
+              <div class="wiki-tree-header" data-cat="metodologia" style="padding: 8px 10px; border-radius: 6px; font-weight: 700; font-size: 12px; color: #c084fc; background: rgba(192,132,252,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+                <span>💡 Metodologia 50-30-20</span>
+                <span class="wiki-tree-arrow">▾</span>
+              </div>
+              <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+                <div class="wiki-tree-item" data-cat="metodologia" data-topic="met-regra" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+                  • Como Dividir o Orçamento Familiar
+                </div>
+              </div>
+            </div>
+
+            <!-- GRUPO 7: FAQ INTERATIVO -->
+            <div class="wiki-tree-group">
+              <div class="wiki-tree-header" data-cat="faq" style="padding: 8px 10px; border-radius: 6px; font-weight: 700; font-size: 12px; color: #f87171; background: rgba(248,113,113,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+                <span>❓ FAQ (Perguntas)</span>
+                <span class="wiki-tree-arrow">▾</span>
+              </div>
+              <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+                <div class="wiki-tree-item" data-cat="faq" data-topic="faq-interativo" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+                  • Dúvidas Frequentes (Clique e Veja)
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- PAINEL DE CONTEÚDO (DIREITA) -->
+          <div id="wiki-display-panel" style="flex: 1; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); overflow-y: auto; padding: 18px; scrollbar-width: thin;">
+
+            <!-- TÓPICO: CARTÕES > COMPETÊNCIA VS VENCIMENTO -->
+            <div class="wiki-topic-content" id="topic-cartao-competencia" style="display: block;">
+              <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #60a5fa; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                <span>📋 Competência vs. Vencimento na Fatura do Cartão</span>
+              </h4>
+              <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
+                <div style="background: rgba(96,165,250,0.08); border-left: 4px solid #60a5fa; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+                  <strong>Como o aplicativo sincroniza o consumo real com o vencimento do cartão:</strong>
+                </div>
+                <p style="margin-bottom: 10px;">• <strong>Mês de Competência da Fatura (<code>competence_date</code>):</strong> Representa o mês do ciclo de compras. Por exemplo, a fatura com ciclo encerrando em 25 de <em>Fevereiro</em> possui competência de <strong>Fevereiro</strong>.</p>
+                <p style="margin-bottom: 10px;">• <strong>Data de Vencimento (<code>due_day</code>):</strong> É o dia exato em que o banco cobra o pagamento da fatura (ex: dia 05 de <em>Março</em>).</p>
+                <p style="margin-bottom: 10px;">• <strong>Controle de Despesas Parceladas:</strong> Cada parcela de uma compra parcelada é atribuída automaticamente à fatura do seu respectivo mês de competência, garantindo que o seu fluxo de caixa reflita a realidade exata de cada período.</p>
+              </div>
+            </div>
+
+            <!-- TÓPICO: CARTÕES > CICLO & MELHOR DIA -->
+            <div class="wiki-topic-content" id="topic-cartao-ciclo" style="display: none;">
+              <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #60a5fa; font-weight: 700;">
+                🔒 Ciclo de Fechamento & O "Melhor Dia de Compra"
+              </h4>
+              <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
+                <div style="background: rgba(59,130,246,0.08); border-left: 4px solid var(--info); padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+                  <strong>Fórmula do Ciclo:</strong> <code>(Fechamento Anterior + 1)</code> até <code>(Fechamento Atual)</code>
+                </div>
+                <p style="margin-bottom: 10px;"><strong>Exemplo Prático (Fechamento dia 25 e Vencimento dia 05):</strong></p>
+                <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
+                  <li>Compras realizadas de <strong>26/07 a 25/08</strong> entram na fatura de <strong>Agosto</strong> (vencimento em 05/09).</li>
+                  <li>Compras realizadas no dia <strong>26/08 em diante</strong> entram apenas na fatura de <strong>Setembro</strong> (vencimento em 05/10).</li>
+                </ul>
+                <p style="margin: 0;">💡 <strong>Dica de Ouro:</strong> Comprar no dia 26 garante até <strong>40 dias de prazo</strong> para pagar a despesa sem juros!</p>
+              </div>
+            </div>
+
+            <!-- TÓPICO: CARTÕES > LIMITE COMPROMETIDO -->
+            <div class="wiki-topic-content" id="topic-cartao-limite" style="display: none;">
+              <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #60a5fa; font-weight: 700;">
+                📊 Limite Global Comprometido vs. Limite Disponível
+              </h4>
+              <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
+                <p style="margin-bottom: 10px;">Quando você cadastra um cartão com <strong>Limite Total de R$ 5.000,00</strong>:</p>
+                <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
+                  <li>Se você faz uma compra de <strong>R$ 1.200,00 em 12x de R$ 100,00</strong>, o limite disponível cai imediatamente para <strong>R$ 3.800,00</strong>.</li>
+                  <li>O widget de Rosca (Donut) no Dashboard exibe <code>Limite Comprometido = R$ 1.200,00 (24%)</code>.</li>
+                  <li>Conforme você paga a fatura mensal (R$ 100,00), o sistema libera R$ 100,00 do limite automaticamente!</li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- TÓPICO: CARTÕES > PAGAMENTO & BAIXA ATÔMICA -->
+            <div class="wiki-topic-content" id="topic-cartao-pagamento" style="display: none;">
+              <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #60a5fa; font-weight: 700;">
+                💵 Pagamento de Fatura & Baixa Atômica
+              </h4>
+              <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
+                <p style="margin-bottom: 10px;">Ao clicar no botão <strong>"Pagar Fatura"</strong> na aba de Planejamento:</p>
+                <div style="background: var(--bg-raised); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+                  <p style="margin-bottom: 6px;">1. 🏦 <strong>Débito em Conta:</strong> O valor líquido da fatura é subtraído do saldo da conta corrente selecionada.</p>
+                  <p style="margin-bottom: 6px;">2. 🏷️ <strong>Status da Fatura:</strong> A fatura é marcada como <span class="badge badge-green">Paga</span> com a data exata do pagamento.</p>
+                  <p style="margin: 0;">3. 📦 <strong>Baixa nas Compras:</strong> Todas as compras e parcelas pertencentes àquele ciclo são marcadas como quitadas em uma única transação atômica.</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- TÓPICO: CARTÕES > RENEGOCIAÇÃO & ACORDO -->
+            <div class="wiki-topic-content" id="topic-cartao-acordo" style="display: none;">
+              <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #60a5fa; font-weight: 700;">
+                🤝 Renegociação & Parcelamento de Fatura
+              </h4>
+              <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
+                <p style="margin-bottom: 10px;">Caso você parcele ou faça um acordo da fatura com o banco:</p>
+                <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
+                  <li>Clique em <strong>"Renegociar / Acordo"</strong> no card da fatura.</li>
+                  <li>Informe o valor da entrada (se houver) e a conta pagadora.</li>
+                  <li>Estipule o número de parcelas (ex: 6x) e o valor de cada uma.</li>
+                  <li>O sistema encerra a fatura com o selo <span class="badge badge-purple">🤝 Renegociada</span> e gera automaticamente as despesas recorrentes parceladas nos meses futuros.</li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- TÓPICO: CARTÕES > REABERTURA & ESTORNO -->
+            <div class="wiki-topic-content" id="topic-cartao-reabertura" style="display: none;">
+              <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #60a5fa; font-weight: 700;">
+                🔓 Reabertura de Fatura & Estorno Seguro
+              </h4>
+              <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
+                <p style="margin-bottom: 10px;">Se você deu baixa ou renegociou uma fatura por engano:</p>
+                <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
+                  <li>Clique em <strong>"Reabrir Fatura"</strong>.</li>
+                  <li>O valor pago é <strong>estornado de volta para o saldo da sua conta bancária</strong>.</li>
+                  <li>Se houve renegociação, as parcelas futuras geradas pelo acordo são canceladas e removidas.</li>
+                  <li>A fatura volta para o estado <span class="badge badge-yellow">⏳ Aberta</span> e recalcula seu valor total automaticamente.</li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- TÓPICO: LANÇAMENTOS > COMPETÊNCIA -->
+            <div class="wiki-topic-content" id="topic-lanc-competencia" style="display: none;">
+              <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #34d399; font-weight: 700;">
+                📋 Mês de Referência (Competência: Ref: MM/AAAA)
+              </h4>
+              <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
+                <p style="margin-bottom: 10px;">O app permite controlar tanto a data de pagamento quanto o mês de competência:</p>
+                <div style="background: rgba(16,185,129,0.08); border-left: 4px solid #10b981; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 12px;">
+                  <strong>Exemplo de Conta de Energia:</strong><br>
+                  • Consumo do mês de <strong>Fevereiro</strong> (Competência: <code>Ref: 02/2026</code>).<br>
+                  • Vencimento do boleto em <strong>10 de Março</strong> (Data de Pagamento: <code>10/03/2026</code>).
+                </div>
+                <p style="margin: 0;">Isso garante que ao emitir relatórios de gastos mensais, o custo seja computado no mês em que o consumo realmente ocorreu.</p>
+              </div>
+            </div>
+
+            <!-- TÓPICO: LANÇAMENTOS > FIXAS -->
+            <div class="wiki-topic-content" id="topic-lanc-fixas" style="display: none;">
+              <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #34d399; font-weight: 700;">
+                ⭐ Despesas Fixas (Recorrentes) & Prioridades
+              </h4>
+              <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
+                <p style="margin-bottom: 10px;">Despesas fixas são aquelas que se repetem todo mês (Aluguel, Internet, Mensalidade Escolar, Financiamento):</p>
+                <p style="margin-bottom: 8px;">• <strong>Estrela de Prioridade ⭐:</strong> Marque despesas essenciais com estrela para que fiquem no topo da lista.</p>
+                <p style="margin: 0;">• <strong>Adiar Vencimento:</strong> Permite empurrar o vencimento de uma conta para frente se o orçamento do mês estiver apertado.</p>
+              </div>
+            </div>
+
+            <!-- TÓPICO: LANÇAMENTOS > AVULSOS -->
+            <div class="wiki-topic-content" id="topic-lanc-avulsos" style="display: none;">
+              <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #34d399; font-weight: 700;">
+                🛍️ Despesas Variáveis do Mês (Avulsas)
+              </h4>
+              <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
+                <p style="margin-bottom: 10px;">Gastos esporádicos do dia a dia (Supermercado, Farmácia, Restaurante, Combustível):</p>
+                <p style="margin: 0;">Clique no botão roxo <code>+ Nova Variável</code> em qualquer momento para registrar uma compra rápida, escolhendo a categoria, conta/cartão e quem realizou o gasto.</p>
+              </div>
+            </div>
+
+            <!-- TÓPICO: LANÇAMENTOS > JUROS & DESCONTOS -->
+            <div class="wiki-topic-content" id="topic-lanc-juros" style="display: none;">
+              <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #34d399; font-weight: 700;">
+                🏷️ Juros, Multas e Descontos Antecipados
+              </h4>
+              <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
+                <p style="margin-bottom: 8px;">• <strong>Desconto:</strong> Ao pagar antecipado com desconto, o sistema debita do saldo da conta apenas o valor líquido real.</p>
+                <p style="margin: 0;">• <strong>Juros / Multa:</strong> Ao pagar em atraso, registre o acréscimo para que o valor real debitado corresponda exatamente ao extrato do banco.</p>
+              </div>
+            </div>
+
+            <!-- TÓPICO: CONTAS > TIPOS -->
+            <div class="wiki-topic-content" id="topic-contas-tipos" style="display: none;">
+              <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #06b6d4; font-weight: 700;">
+                🏦 Tipos de Contas Bancárias & Carteiras
+              </h4>
+              <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
+                <p style="margin-bottom: 8px;">• <span class="badge badge-blue">Conta Corrente</span>: Banco do Brasil, Itaú, Nubank, etc.</p>
+                <p style="margin-bottom: 8px;">• <span class="badge badge-green">Poupança / Investimentos</span>: Reserva de emergência e aplicações.</p>
+                <p style="margin-bottom: 8px;">• <span class="badge badge-yellow">Carteira Física</span>: Dinheiro em espécie na mão.</p>
+                <p style="margin: 0;">• <span class="badge badge-cyan">Voucher</span>: Vale Refeição / Alimentação (Alelo, Ticket, Sodexo).</p>
+              </div>
+            </div>
+
+            <!-- TÓPICO: CONTAS > TRANSFERÊNCIAS -->
+            <div class="wiki-topic-content" id="topic-contas-transf" style="display: none;">
+              <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #06b6d4; font-weight: 700;">
+                🔁 Transferências entre Contas sem Duplicação
+              </h4>
+              <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
+                <p style="margin: 0;">Ao usar o botão <strong>"Nova Transferência"</strong> na tela de Contas, o saldo é transferido da conta de origem para a de destino sem gerar receitas ou despesas artificiais no balanço familiar.</p>
+              </div>
+            </div>
+
+            <!-- TÓPICO: CONTAS > PRODUTOS -->
+            <div class="wiki-topic-content" id="topic-contas-produtos" style="display: none;">
+              <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #06b6d4; font-weight: 700;">
+                💳 Produtos da Conta (Banricompras, Cheque Especial)
+              </h4>
+              <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
+                <p style="margin: 0;">O aplicativo suporta produtos acoplados à conta corrente, permitindo parcelar despesas em débito pré-datado ou controlar o uso do cheque especial com visibilidade total.</p>
+              </div>
+            </div>
+
+            <!-- TÓPICO: FAMÍLIA > PERFIS -->
+            <div class="wiki-topic-content" id="topic-fam-perfis" style="display: none;">
+              <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #a78bfa; font-weight: 700;">
+                👑 Papéis de Usuário (ADM, Responsável, Colaborador, Caçula)
+              </h4>
+              <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
+                <p style="margin-bottom: 8px;">• 👑 <strong>ADM Geral:</strong> Gestão técnica, auditoria e backups globais.</p>
+                <p style="margin-bottom: 8px;">• ⭐ <strong>Responsável:</strong> Gestão financeira da casa, membros e permissões.</p>
+                <p style="margin-bottom: 8px;">• 👤 <strong>Colaborador:</strong> Membro adulto com acesso às suas finanças e menus autorizados.</p>
+                <p style="margin: 0;">• 🧸 <strong>Caçula:</strong> Interface especial para crianças e controle de mesada.</p>
+              </div>
+            </div>
+
+            <!-- TÓPICO: FAMÍLIA > PERMISSÕES -->
+            <div class="wiki-topic-content" id="topic-fam-permissoes" style="display: none;">
+              <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #a78bfa; font-weight: 700;">
+                🔒 Permissões Granulares por Menu
+              </h4>
+              <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
+                <p style="margin: 0;">Em <em>Configurações ⚙️ → Membros da Família</em>, o Responsável pode ativar ou desativar individualmente quais telas cada membro pode visualizar (Dashboard, Contas, Metas, Relatórios).</p>
+              </div>
+            </div>
+
+            <!-- TÓPICO: ORÇAMENTOS > BUDGETS -->
+            <div class="wiki-topic-content" id="topic-orc-budgets" style="display: none;">
+              <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #f43f5e; font-weight: 700;">
+                📊 Tetos de Gastos por Categoria (Budgets)
+              </h4>
+              <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
+                <p style="margin: 0;">Estipule um limite máximo para categorias como Alimentação, Lazer e Transporte. O app avisa com barras coloridas quando você atinge 70%, 90% ou 100% do teto estipulado.</p>
+              </div>
+            </div>
+
+            <!-- TÓPICO: ORÇAMENTOS > METAS -->
+            <div class="wiki-topic-content" id="topic-orc-metas" style="display: none;">
+              <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #f43f5e; font-weight: 700;">
+                🏆 Metas Financeiras & Depósitos (Aportes)
+              </h4>
+              <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
+                <p style="margin: 0;">Crie objetivos da família (Viagem de Férias, Carro Novo, Reforma) e registre aportes mensais até completar 100% da meta!</p>
+              </div>
+            </div>
+
+            <!-- TÓPICO: METODOLOGIA > REGRA 50-30-20 -->
+            <div class="wiki-topic-content" id="topic-met-regra" style="display: none;">
+              <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #c084fc; font-weight: 700;">
+                💡 Metodologia Familiar: A Regra dos 50-30-20
+              </h4>
+              <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
+                <div style="background: rgba(192,132,252,0.08); border-left: 4px solid #c084fc; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 12px;">
+                  <strong>Divisão Ideal da Renda Familiar:</strong><br>
+                  • <strong>50% — Necessidades Básicas:</strong> Moradia, mercado, saúde, contas de consumo.<br>
+                  • <strong>30% — Estilo de Vida:</strong> Passeios, restaurantes, cinema, hobbies.<br>
+                  • <strong>20% — Futuro & Metas:</strong> Reserva de emergência e investimentos.
+                </div>
+              </div>
+            </div>
+
+            <!-- TÓPICO: FAQ INTERATIVO (ACCORDION CLICK-TO-EXPAND) -->
+            <div class="wiki-topic-content" id="topic-faq-interativo" style="display: none;">
+              <h4 style="margin: 0 0 14px 0; font-size: 15px; color: #f87171; font-weight: 700; display: flex; align-items: center; justify-content: space-between;">
+                <span>❓ Perguntas Frequentes (Clique para Ver a Resposta)</span>
+              </h4>
+              
+              <div style="display: flex; flex-direction: column; gap: 8px;">
+
+                <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
+                  <div class="wiki-faq-q" style="padding: 12px 14px; font-weight: 600; font-size: 12.8px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
+                    <span>📱 Como conectar o aplicativo ao celular na mesma rede Wi-Fi?</span>
+                    <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
+                  </div>
+                  <div class="wiki-faq-a" style="display: none; padding: 12px 14px; font-size: 12.5px; color: var(--text-muted); line-height: 1.6; border-top: 1px solid var(--border); background: var(--bg-surface);">
+                    Basta certificar-se de que o computador e o celular estão conectados na mesma rede Wi-Fi. No app do computador, clique no ícone <strong>"Conectar Celular 📱"</strong> no menu lateral e aponte a câmera do celular para o QR Code exibido na tela.
+                  </div>
+                </div>
+
+                <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
+                  <div class="wiki-faq-q" style="padding: 12px 14px; font-weight: 600; font-size: 12.8px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
+                    <span>🔑 Como funciona a recuperação de senha com pergunta secreta?</span>
+                    <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
+                  </div>
+                  <div class="wiki-faq-a" style="display: none; padding: 12px 14px; font-size: 12.5px; color: var(--text-muted); line-height: 1.6; border-top: 1px solid var(--border); background: var(--bg-surface);">
+                    Na tela de login, clique no link <em>"Esqueci minha senha"</em>, informe seu nome de usuário e responda à pergunta de segurança cadastrada. O sistema valida sua resposta e permite cadastrar uma nova senha imediatamente.
+                  </div>
+                </div>
+
+                <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
+                  <div class="wiki-faq-q" style="padding: 12px 14px; font-weight: 600; font-size: 12.8px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
+                    <span>💳 Uma compra parcelada no cartão consome o limite inteiro imediatamente?</span>
+                    <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
+                  </div>
+                  <div class="wiki-faq-a" style="display: none; padding: 12px 14px; font-size: 12.5px; color: var(--text-muted); line-height: 1.6; border-top: 1px solid var(--border); background: var(--bg-surface);">
+                    Sim! O limite global do cartão é comprometido pelo valor integral da compra no momento do lançamento. O limite disponível vai sendo restabelecido mês a mês conforme você realiza o pagamento de cada fatura.
+                  </div>
+                </div>
+
+                <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
+                  <div class="wiki-faq-q" style="padding: 12px 14px; font-weight: 600; font-size: 12.8px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
+                    <span>🤝 O que acontece quando renegocio ou reabro uma fatura de cartão?</span>
+                    <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
+                  </div>
+                  <div class="wiki-faq-a" style="display: none; padding: 12px 14px; font-size: 12.5px; color: var(--text-muted); line-height: 1.6; border-top: 1px solid var(--border); background: var(--bg-surface);">
+                    Na renegociação, a fatura é quitada por acordo e as parcelas futuras são geradas automaticamente. Ao <strong>reabrir</strong>, o sistema desfaz o acordo, cancela as parcelas pendentes e estorna o pagamento para a conta corrente de forma segura e atômica.
+                  </div>
+                </div>
+
+                <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
+                  <div class="wiki-faq-q" style="padding: 12px 14px; font-weight: 600; font-size: 12.8px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
+                    <span>📦 Como exportar meus dados financeiros em Excel (.xlsx) ou CSV?</span>
+                    <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
+                  </div>
+                  <div class="wiki-faq-a" style="display: none; padding: 12px 14px; font-size: 12.5px; color: var(--text-muted); line-height: 1.6; border-top: 1px solid var(--border); background: var(--bg-surface);">
+                    Acesse <em>Configurações ⚙️ → Backups & Dados</em> e clique no botão de exportação desejado. Seus dados são formatados com cabeçalhos claros e valores compatíveis com Excel e Google Planilhas.
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      `;
+
+      // 1. INTERACTIVE TREE SIDEBAR NAVIGATION & BREADCRUMB
+      const treeHeaders = bodyEl.querySelectorAll('.wiki-tree-header');
+      const treeItems = bodyEl.querySelectorAll('.wiki-tree-item');
+      const crumbCat = document.getElementById('wiki-crumb-cat');
+      const crumbSub = document.getElementById('wiki-crumb-sub');
+      const topicContents = bodyEl.querySelectorAll('.wiki-topic-content');
+
+      // Toggle tree groups open/closed
+      treeHeaders.forEach(hdr => {
+        hdr.onclick = () => {
+          const subs = hdr.nextElementSibling;
+          const arrow = hdr.querySelector('.wiki-tree-arrow');
+          if (subs) {
+            const isHidden = subs.style.display === 'none';
+            subs.style.display = isHidden ? 'flex' : 'none';
+            if (arrow) arrow.textContent = isHidden ? '▾' : '▸';
+          }
+        };
+      });
+
+      // Select specific topic in tree
+      treeItems.forEach(item => {
+        item.onclick = () => {
+          treeItems.forEach(i => {
+            i.classList.remove('active');
+            i.style.borderLeftColor = 'transparent';
+            i.style.color = 'var(--text-muted)';
+            i.style.background = 'transparent';
+          });
+          item.classList.add('active');
+          item.style.borderLeftColor = 'var(--accent)';
+          item.style.color = 'var(--text-primary)';
+          item.style.background = 'var(--bg-raised)';
+
+          // Update breadcrumbs
+          const parentGroup = item.closest('.wiki-tree-group');
+          const groupHeader = parentGroup ? parentGroup.querySelector('.wiki-tree-header span') : null;
+          if (groupHeader) crumbCat.textContent = groupHeader.textContent.trim();
+          crumbSub.textContent = item.textContent.replace('•', '').trim();
+
+          // Show corresponding content
+          const topicKey = item.dataset.topic;
+          topicContents.forEach(tc => {
+            tc.style.display = (tc.id === `topic-${topicKey}`) ? 'block' : 'none';
+          });
+        };
+      });
+
+      // 2. FAQ INTERACTIVE CLICK-TO-EXPAND ACCORDION
+      bodyEl.querySelectorAll('.wiki-faq-q').forEach(qEl => {
+        qEl.onclick = () => {
+          const aEl = qEl.nextElementSibling;
+          const chevron = qEl.querySelector('.faq-chevron');
+          if (aEl) {
+            const isOpen = aEl.style.display === 'block';
+            aEl.style.display = isOpen ? 'none' : 'block';
+            if (chevron) chevron.textContent = isOpen ? '➕' : '➖';
+          }
+        };
+      });
+
+      // 3. GLOBAL SEARCH FILTER
+      const wikiSearch = document.getElementById('wiki-search-input');
+      if (wikiSearch) {
+        wikiSearch.oninput = (e) => {
+          const q = e.target.value.toLowerCase().trim();
+          if (q) {
+            crumbCat.textContent = 'Busca Global';
+            crumbSub.textContent = `Resultados para "${q}"`;
+            topicContents.forEach(tc => {
+              const text = tc.textContent.toLowerCase();
+              const matches = text.includes(q);
+              tc.style.display = matches ? 'block' : 'none';
+            });
+            // If FAQ contains query, auto open matched answers
+            bodyEl.querySelectorAll('.wiki-faq-accordion').forEach(acc => {
+              const text = acc.textContent.toLowerCase();
+              const aEl = acc.querySelector('.wiki-faq-a');
+              const chevron = acc.querySelector('.faq-chevron');
+              if (text.includes(q)) {
+                acc.style.display = 'block';
+                if (aEl) aEl.style.display = 'block';
+                if (chevron) chevron.textContent = '➖';
+              } else {
+                acc.style.display = 'none';
+              }
+            });
+          } else {
+            // Restore active tree topic
+            const activeItem = bodyEl.querySelector('.wiki-tree-item.active');
+            if (activeItem) activeItem.click();
+            bodyEl.querySelectorAll('.wiki-faq-accordion').forEach(acc => {
+              acc.style.display = 'block';
+              const aEl = acc.querySelector('.wiki-faq-a');
+              const chevron = acc.querySelector('.faq-chevron');
+              if (aEl) aEl.style.display = 'none';
+              if (chevron) chevron.textContent = '➕';
+            });
+          }
+        };
+      }
+
+    } else if (tab === 'lgpd') {
+      bodyEl.innerHTML = `
+        <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+          ⚖️ Privacidade & LGPD (Conformidade)
+        </h3>
+        <div style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 16px;">
+          De acordo com a Lei Geral de Proteção de Dados (LGPD), você possui o controle total sobre seus dados pessoais cadastrais e registros de transações financeiras.
+          <br><br>
+          <strong>Termos aceitos em:</strong> ${State.user.accepted_terms_timestamp ? new Date(State.user.accepted_terms_timestamp).toLocaleString('pt-BR') : 'Não registrado (versão legada)'}
+          <br>
+          <strong>Versão dos termos:</strong> ${State.user.accepted_terms_version || 'N/A'}
+        </div>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px;">
+          <button class="btn btn-secondary btn-sm" id="btn-show-terms-settings" style="padding: 8px 16px;">Visualizar Termos de Uso</button>
+          <button class="btn btn-secondary btn-sm" id="btn-show-privacy-settings" style="padding: 8px 16px;">Visualizar Política de Privacidade</button>
+          <button class="btn btn-secondary btn-sm" id="btn-export-my-data" style="padding: 8px 16px; display: flex; align-items: center; gap: 6px;">📦 Exportar Meus Dados (JSON)</button>
+        </div>
+        <div style="border-top: 1px dashed var(--border); margin: 16px 0;"></div>
+        <div>
+          <div style="font-size: 13px; font-weight: 600; color: #ef4444; margin-bottom: 8px;">⚠️ Excluir Minha Conta (Direito ao Esquecimento)</div>
+          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">
+            Ao clicar no botão abaixo, todos os seus dados pessoais (nome, CPF, e-mail, telefone), contas bancárias registradas, transações financeiras, orçamentos e metas serão <strong>excluídos permanentemente</strong> de nossos bancos de dados, sem possibilidade de recuperação.
+          </p>
+          <button class="btn btn-danger btn-sm" id="btn-delete-my-account" style="background-color: #ef4444; border-color: #ef4444; color: #ffffff; padding: 8px 16px;">
+            Excluir Definitivamente Minha Conta
           </button>
         </div>
-      </div>
+      `;
 
-      <div class="settings-section">
-        <div class="settings-section-title">⚖️ Privacidade & LGPD (Conformidade)</div>
-        <div class="card" style="padding: 20px;">
-          <div style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 16px;">
-            De acordo com a Lei Geral de Proteção de Dados (LGPD), você possui o controle total sobre seus dados pessoais cadastrais e registros de transações financeiras.
-            <br><br>
-            <strong>Termos aceitos em:</strong> ${State.user.accepted_terms_timestamp ? new Date(State.user.accepted_terms_timestamp).toLocaleString('pt-BR') : 'Não registrado (versão legada)'}
-            <br>
-            <strong>Versão dos termos:</strong> ${State.user.accepted_terms_version || 'N/A'}
-          </div>
-          <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-            <button class="btn btn-secondary btn-sm" id="btn-show-terms-settings" style="padding: 8px 16px;">Visualizar Termos de Uso</button>
-            <button class="btn btn-secondary btn-sm" id="btn-show-privacy-settings" style="padding: 8px 16px;">Visualizar Política de Privacidade</button>
-            <button class="btn btn-secondary btn-sm" id="btn-export-my-data" style="padding: 8px 16px; display: flex; align-items: center; gap: 6px;">📦 Exportar Meus Dados (JSON)</button>
-          </div>
-          <div style="border-top: 1px dashed var(--border); margin: 16px 0;"></div>
-          <div>
-            <div style="font-size: 13px; font-weight: 600; color: #ef4444; margin-bottom: 8px;">⚠️ Excluir Minha Conta (Direito ao Esquecimento)</div>
-            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">
-              Ao clicar no botão abaixo, todos os seus dados pessoais (nome, CPF, e-mail, telefone), contas bancárias registradas, transações financeiras, orçamentos e metas serão <strong>excluídos permanentemente</strong> de nossos bancos de dados, sem possibilidade de recuperação.
-            </p>
-            <button class="btn btn-danger btn-sm" id="btn-delete-my-account" style="background-color: #ef4444; border-color: #ef4444; color: #ffffff; padding: 8px 16px;">
-              Excluir Definitivamente Minha Conta
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>`;
+      bindLgpdTabEvents();
+    }
+  };
 
-  // --- MEU PERFIL EVENT BINDINGS & MASKS ---
+  document.querySelectorAll('.settings-modal-tab-btn').forEach(btn => {
+    btn.onclick = () => renderTabContent(btn.dataset.tab);
+  });
+
+  await renderTabContent(activeTab);
+}
+
+function bindProfileTabEvents(categories, users) {
   const profCpf = document.getElementById('prof-cpf');
   if (profCpf) {
     profCpf.oninput = (e) => {
@@ -3334,7 +7575,6 @@ async function renderSettings() {
         return;
       }
 
-      // Success! Update local State.user with the new values
       State.user.name = payload.name;
       State.user.first_name = payload.first_name;
       State.user.last_name = payload.last_name;
@@ -3344,156 +7584,26 @@ async function renderSettings() {
       State.user.phone = payload.phone;
       State.user.username = payload.username;
       
-      // Update sidebar name
       document.getElementById('sidebar-user-name').textContent = State.user.name;
-
       toast('Seu perfil foi atualizado com sucesso!', 'success');
-      renderSettings();
+      openSettingsModal('profile');
     };
   }
 
-  if (currentFamily && (State.user.profile_type === 1 || State.user.profile_type === 2)) {
-    document.getElementById('save-family-name').onclick = async () => {
-      const newName = document.getElementById('family-name-input').value.trim();
-      if (!newName) { toast('O nome da família não pode ser vazio', 'error'); return; }
-      const r = await window.api.families.update({
-        id: currentFamily.id,
-        name: newName,
-        quota_users: currentFamily.quota_users,
-        quota_accounts: currentFamily.quota_accounts
-      });
-      if (r.success) {
-        toast(`Nome da família atualizado para "${newName}"!`);
-        currentFamily.name = newName;
-        State.familyName = newName;
-        renderSettings();
-      } else {
-        toast('Erro ao atualizar nome da família: ' + r.error, 'error');
-      }
+  if (document.getElementById('save-alert-days')) {
+    document.getElementById('save-alert-days').onclick = async () => {
+      const days = parseInt(document.getElementById('alert-days').value);
+      if (!days || days < 1) { toast('Informe um valor válido', 'error'); return; }
+      await window.api.settings.set(State.user.id, 'alert_days_before', days);
+      State.settings.alert_days_before = days;
+      toast('Configuração de alertas salva!');
     };
   }
 
-  document.getElementById('save-alert-days').onclick = async () => {
-    const days = parseInt(document.getElementById('alert-days').value);
-    if (!days || days < 1) { toast('Informe um valor válido', 'error'); return; }
-    await window.api.settings.set(State.user.id, 'alert_days_before', days);
-    State.settings.alert_days_before = days;
-    toast('Configuração salva');
-  };
-  document.getElementById('btn-add-user').onclick = () => openRegisterModal();
-  document.getElementById('btn-add-category').onclick = () => openCategoryModal(categories);
-  document.getElementById('btn-backup').onclick = async () => {
-    try {
-      const r = await window.api.backup.export();
-      if (r && r.fileData) {
-        // Web/RPC flow: convert base64 to binary blob and trigger download
-        const binaryStr = atob(r.fileData);
-        const bytes = new Uint8Array(binaryStr.length);
-        for (let i = 0; i < binaryStr.length; i++) {
-          bytes[i] = binaryStr.charCodeAt(i);
-        }
-        const blob = new Blob([bytes], { type: 'application/x-sqlite3' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = r.filename || 'financeiro.db';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        toast('Backup exportado com sucesso!');
-      } else if (r && r.success) {
-        // Desktop flow
-        toast('Backup exportado!');
-      } else {
-        toast('Erro ao exportar backup', 'error');
-      }
-    } catch (err) {
-      toast('Erro na exportação: ' + err.message, 'error');
-    }
-  };
-
-  if (document.getElementById('btn-restore-backup')) {
-    document.getElementById('btn-restore-backup').onclick = () => {
-      document.getElementById('input-restore-backup').click();
-    };
-    
-    document.getElementById('input-restore-backup').onchange = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const confirmRestore = confirm('⚠️ ATENÇÃO: Restaurar o banco de dados irá SOBRESCREVER todos os dados atuais (incluindo usuários, contas, lançamentos e famílias) de forma definitiva!\n\nCertifique-se de que o arquivo .db selecionado é um backup válido.\n\nDeseja prosseguir com a restauração?');
-      if (!confirmRestore) {
-        e.target.value = '';
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const base64 = event.target.result.split(',')[1];
-        try {
-          const res = await window.api.backup.restore({ fileData: base64 });
-          if (res.success) {
-            alert('Banco de dados restaurado com sucesso! O aplicativo será recarregado.');
-            window.location.reload();
-          } else {
-            alert('Erro ao restaurar banco de dados: ' + (res.error || 'Erro desconhecido.'));
-          }
-        } catch (err) {
-          alert('Erro de conexão ao restaurar: ' + err.message);
-        }
-      };
-      reader.onerror = () => {
-        alert('Erro ao ler o arquivo selecionado.');
-      };
-      reader.readAsDataURL(file);
-    };
+  if (document.getElementById('btn-add-user')) {
+    document.getElementById('btn-add-user').onclick = () => openRegisterModal();
   }
-  document.getElementById('btn-export-month').onclick = async () => {
-    try {
-      const res = await window.api.backup.exportExcel({
-        userId: State.user.id,
-        month: State.currentMonth,
-        year: State.currentYear,
-        type: 'monthly'
-      });
-      if (res.success) {
-        toast('Excel mensal exportado com sucesso!');
-      } else if (res.message !== 'Cancelado') {
-        toast('Erro ao exportar: ' + (res.error || 'Erro desconhecido'), 'error');
-      }
-    } catch (err) {
-      toast('Erro ao exportar: ' + err.message, 'error');
-    }
-  };
-  document.getElementById('btn-export-year').onclick = async () => {
-    try {
-      const res = await window.api.backup.exportExcel({
-        userId: State.user.id,
-        year: State.currentYear,
-        type: 'annual'
-      });
-      if (res.success) {
-        toast('Excel anual exportado com sucesso!');
-      } else if (res.message !== 'Cancelado') {
-        toast('Erro ao exportar: ' + (res.error || 'Erro desconhecido'), 'error');
-      }
-    } catch (err) {
-      toast('Erro ao exportar: ' + err.message, 'error');
-    }
-  };
-  document.querySelectorAll('.cat-delete').forEach(btn => {
-    btn.onclick = async () => { if (confirm('Excluir?')) { await window.api.categories.delete(parseInt(btn.dataset.id)); toast('Categoria excluída'); renderSettings(); } };
-  });
-  document.querySelectorAll('.cat-edit').forEach(btn => {
-    btn.onclick = () => {
-      const catId = parseInt(btn.dataset.id);
-      const cat = categories.find(c => c.id === catId);
-      if (cat) openCategoryModal(categories, cat);
-    };
-  });
 
-  // Salvar edições do perfil pelo adm
   if (State.permissions.can_edit_all === 1) {
     document.querySelectorAll('.btn-edit-user').forEach(btn => {
       btn.onclick = () => {
@@ -3508,24 +7618,171 @@ async function renderSettings() {
         const uId = parseInt(btn.dataset.id);
         const targetUser = users.find(u => u.id === uId);
         if (targetUser) {
-          const confirmMsg = `Tem certeza que deseja excluir o usuário "${targetUser.name}" (@${targetUser.username})?\n\nISSO IRÁ APAGAR PERMANENTEMENTE:\n- A conta de acesso deste usuário\n- Todos os lançamentos dele\n- Todas as contas bancárias dele\n- Todos os planejamentos e metas criados por ele\n\nEsta ação NÃO pode ser desfeita. Deseja continuar?`;
+          const confirmMsg = `Tem certeza que deseja excluir o usuário "${targetUser.name}" (@${targetUser.username})?`;
           if (confirm(confirmMsg)) {
             const r = await window.api.auth.deleteUser(uId);
             if (r && r.error) {
               toast(r.error, 'error');
             } else {
-              toast('Usuário e todos os seus dados excluídos com sucesso');
-              renderSettings();
+              toast('Usuário excluído');
+              openSettingsModal('profile');
             }
           }
         }
       };
     });
-    
-    setupUserDragAndDrop(page.querySelector('.settings-list'));
+  }
+}
+
+function bindBackupTabEvents(capitalizedMonth) {
+  const downloadBase64File = (base64Content, filename, mimeType) => {
+    const binaryStr = atob(base64Content);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  if (document.getElementById('btn-backup')) {
+    document.getElementById('btn-backup').onclick = async () => {
+      try {
+        const r = await window.api.backup.export();
+        if (r && r.fileData) {
+          downloadBase64File(r.fileData, r.filename || 'financeiro.db', 'application/x-sqlite3');
+          toast('Backup exportado com sucesso!');
+        } else if (r && r.success) {
+          toast('Backup exportado!');
+        } else {
+          toast('Erro ao exportar backup', 'error');
+        }
+      } catch (err) {
+        toast('Erro na exportação: ' + err.message, 'error');
+      }
+    };
   }
 
-  // Bind Privacy Term buttons in Settings
+  if (document.getElementById('btn-restore-backup')) {
+    document.getElementById('btn-restore-backup').onclick = () => {
+      document.getElementById('input-restore-backup').click();
+    };
+    
+    document.getElementById('input-restore-backup').onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const confirmRestore = confirm('⚠️ ATENÇÃO: Restaurar o banco de dados irá SOBRESCREVER todos os dados atuais!');
+      if (!confirmRestore) { e.target.value = ''; return; }
+
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64 = event.target.result.split(',')[1];
+        try {
+          const res = await window.api.backup.restore({ fileData: base64 });
+          if (res.success) {
+            alert('Banco de dados restaurado com sucesso!');
+            window.location.reload();
+          } else {
+            alert('Erro ao restaurar: ' + (res.error || 'Erro desconhecido.'));
+          }
+        } catch (err) {
+          alert('Erro ao restaurar: ' + err.message);
+        }
+      };
+      reader.readAsDataURL(file);
+    };
+  }
+
+  if (document.getElementById('btn-export-month')) {
+    document.getElementById('btn-export-month').onclick = async () => {
+      try {
+        const res = await window.api.backup.exportExcel({ userId: State.user.id, month: State.currentMonth, year: State.currentYear, type: 'monthly' });
+        if (res.success) {
+          if (res.isWebDownload && res.content) {
+            downloadBase64File(res.content, res.filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+          }
+          toast('Excel mensal exportado!');
+        } else if (res.message !== 'Cancelado') {
+          toast('Erro ao exportar: ' + (res.error || 'Erro desconhecido'), 'error');
+        }
+      } catch (err) { toast('Erro: ' + err.message, 'error'); }
+    };
+  }
+
+  if (document.getElementById('btn-export-year')) {
+    document.getElementById('btn-export-year').onclick = async () => {
+      try {
+        const res = await window.api.backup.exportExcel({ userId: State.user.id, year: State.currentYear, type: 'annual' });
+        if (res.success) {
+          if (res.isWebDownload && res.content) {
+            downloadBase64File(res.content, res.filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+          }
+          toast('Excel anual exportado!');
+        } else if (res.message !== 'Cancelado') {
+          toast('Erro ao exportar: ' + (res.error || 'Erro desconhecido'), 'error');
+        }
+      } catch (err) { toast('Erro: ' + err.message, 'error'); }
+    };
+  }
+
+  if (document.getElementById('btn-export-csv-month')) {
+    document.getElementById('btn-export-csv-month').onclick = async () => {
+      try {
+        const res = await window.api.backup.exportCsv({ userId: State.user.id, month: State.currentMonth, year: State.currentYear, type: 'monthly' });
+        if (res.success) {
+          if (res.isWebDownload && res.content) {
+            downloadBase64File(res.content, res.filename, 'text/csv;charset=utf-8;');
+          }
+          toast('CSV mensal exportado!');
+        } else if (res.message !== 'Cancelado') {
+          toast('Erro ao exportar CSV: ' + (res.error || 'Erro desconhecido'), 'error');
+        }
+      } catch (err) { toast('Erro ao exportar CSV: ' + err.message, 'error'); }
+    };
+  }
+
+  if (document.getElementById('btn-export-csv-year')) {
+    document.getElementById('btn-export-csv-year').onclick = async () => {
+      try {
+        const res = await window.api.backup.exportCsv({ userId: State.user.id, year: State.currentYear, type: 'annual' });
+        if (res.success) {
+          if (res.isWebDownload && res.content) {
+            downloadBase64File(res.content, res.filename, 'text/csv;charset=utf-8;');
+          }
+          toast('CSV anual exportado!');
+        } else if (res.message !== 'Cancelado') {
+          toast('Erro ao exportar CSV: ' + (res.error || 'Erro desconhecido'), 'error');
+        }
+      } catch (err) { toast('Erro ao exportar CSV: ' + err.message, 'error'); }
+    };
+  }
+
+  if (document.getElementById('btn-export-json')) {
+    document.getElementById('btn-export-json').onclick = async () => {
+      try {
+        const res = await window.api.backup.exportJson({ userId: State.user.id });
+        if (res.success) {
+          if (res.isWebDownload && res.content) {
+            downloadBase64File(res.content, res.filename, 'application/json;charset=utf-8;');
+          }
+          toast('Backup JSON exportado!');
+        } else if (res.message !== 'Cancelado') {
+          toast('Erro ao exportar JSON: ' + (res.error || 'Erro desconhecido'), 'error');
+        }
+      } catch (err) { toast('Erro ao exportar JSON: ' + err.message, 'error'); }
+    };
+  }
+}
+
+function bindLgpdTabEvents() {
   const btnShowTerms = document.getElementById('btn-show-terms-settings');
   const btnShowPrivacy = document.getElementById('btn-show-privacy-settings');
   if (btnShowTerms) {
@@ -3549,7 +7806,6 @@ async function renderSettings() {
     };
   }
 
-  // LGPD data portability — export JSON button
   const btnExportMyData = document.getElementById('btn-export-my-data');
   if (btnExportMyData) {
     btnExportMyData.onclick = async () => {
@@ -3572,7 +7828,6 @@ async function renderSettings() {
     };
   }
 
-  // Account erasure button
   const btnDeleteMyAccount = document.getElementById('btn-delete-my-account');
   if (btnDeleteMyAccount) {
     btnDeleteMyAccount.onclick = () => {
@@ -3580,8 +7835,6 @@ async function renderSettings() {
         toast('O administrador do sistema (adm) não pode ser excluído!', 'error');
         return;
       }
-      
-      // Open confirm modal asking for password
       Modal.open('⚠️ Confirmar Exclusão de Conta', `
         <div style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 15px;">
           Esta ação é irreversível. Para confirmar a exclusão completa de todos os seus dados cadastrais e financeiros do sistema, digite a sua senha de acesso abaixo:
@@ -3602,44 +7855,29 @@ async function renderSettings() {
         const passwordInput = document.getElementById('delete-account-password').value;
         const errEl = document.getElementById('delete-account-error');
         errEl.textContent = '';
-        
-        if (!passwordInput) {
-          errEl.textContent = 'Por favor, insira sua senha.';
-          return;
-        }
-        
+        if (!passwordInput) { errEl.textContent = 'Por favor, insira sua senha.'; return; }
         const confirmBtn = document.getElementById('btn-confirm-delete');
-        confirmBtn.disabled = true;
-        confirmBtn.textContent = 'Processando...';
+        confirmBtn.disabled = true; confirmBtn.textContent = 'Processando...';
         
-        // Authenticate password
         const authCheck = await window.api.auth.login({ username: State.user.username, password: passwordInput });
         if (!authCheck.success) {
           errEl.textContent = 'Senha incorreta. Acesso negado.';
-          confirmBtn.disabled = false;
-          confirmBtn.textContent = 'Excluir Conta Permanentemente';
+          confirmBtn.disabled = false; confirmBtn.textContent = 'Excluir Conta Permanentemente';
           return;
         }
         
-        // Execute cascaded deletion
         const delRes = await window.api.auth.deleteSelf(State.user.id);
         if (delRes.success) {
           Modal.close();
           toast('Sua conta e todos os seus dados foram purgados do sistema.', 'success');
-          
-          // Clear session and redirect to login
           localStorage.removeItem('sessionToken');
           sessionStorage.removeItem('sessionToken');
           State.user = null;
           State.token = null;
-          
-          setTimeout(() => {
-            window.location.reload();
-          }, 1500);
+          setTimeout(() => { window.location.reload(); }, 1500);
         } else {
           errEl.textContent = delRes.error || 'Erro ao processar exclusão de dados.';
-          confirmBtn.disabled = false;
-          confirmBtn.textContent = 'Excluir Conta Permanentemente';
+          confirmBtn.disabled = false; confirmBtn.textContent = 'Excluir Conta Permanentemente';
         }
       };
     };
@@ -4701,6 +8939,12 @@ async function startApp(user) {
     }
   }
 
+  const syncBtn = document.getElementById('sidebar-sync-btn');
+  if (syncBtn) {
+    syncBtn.style.display = 'flex';
+    syncBtn.onclick = () => openDeduplicationModal();
+  }
+
   const avatarEl = document.getElementById('sidebar-avatar');
   avatarEl.innerHTML = renderAvatarHtml(user, 36);
   avatarEl.style.background = 'transparent';
@@ -5684,3 +9928,42 @@ function initLgpdModals() {
 
 // Call on startup
 initLgpdModals();
+
+/* ════════════════════════════════════════
+   THEME MANAGER (3 CONTRAST THEMES)
+   ═════════════════════════════════════════ */
+function setAppTheme(themeName) {
+  const THEME_KEY = 'financas_theme';
+  const validThemes = ['dark-emerald', 'light', 'high-contrast-dark', 'high-contrast-light'];
+  if (!validThemes.includes(themeName)) themeName = 'dark-emerald';
+  document.documentElement.setAttribute('data-theme', themeName);
+  localStorage.setItem(THEME_KEY, themeName);
+
+  const toggleBtn = document.getElementById('app-theme-toggle');
+  if (toggleBtn) {
+    toggleBtn.innerHTML = themeName === 'light' ? '🌙' : '☀️';
+    toggleBtn.title = themeName === 'light' ? 'Mudar para Modo Escuro' : 'Mudar para Modo Claro';
+  }
+}
+
+function initThemeSwitcher() {
+  const currentTheme = localStorage.getItem('financas_theme') || 'dark-emerald';
+  setAppTheme(currentTheme);
+
+  const toggleBtn = document.getElementById('app-theme-toggle');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const current = document.documentElement.getAttribute('data-theme') || 'dark-emerald';
+      const nextTheme = current === 'light' ? 'dark-emerald' : 'light';
+      setAppTheme(nextTheme);
+    });
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initThemeSwitcher);
+} else {
+  initThemeSwitcher();
+}
+

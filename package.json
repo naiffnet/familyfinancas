@@ -6,6 +6,7 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
+    "web": "electron server.js",
     "rebuild": "electron-rebuild -f -w better-sqlite3",
     "start:server": "node server.js",
     "start:server:local": "electron server.js"

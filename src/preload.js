@@ -55,8 +55,15 @@ contextBridge.exposeInMainWorld('api', {
     update:      (d)  => ipcRenderer.invoke('transactions:update', d),
     delete:      (id) => ipcRenderer.invoke('transactions:delete', id),
     togglePaid:  (id) => ipcRenderer.invoke('transactions:togglePaid', id),
-    togglePaidWithDate: (id, date) => ipcRenderer.invoke('transactions:togglePaidWithDate', id, date),
+    togglePaidWithDate: (id, date, options) => ipcRenderer.invoke('transactions:togglePaidWithDate', id, date, options),
     updatePositions: (userId, positions) => ipcRenderer.invoke('transactions:updatePositions', { userId, positions }),
+  },
+  invoices: {
+    getMonthly:  (d) => ipcRenderer.invoke('invoices:getMonthly', d),
+    pay:         (d) => ipcRenderer.invoke('invoices:pay', d),
+    renegotiate: (d) => ipcRenderer.invoke('invoices:renegotiate', d),
+    reopen:      (d) => ipcRenderer.invoke('invoices:reopen', d),
+    recalculate: (d) => ipcRenderer.invoke('invoices:recalculate', d),
   },
   budgets: {
     getAll: (d) => ipcRenderer.invoke('budgets:getAll', d),
@@ -83,6 +90,8 @@ contextBridge.exposeInMainWorld('api', {
     export: () => ipcRenderer.invoke('backup:export'),
     restore: (d) => ipcRenderer.invoke('backup:restore', d),
     exportExcel: (d) => ipcRenderer.invoke('backup:exportExcel', d),
+    exportJson: (d) => ipcRenderer.invoke('backup:exportJson', d),
+    exportCsv: (d) => ipcRenderer.invoke('backup:exportCsv', d),
   },
   permissions: {
     get: (userId) => ipcRenderer.invoke('permissions:get', userId),
@@ -98,5 +107,19 @@ contextBridge.exposeInMainWorld('api', {
   logs: {
     get: () => ipcRenderer.invoke('server:getLogs'),
     getByFamily: (id) => ipcRenderer.invoke('logs:getByFamily', id),
+  },
+  importer: {
+    parseOfx: (ofxString) => ipcRenderer.invoke('importer:parseOfx', { ofxString }),
+    parseCsv: (csvString) => ipcRenderer.invoke('importer:parseCsv', { csvString }),
+    importBatch: (d) => ipcRenderer.invoke('importer:importBatch', d),
+  },
+  sync: {
+    pushPull: (d) => ipcRenderer.invoke('sync:pushPull', d),
+    findDuplicates: (d) => ipcRenderer.invoke('sync:findDuplicates', d),
+    checkCandidate: (d) => ipcRenderer.invoke('sync:checkCandidate', d),
+    mergeTransactions: (d) => ipcRenderer.invoke('sync:mergeTransactions', d),
+    mergeBatch: (d) => ipcRenderer.invoke('sync:mergeBatch', d),
+    dismissDuplicate: (d) => ipcRenderer.invoke('sync:dismissDuplicate', d),
+    getHistory: (d) => ipcRenderer.invoke('sync:getHistory', d),
   },
 });

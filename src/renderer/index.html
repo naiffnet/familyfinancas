@@ -2,123 +2,427 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FinançasFamília — Controle Financeiro Inteligente</title>
-  <meta name="description" content="Planejamento e gerenciamento do orçamento familiar local e na nuvem.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>FinançasFamília — Controle Financeiro Inteligente & Familiar</title>
+  <meta name="description" content="Sistema completo de controle financeiro familiar, gestão de cartões, faturas, metas e orçamento. 100% privado e local.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="landing.css">
+  <script>
+    (function() {
+      const savedTheme = localStorage.getItem('financas_theme') || 'dark-emerald';
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    })();
+  </script>
 </head>
 <body>
 
-  <!-- Background Orbs -->
-  <div class="landing-bg">
+  <!-- Background Animated Orbs -->
+  <div class="landing-bg" aria-hidden="true">
     <div class="landing-orb landing-orb-1"></div>
     <div class="landing-orb landing-orb-2"></div>
     <div class="landing-orb landing-orb-3"></div>
   </div>
 
   <div class="landing-wrapper">
-    <!-- Header -->
+    <!-- Header / Navbar -->
     <header class="landing-header">
-      <div class="landing-logo">
+      <a href="index.html" class="landing-logo" aria-label="FinançasFamília Início">
         <span class="landing-logo-icon">💰</span>
         <span class="landing-logo-text">FinançasFamília</span>
-      </div>
-      <div>
-        <a href="app.html" class="btn btn-primary" style="padding: 8px 20px; font-size: 13px;">Acessar Painel</a>
+      </a>
+
+      <!-- Desktop Nav -->
+      <nav class="landing-nav" id="landing-nav">
+        <a href="#recursos" class="nav-link" onclick="scrollToSection('recursos', event)">Recursos</a>
+        <a href="#cartoes" class="nav-link" onclick="scrollToSection('cartoes', event)">Cartões & Dívidas</a>
+        <a href="#calculadora" class="nav-link" onclick="scrollToSection('calculadora', event)">Simulador</a>
+        <a href="#faq" class="nav-link" onclick="scrollToSection('faq', event)">Dúvidas</a>
+      </nav>
+
+      <!-- Header Actions -->
+      <div class="header-actions">
+        <button type="button" class="theme-toggle-btn" id="landing-theme-toggle" onclick="toggleLandingTheme()" title="Alternar tema visual" aria-label="Alternar tema">
+          🌓
+        </button>
+        <a href="app.html" class="btn btn-primary nav-cta">
+          <span>Acessar Painel</span>
+          <span class="cta-arrow">➔</span>
+        </a>
+        <button type="button" class="mobile-menu-toggle" id="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="Abrir menu mobile">
+          <span></span><span></span><span></span>
+        </button>
       </div>
     </header>
 
+    <!-- Mobile Navigation Drawer -->
+    <div class="mobile-nav-drawer" id="mobile-nav-drawer">
+      <a href="#recursos" class="mobile-nav-link" onclick="scrollToSection('recursos', event)">✨ Recursos</a>
+      <a href="#cartoes" class="mobile-nav-link" onclick="scrollToSection('cartoes', event)">💳 Cartões & Renegociação</a>
+      <a href="#calculadora" class="mobile-nav-link" onclick="scrollToSection('calculadora', event)">📊 Simulador de Economia</a>
+      <a href="#faq" class="mobile-nav-link" onclick="scrollToSection('faq', event)">❓ Perguntas Frequentes</a>
+      <a href="app.html" class="btn btn-primary" style="margin-top: 16px; width: 100%; text-align: center;">Entrar no Aplicativo ➔</a>
+    </div>
+
     <!-- Hero Section -->
     <section class="hero-section">
-      <div class="hero-tag">🚀 100% SEGURO E PRIVADO</div>
-      <h1 class="hero-title">O controle financeiro feito para a sua <span>família</span>.</h1>
+      <div class="hero-badge">
+        <span class="badge-dot"></span>
+        <span>NOVO: GESTÃO & RENEGOCIAÇÃO DE FATURAS DE CARTÃO</span>
+      </div>
+
+      <h1 class="hero-title">
+        O controle financeiro feito para o futuro da sua <span>família</span>.
+      </h1>
+
       <p class="hero-subtitle">
-        Gerencie gastos, planeje metas de economia e acompanhe cartões de crédito em um sistema integrado, moderno e com controle total dos seus dados.
+        Gerencie gastos fixos e variáveis, acompanhe ciclos de cartões de crédito, planeje metas de economia e tenha controle absoluto dos seus dados com segurança de nível bancário.
       </p>
-      <div class="hero-cta">
+
+      <div class="hero-cta-group">
         <a href="app.html" class="btn-cta btn-cta-primary">
-          Acessar o Aplicativo <span style="font-size: 18px;">➔</span>
+          <span>Abrir FinançasFamília</span>
+          <span class="btn-icon">➔</span>
         </a>
-        <a href="#recursos" class="btn-cta btn-cta-secondary">Conhecer Recursos</a>
+        <a href="#recursos" class="btn-cta btn-cta-secondary" onclick="scrollToSection('recursos', event)">
+          <span>Explorar Recursos</span>
+          <span class="btn-icon">⚡</span>
+        </a>
+      </div>
+
+      <!-- Live Interactive App Mockup Showcase -->
+      <div class="hero-showcase">
+        <div class="mockup-window">
+          <!-- Window Header Bar -->
+          <div class="mockup-titlebar">
+            <div class="mockup-dots">
+              <span class="dot dot-red"></span>
+              <span class="dot dot-yellow"></span>
+              <span class="dot dot-green"></span>
+            </div>
+            <div class="mockup-title">FinançasFamília — Painel Principal (Visão Geral)</div>
+            <div style="width: 48px;"></div>
+          </div>
+
+          <!-- Mockup Content -->
+          <div class="mockup-body">
+            <!-- Metrics Row -->
+            <div class="mockup-metrics">
+              <div class="mockup-metric-card metric-balance">
+                <div class="metric-label">Patrimônio Líquido</div>
+                <div class="metric-value">R$ 14.850,00</div>
+                <div class="metric-tag positive">+14.2% este mês</div>
+              </div>
+              <div class="mockup-metric-card metric-income">
+                <div class="metric-label">Receitas Recebidas</div>
+                <div class="metric-value">R$ 9.400,00</div>
+                <div class="metric-tag">Salários & Investimentos</div>
+              </div>
+              <div class="mockup-metric-card metric-expense">
+                <div class="metric-label">Despesas Pagas</div>
+                <div class="metric-value">R$ 4.320,00</div>
+                <div class="metric-tag">Totalmente em dia</div>
+              </div>
+            </div>
+
+            <!-- Visual Cards & Chart Row -->
+            <div class="mockup-content-grid">
+              <!-- Credit Card Widget Preview -->
+              <div class="mockup-card-widget">
+                <div class="card-widget-header">
+                  <div class="card-chip">💳 Nubank Ultravioleta</div>
+                  <span class="card-tag-bank">Nubank</span>
+                </div>
+                <div class="card-widget-donut-area">
+                  <div class="mini-donut">
+                    <div class="donut-center">
+                      <span class="donut-pct">45%</span>
+                      <span class="donut-sub">Usado</span>
+                    </div>
+                  </div>
+                  <div class="card-widget-info">
+                    <div class="card-info-item">
+                      <span class="info-label">Limite Total:</span>
+                      <span class="info-val">R$ 5.000,00</span>
+                    </div>
+                    <div class="card-info-item">
+                      <span class="info-label">Disponível:</span>
+                      <span class="info-val green">R$ 2.750,00</span>
+                    </div>
+                    <div class="card-info-item">
+                      <span class="info-label">Fatura Atual:</span>
+                      <span class="info-val red">R$ 2.250,00</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Transactions Mini-List -->
+              <div class="mockup-tx-list">
+                <div class="tx-list-title">Últimas Movimentações</div>
+                <div class="tx-row">
+                  <span class="tx-icon">💼</span>
+                  <div class="tx-details">
+                    <span class="tx-name">Salário Mensal</span>
+                    <span class="tx-acc">Conta Corrente Nubank</span>
+                  </div>
+                  <span class="tx-amount income">+R$ 6.500,00</span>
+                </div>
+                <div class="tx-row">
+                  <span class="tx-icon">🛒</span>
+                  <div class="tx-details">
+                    <span class="tx-name">Supermercado Mensal</span>
+                    <span class="tx-acc">Cartão de Crédito</span>
+                  </div>
+                  <span class="tx-amount expense">-R$ 840,00</span>
+                </div>
+                <div class="tx-row">
+                  <span class="tx-icon">🤝</span>
+                  <div class="tx-details">
+                    <span class="tx-name">Acordo Fatura (Parcela 1/6)</span>
+                    <span class="tx-acc">Cartão de Crédito</span>
+                  </div>
+                  <span class="tx-amount reneg">-R$ 350,00</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Floating Interactive Badges -->
+        <div class="floating-badge badge-top-right">
+          <span class="badge-icon">✓</span>
+          <div>
+            <div class="badge-title">Fatura Quitada</div>
+            <div class="badge-sub">Limite liberado instantaneamente</div>
+          </div>
+        </div>
+
+        <div class="floating-badge badge-bottom-left">
+          <span class="badge-icon">🔒</span>
+          <div>
+            <div class="badge-title">Privacidade Absoluta</div>
+            <div class="badge-sub">Criptografia AES-256 no seu dispositivo</div>
+          </div>
+        </div>
       </div>
     </section>
 
-    <!-- Features Section -->
+    <!-- Metrics Numbers Ribbon -->
+    <section class="metrics-ribbon">
+      <div class="ribbon-card">
+        <div class="ribbon-num">100%</div>
+        <div class="ribbon-label">Privado & Local (Sem Espionagem)</div>
+      </div>
+      <div class="ribbon-card">
+        <div class="ribbon-num">R$ 0</div>
+        <div class="ribbon-label">Mensalidades ou Taxas Ocultas</div>
+      </div>
+      <div class="ribbon-card">
+        <div class="ribbon-num">1-Clique</div>
+        <div class="ribbon-label">Exportação Excel, JSON e CSV</div>
+      </div>
+      <div class="ribbon-card">
+        <div class="ribbon-num">Multi-Perfis</div>
+        <div class="ribbon-label">Responsáveis, Membros e Filhos</div>
+      </div>
+    </section>
+
+    <!-- Main Features Grid -->
     <section class="features-section" id="recursos">
       <div class="section-header">
-        <h2 class="section-title">Planejado para cada detalhe da sua rotina</h2>
-        <p class="section-subtitle">Tudo o que você precisa para manter o orçamento familiar em dia</p>
+        <div class="section-tag">RECURSOS COMPLETOS</div>
+        <h2 class="section-title">Construído para simplificar o orçamento de verdade</h2>
+        <p class="section-subtitle">Sem planilhas confusas. Tudo organizado por quem entende as finanças do lar.</p>
       </div>
 
       <div class="features-grid">
         <!-- Feature 1 -->
-        <div class="feature-card">
-          <div class="feature-icon-wrap">👥</div>
-          <h3 class="feature-title">Perfis Familiares</h3>
+        <div class="feature-card clickable-card" onclick="openFeatureModal('cards')" tabindex="0" role="button" aria-label="Ver detalhes de Faturas e Cartões">
+          <div class="feature-icon-wrap">💳</div>
+          <h3 class="feature-title">Faturas & Cartões Reais</h3>
           <p class="feature-desc">
-            Cadastre múltiplos membros com papéis de Responsável, Colaborador ou Caçula. O caçula ganha um painel gamificado de mesada para aprender educação financeira.
+            Controle de fechamento e vencimento de ciclos bancários. Visualização de limite comprometido e liberação automática no pagamento.
           </p>
+          <div class="feature-card-cta">
+            <span>Ver como funciona</span>
+            <span class="cta-arrow-mini">➔</span>
+          </div>
         </div>
 
         <!-- Feature 2 -->
-        <div class="feature-card">
-          <div class="feature-icon-wrap">🔄</div>
-          <h3 class="feature-title">Motor de Recorrências</h3>
+        <div class="feature-card highlighted-card clickable-card" id="cartoes" onclick="openFeatureModal('reneg')" tabindex="0" role="button" aria-label="Ver detalhes de Renegociação de Faturas">
+          <div class="card-badge-new">NOVO</div>
+          <div class="feature-icon-wrap">🤝</div>
+          <h3 class="feature-title">Renegociação Guiada de Faturas</h3>
           <p class="feature-desc">
-            Agende salários, aluguel ou assinaturas. O sistema gera lançamentos automáticos mês a mês e corrige descrições modificadas retroativamente por auto-healing.
+            Atrasou o cartão? Lance acordos em até 36x com entrada e cálculo de juros automático em 1 clique, sem desorganizar o limite futuro.
           </p>
+          <div class="feature-card-cta">
+            <span>Ver como funciona</span>
+            <span class="cta-arrow-mini">➔</span>
+          </div>
         </div>
 
         <!-- Feature 3 -->
-        <div class="feature-card">
-          <div class="feature-icon-wrap">💳</div>
-          <h3 class="feature-title">Widget de Cartões</h3>
+        <div class="feature-card clickable-card" onclick="openFeatureModal('recurring')" tabindex="0" role="button" aria-label="Ver detalhes do Motor de Recorrências">
+          <div class="feature-icon-wrap">🔄</div>
+          <h3 class="feature-title">Motor de Recorrências Inteligente</h3>
           <p class="feature-desc">
-            Visualize cartões de crédito estilizados com as cores e marcas dos principais bancos do Brasil. Controle o consumo do limite e datas de fechamento.
+            Agende contas fixas, parcelamentos e salários. Sistema com auto-cura que ajusta nomes e numerações de parcelas retroativamente.
           </p>
+          <div class="feature-card-cta">
+            <span>Ver como funciona</span>
+            <span class="cta-arrow-mini">➔</span>
+          </div>
         </div>
 
         <!-- Feature 4 -->
-        <div class="feature-card">
-          <div class="feature-icon-wrap">🔒</div>
-          <h3 class="feature-title">Privacidade Absoluta</h3>
+        <div class="feature-card clickable-card" onclick="openFeatureModal('family')" tabindex="0" role="button" aria-label="Ver detalhes de Perfis Familiares">
+          <div class="feature-icon-wrap">👨‍👩‍👧‍👦</div>
+          <h3 class="feature-title">Perfis Familiares & Mesadas</h3>
           <p class="feature-desc">
-            Seus dados não são vendidos ou monitorados por terceiros. Toda a inteligência e o banco de dados rodam localmente na sua máquina ou no seu servidor pessoal.
+            Cadastre membros da família com permissões personalizadas. Painel lúdico de mesadas para incentivar educação financeira infantil.
           </p>
+          <div class="feature-card-cta">
+            <span>Ver como funciona</span>
+            <span class="cta-arrow-mini">➔</span>
+          </div>
         </div>
 
         <!-- Feature 5 -->
-        <div class="feature-card">
-          <div class="feature-icon-wrap">📊</div>
-          <h3 class="feature-title">Gráficos Interativos</h3>
+        <div class="feature-card clickable-card" onclick="openFeatureModal('security')" tabindex="0" role="button" aria-label="Ver detalhes de Segurança e Criptografia">
+          <div class="feature-icon-wrap">🛡️</div>
+          <h3 class="feature-title">Criptografia Forte & LGPD</h3>
           <p class="feature-desc">
-            Acompanhe o fluxo de caixa, o balanço de patrimônio e a distribuição dos seus gastos por categoria com painéis interativos atualizados em tempo real.
+            Dados pessoais sensíveis (CPF, e-mails, telefones) são protegidos com algoritmo AES-256-GCM antes de serem gravados no banco.
           </p>
+          <div class="feature-card-cta">
+            <span>Ver como funciona</span>
+            <span class="cta-arrow-mini">➔</span>
+          </div>
         </div>
 
         <!-- Feature 6 -->
-        <div class="feature-card">
-          <div class="feature-icon-wrap">📥</div>
-          <h3 class="feature-title">Exportações em 1 Clique</h3>
+        <div class="feature-card clickable-card" onclick="openFeatureModal('reports')" tabindex="0" role="button" aria-label="Ver detalhes de Relatórios e Fluxo de Caixa">
+          <div class="feature-icon-wrap">📊</div>
+          <h3 class="feature-title">Relatórios & Fluxo de Caixa</h3>
           <p class="feature-desc">
-            Gere relatórios avançados em arquivos Excel formatados com abas separadas por mês ou consolidados anuais. Faça backups e download completo do banco de dados SQLite.
+            Gráficos comparativos de receitas vs despesas, acompanhamento de patrimônio acumulado e orçamentos por categoria em tempo real.
           </p>
+          <div class="feature-card-cta">
+            <span>Ver como funciona</span>
+            <span class="cta-arrow-mini">➔</span>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- Apoie o Projeto Section -->
-    <section style="margin: 60px 0; text-align: center; background: rgba(24, 30, 46, 0.4); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 40px 24px; backdrop-filter: blur(12px);">
-      <h2 style="font-size: 24px; font-weight: 700; margin-bottom: 12px; color: var(--accent-light);">Gostou do FinançasFamília? ☕</h2>
-      <p style="font-size: 15px; color: var(--text-secondary); max-width: 600px; margin: 0 auto 24px; line-height: 1.6;">
-        Este é um sistema de código aberto e totalmente livre. Se ele é útil para organizar as finanças de sua família, considere fazer uma contribuição única de <strong>R$ 9,99</strong> para apoiar o desenvolvimento!
-      </p>
-      <div style="display: flex; flex-direction: column; align-items: center; gap: 12px;">
-        <a href="https://pag.ae/81ZdpUAX7" target="_blank" class="donate-btn-premium" title="Pagar com PagBank">
+    <!-- Interactive ROI Simulator Section -->
+    <section class="calculator-section" id="calculadora">
+      <div class="calc-wrapper">
+        <div class="calc-header">
+          <span class="section-tag">SIMULADOR INTERATIVO</span>
+          <h2 class="calc-title">Quanto a sua família pode economizar?</h2>
+          <p class="calc-sub">Estudos comprovam que famílias que usam controle orçamentário organizado economizam entre 15% e 25% ao ano.</p>
+        </div>
+
+        <div class="calc-card">
+          <div class="calc-control-group">
+            <div class="calc-control-label">
+              <span>Renda Familiar Mensal:</span>
+              <strong id="calc-income-display" class="calc-val-highlight">R$ 7.000,00</strong>
+            </div>
+            <input type="range" id="calc-income-slider" min="2000" max="30000" step="500" value="7000" class="custom-slider">
+            <div class="slider-ticks">
+              <span>R$ 2.000</span>
+              <span>R$ 15.000</span>
+              <span>R$ 30.000+</span>
+            </div>
+          </div>
+
+          <div class="calc-results-grid">
+            <div class="calc-result-box">
+              <div class="result-label">Economia Mensal Estimada</div>
+              <div class="result-value green" id="calc-monthly-savings">R$ 1.050,00</div>
+              <div class="result-sub">Eliminando despesas invisíveis e juros</div>
+            </div>
+            <div class="calc-result-box highlight-box">
+              <div class="result-label">Economia Acumulada em 1 Ano</div>
+              <div class="result-value glow" id="calc-yearly-savings">R$ 12.600,00</div>
+              <div class="result-sub">Dinheiro livre para metas e viagens da família</div>
+            </div>
+            <div class="calc-result-box">
+              <div class="result-label">Reserva em 2 Anos (c/ Rendimentos)</div>
+              <div class="result-value blue" id="calc-future-reserve">R$ 28.500,00</div>
+              <div class="result-sub">Segurança e tranquilidade para o futuro</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ Accordion Section -->
+    <section class="faq-section" id="faq">
+      <div class="section-header">
+        <div class="section-tag">TIRE SUAS DÚVIDAS</div>
+        <h2 class="section-title">Perguntas Frequentes</h2>
+        <p class="section-subtitle">Tudo sobre privacidade, instalação e funcionamento do FinançasFamília</p>
+      </div>
+
+      <div class="faq-list">
+        <div class="faq-item">
+          <button type="button" class="faq-question" onclick="toggleFaq(this)" aria-expanded="false">
+            <span>Os meus dados financeiros vão para a nuvem de terceiros?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <p><strong>Não.</strong> O FinançasFamília foi concebido com foco total em privacidade. O banco de dados SQLite fica armazenado no seu próprio computador ou servidor pessoal. Seus dados nunca são vendidos, coletados ou minerados.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button type="button" class="faq-question" onclick="toggleFaq(this)" aria-expanded="false">
+            <span>Posso usar no computador e no celular ao mesmo tempo?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <p><strong>Sim!</strong> O aplicativo possui um servidor de rede local integrado. Basta abrir o app no computador e acessar o endereço IP local pelo navegador de qualquer celular ou tablet conectado ao mesmo Wi-Fi da sua casa.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button type="button" class="faq-question" onclick="toggleFaq(this)" aria-expanded="false">
+            <span>Como funciona a renegociação de faturas de cartão de crédito?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <p>Quando uma fatura fecha ou atrasa e você negocia com o banco um parcelamento (ex: entrada + 6x), basta clicar no botão <em>"🤝 Parcelar / Acordo"</em>. O app dá baixa na fatura anterior, debita a entrada da conta corrente e lança as novas parcelas no cartão, comprometendo e liberando o limite a cada mês pago.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button type="button" class="faq-question" onclick="toggleFaq(this)" aria-expanded="false">
+            <span>Como fazer backup dos meus lançamentos?</span>
+            <span class="faq-icon">+</span>
+          </button>
+          <div class="faq-answer">
+            <p>Na tela de Configurações, você pode fazer backup em arquivo `.db` com 1 clique, ou exportar relatórios completos e tabulados em Excel (`.xlsx`), JSON ou CSV com todo o seu histórico financeiro.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Support Project Section -->
+    <section class="support-section">
+      <div class="support-card">
+        <span class="support-badge">☕ PROJETO LIVRE & INDEPENDENTE</span>
+        <h2 class="support-title">Gostou do FinançasFamília?</h2>
+        <p class="support-desc">
+          Este é um sistema de código aberto dedicado a ajudar famílias a saírem do endividamento e conquistarem a liberdade financeira. Se o app é útil para o seu dia a dia, apoie o desenvolvedor com uma contribuição simbólica única de <strong>R$ 9,99</strong>!
+        </p>
+        <a href="https://pag.ae/81ZdpUAX7" target="_blank" rel="noopener noreferrer" class="donate-btn-premium" title="Pagar com PagBank">
           <span class="icon">☕</span>
           <div class="btn-text">
             <span class="title">Contribuir com R$ 9,99</span>
@@ -130,10 +434,75 @@
 
     <!-- Footer -->
     <footer class="landing-footer">
-      <p>&copy; 2026 FinançasFamília. Todos os direitos reservados.</p>
-      <p style="margin-top: 6px; font-size: 11px; opacity: 0.7;">Desenvolvido com carinho para o orçamento inteligente de sua família.</p>
+      <div class="footer-content">
+        <div class="footer-brand">
+          <div class="landing-logo">
+            <span class="landing-logo-icon">💰</span>
+            <span class="landing-logo-text">FinançasFamília</span>
+          </div>
+          <p class="footer-tagline">Controle financeiro inteligente, local e seguro para a sua família.</p>
+        </div>
+        <div class="footer-links">
+          <a href="app.html">Acessar App</a>
+          <a href="#recursos" onclick="scrollToSection('recursos', event)">Recursos</a>
+          <a href="#calculadora" onclick="scrollToSection('calculadora', event)">Simulador</a>
+          <a href="#faq" onclick="scrollToSection('faq', event)">Dúvidas</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2026 FinançasFamília. Todos os direitos reservados.</p>
+        <p class="footer-legal">Proteção de dados com criptografia AES-256 e conformidade com a LGPD.</p>
+      </div>
     </footer>
-  </div>
 
+    <!-- Feature Details Modal Component (Pop-up) -->
+    <div id="feature-modal-backdrop" class="feature-modal-backdrop hidden" aria-hidden="true" onclick="handleBackdropClick(event)">
+      <div class="feature-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="feature-modal-title">
+        <!-- Modal Header -->
+        <div class="feature-modal-header">
+          <div class="feature-modal-header-info">
+            <span class="feature-modal-badge" id="feature-modal-badge">Destaque</span>
+            <h2 class="feature-modal-title" id="feature-modal-title">Título do Recurso</h2>
+          </div>
+          <button type="button" class="feature-modal-close" onclick="closeFeatureModal()" aria-label="Fechar pop-up">✕</button>
+        </div>
+
+        <!-- Modal Body -->
+        <div class="feature-modal-body">
+          <p class="feature-modal-tagline" id="feature-modal-tagline"></p>
+
+          <!-- Problem Solved Alert Box -->
+          <div class="feature-modal-problem-box">
+            <div class="problem-box-title">🚨 O problema real que este recurso resolve:</div>
+            <p class="problem-box-desc" id="feature-modal-problem"></p>
+          </div>
+
+          <!-- Benefits Section -->
+          <div class="feature-modal-benefits-section">
+            <h3 class="benefits-section-title">✨ Como funciona na prática no seu dia a dia:</h3>
+            <div class="feature-modal-benefits-grid" id="feature-modal-benefits-grid">
+              <!-- Dynamically Injected -->
+            </div>
+          </div>
+
+          <!-- Highlight Callout Box -->
+          <div class="feature-modal-highlight-box" id="feature-modal-highlight"></div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="feature-modal-footer">
+          <button type="button" class="btn btn-secondary feature-modal-btn-dismiss" onclick="closeFeatureModal()">Voltar</button>
+          <a href="app.html" class="btn btn-primary feature-modal-btn-cta">
+            <span>Acessar o Painel Agora</span>
+            <span class="cta-arrow">➔</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+  </div> <!-- End .landing-wrapper -->
+
+  <!-- Landing Page Interactive Scripts -->
+  <script src="landing.js"></script>
 </body>
 </html>

@@ -13,8 +13,16 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script>
+    (function() {
+      const savedTheme = localStorage.getItem('financas_theme') || 'dark-emerald';
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    })();
+  </script>
 </head>
 <body>
+
+
 
 <!-- ════════════════════════════════════════
      LOGIN SCREEN
@@ -149,6 +157,7 @@
       <span class="titlebar-title">FinançasFamília</span>
     </div>
     <div class="titlebar-controls">
+      <button class="titlebar-btn" id="app-theme-toggle" title="Alternar Modo Claro / Escuro" style="font-size: 13px;">🌓</button>
       <button class="titlebar-btn" id="btn-minimize">─</button>
       <button class="titlebar-btn" id="btn-maximize">□</button>
       <button class="titlebar-btn titlebar-btn-close" id="btn-close">✕</button>
@@ -164,6 +173,7 @@
         <span class="sidebar-user-role">Usuário</span>
       </div>
       <button class="sidebar-connect" id="sidebar-connect" title="Conectar outro aparelho (Rede Local)" style="display: none;">📱</button>
+      <button class="sidebar-connect" id="sidebar-sync-btn" title="Conciliação & Anti-Duplicidade" style="display: flex;">🛡️</button>
       <button class="sidebar-logout" id="sidebar-logout" title="Sair">⏻</button>
     </div>
 
@@ -193,6 +203,10 @@
         <span class="nav-label">Relatórios</span>
       </button>
       <div class="nav-spacer"></div>
+      <button class="nav-item" data-page="manual" id="nav-manual">
+        <span class="nav-icon">📖</span>
+        <span class="nav-label">Manual do Usuário</span>
+      </button>
       <button class="nav-item" data-page="settings" id="nav-settings">
         <span class="nav-icon">⚙️</span>
         <span class="nav-label">Configurações</span>
@@ -208,6 +222,7 @@
     <div id="page-budget" class="page"></div>
     <div id="page-goals" class="page"></div>
     <div id="page-reports" class="page"></div>
+    <div id="page-manual" class="page"></div>
     <div id="page-settings" class="page"></div>
     <div id="page-families" class="page"></div>
   </main>
