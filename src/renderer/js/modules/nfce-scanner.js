@@ -3,279 +3,239 @@
  * Módulo para FamilyFinancas
  * === */
 
-/**
- * Emite feedback sonoro futurista e agradável de leitura de QR Code usando Web Audio API
- */
 function playScanBeep() {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
     const ctx = new AudioContext();
     const now = ctx.currentTime;
-
-    // Tom 1 (Frequência média alta)
     const osc1 = ctx.createOscillator();
     const gain1 = ctx.createGain();
     osc1.type = 'sine';
-    osc1.frequency.setValueAtTime(880, now); // Nota A5
-    osc1.frequency.exponentialRampToValueAtTime(1760, now + 0.12); // Nota A6
+    osc1.frequency.setValueAtTime(880, now);
+    osc1.frequency.exponentialRampToValueAtTime(1760, now + 0.12);
     gain1.gain.setValueAtTime(0.15, now);
     gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-
     osc1.connect(gain1);
     gain1.connect(ctx.destination);
-
     osc1.start(now);
     osc1.stop(now + 0.16);
-
-    setTimeout(() => {
-      if (ctx.state !== 'closed') ctx.close().catch(() => {});
-    }, 300);
-  } catch (err) {
-    console.debug('[Scanner] Audio feedback indisponível:', err);
-  }
+    setTimeout(() => { if (ctx.state !== 'closed') ctx.close().catch(() => {}); }, 300);
+  } catch (err) {}
 }
 
-/**
- * Emite vibração háptica no dispositivo mobile
- */
 function vibrateDevice(ms = 70) {
-  try {
-    if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      navigator.vibrate(ms);
-    }
-  } catch (e) {}
+  try { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(ms); } catch (e) {}
 }
 
-/**
- * Garante que a biblioteca jsQR esteja carregada e pronta para uso
- */
 async function ensureJsQRLoaded() {
   if (typeof window.jsQR === 'function') return true;
-
-  // Tenta carregar via script tag dinâmico
   return new Promise((resolve) => {
     const script = document.createElement('script');
     script.src = 'js/vendor/jsQR.js';
-    script.onload = () => {
-      resolve(typeof window.jsQR === 'function');
-    };
-    script.onerror = () => {
-      console.warn('[Scanner] Não foi possível carregar jsQR local');
-      resolve(false);
-    };
+    script.onload = () => resolve(typeof window.jsQR === 'function');
+    script.onerror = () => resolve(false);
     document.head.appendChild(script);
   });
 }
 
-/**
- * Parser inteligente de URLs de QR Code da SEFAZ (NFC-e / NF-e), SAT-CF-e, Pix e Boletos
- */
+function decodeHexAscii(str) {
+  if (!str || typeof str !== 'string') return null;
+  const clean = str.trim();
+  if (/^[0-9a-fA-F]+$/.test(clean) && clean.length % 2 === 0 && clean.length >= 4) {
+    try {
+      let decoded = '';
+      for (let i = 0; i < clean.length; i += 2) {
+        const code = parseInt(clean.substring(i, i + 2), 16);
+        if (code >= 32 && code <= 126) decoded += String.fromCharCode(code);
+        else return null;
+      }
+      return decoded;
+    } catch (e) { return null; }
+  }
+  return null;
+}
+
+const KNOWN_CNPJS = [
+  { root: '94896792', name: 'Supermercados Rissul', cat: 'Alimentação' },
+  { root: '92754738', name: 'Supermercado Zaffari', cat: 'Alimentação' },
+  { root: '45543915', name: 'Carrefour Supermercado', cat: 'Alimentação' },
+  { root: '01545822', name: 'Supermercados Asun', cat: 'Alimentação' },
+  { root: '07170938', name: 'Stok Center Atacado', cat: 'Alimentação' },
+  { root: '06057223', name: 'Assaí Atacadista', cat: 'Alimentação' },
+  { root: '47508411', name: 'Pão de Açúcar / Extra', cat: 'Alimentação' },
+  { root: '75315333', name: 'Bistek Supermercados', cat: 'Alimentação' },
+  { root: '83646984', name: 'Fort Atacadista', cat: 'Alimentação' },
+  { root: '02502844', name: 'Angeloni Supermercados', cat: 'Alimentação' },
+  { root: '92999999', name: 'Farmácia Panvel', cat: 'Saúde' },
+  { root: '92999704', name: 'Farmácia Panvel', cat: 'Saúde' },
+  { root: '92665611', name: 'Farmácia Panvel', cat: 'Saúde' },
+  { root: '61585865', name: 'Droga Raia / Drogasil', cat: 'Saúde' },
+  { root: '88212147', name: 'Farmácias São João', cat: 'Saúde' },
+  { root: '05493015', name: 'Farmácia Pague Menos', cat: 'Saúde' },
+  { root: '33000167', name: 'Posto Petrobras', cat: 'Transporte' },
+  { root: '33453598', name: 'Posto Shell', cat: 'Transporte' },
+  { root: '33337122', name: 'Posto Ipiranga', cat: 'Transporte' },
+  { root: '92798735', name: 'Lojas Renner', cat: 'Vestuário' },
+  { root: '61099966', name: 'Lojas Riachuelo', cat: 'Vestuário' },
+  { root: '45242914', name: 'Lojas C&A', cat: 'Vestuário' },
+  { root: '00776574', name: 'Cassol Centerlar', cat: 'Moradia' },
+  { root: '01438784', name: 'Leroy Merlin', cat: 'Moradia' },
+  { root: '42591651', name: 'McDonald\'s', cat: 'Alimentação' },
+  { root: '13574594', name: 'Burger King', cat: 'Alimentação' }
+];
+
 function parseNFCeUrl(raw) {
   if (!raw || typeof raw !== 'string') return null;
   const text = raw.trim();
-
   let result = {
-    type: 'expense',
-    amount: null,
-    date: null,
-    competence: null,
-    description: '',
-    suggestedCategory: '',
-    accessKey: '',
-    cnpj: '',
-    nNF: '',
-    uf: '',
-    rawUrl: text,
-    isPix: false,
-    isBoleto: false
+    type: 'expense', amount: null, date: null, competence: null, description: '',
+    suggestedCategory: '', accessKey: '', cnpj: '', nNF: '', uf: '', rawUrl: text, isPix: false, isBoleto: false
   };
 
-  // 1. Detecção de Pix Copia e Cola (EMVCo)
+  // 1. Pix
   if (text.startsWith('000201') && text.includes('BR.GOV.BCB.PIX')) {
-    result.isPix = true;
-    result.description = 'Pagamento PIX';
-    result.suggestedCategory = 'Alimentação';
-    
-    // Extrai valor do Pix (Tag 54: 5405123.45)
-    const pixValMatch = text.match(/54\d{2}([0-9.]+)/);
-    if (pixValMatch) {
-      result.amount = parseFloat(pixValMatch[1]);
+    result.isPix = true; result.description = 'Pagamento PIX'; result.suggestedCategory = 'Alimentação';
+    const pixVal = text.match(/54\d{2}([0-9.]+)/);
+    if (pixVal) result.amount = parseFloat(pixVal[1]);
+    const pixName = text.match(/59(\d{2})([^0-9]+)/);
+    if (pixName) {
+      const len = parseInt(pixName[1], 10);
+      const name = pixName[2].substring(0, len).trim();
+      if (name) result.description = `PIX para ${name}`;
     }
-    
-    // Extrai nome do recebedor (Tag 59: 5915NOME DO RECEBEDOR)
-    const pixNameMatch = text.match(/59(\d{2})([^0-9]+)/);
-    if (pixNameMatch) {
-      const len = parseInt(pixNameMatch[1], 10);
-      const nameRaw = pixNameMatch[2].substring(0, len).trim();
-      if (nameRaw) {
-        result.description = `PIX para ${nameRaw}`;
-      }
-    }
-    
     const today = new Date().toISOString().split('T')[0];
-    result.date = today;
-    result.competence = today.slice(0, 7);
+    result.date = today; result.competence = today.slice(0, 7);
     return result;
   }
 
-  // 2. Detecção de Boleto / Código de Barras (44, 47 ou 48 dígitos)
+  // 2. Boleto
   const cleanDigits = text.replace(/[^0-9]/g, '');
   if ((cleanDigits.length === 47 || cleanDigits.length === 48) && !text.includes('http')) {
-    result.isBoleto = true;
-    result.description = 'Pagamento de Boleto';
-    result.suggestedCategory = 'Moradia';
-    
-    // Extrai valor da linha digitável de título bancário (últimos 10 dígitos)
+    result.isBoleto = true; result.description = 'Pagamento de Boleto'; result.suggestedCategory = 'Moradia';
     if (cleanDigits.length === 47) {
-      const valStr = cleanDigits.slice(-10);
-      const valCents = parseInt(valStr, 10);
-      if (valCents > 0) {
-        result.amount = valCents / 100;
-      }
+      const cents = parseInt(cleanDigits.slice(-10), 10);
+      if (cents > 0) result.amount = cents / 100;
     }
-    
     const today = new Date().toISOString().split('T')[0];
-    result.date = today;
-    result.competence = today.slice(0, 7);
+    result.date = today; result.competence = today.slice(0, 7);
     return result;
   }
 
-  // 3. Extração de Chave de Acesso de NFC-e / NF-e (44 dígitos contínuos)
+  // 3. Chave de 44 dígitos
   const keyMatch = text.match(/\b([0-9]{44})\b/) || text.match(/[?&]p=([0-9]{44})/i) || text.match(/[?&]chNFe=([0-9]{44})/i);
   if (keyMatch) {
     result.accessKey = keyMatch[1];
-    
-    // UF (2 primeiros dígitos)
     const ufCode = result.accessKey.substring(0, 2);
-    const ufMap = {
-      '11':'RO','12':'AC','13':'AM','14':'RR','15':'PA','16':'AP','17':'TO',
-      '21':'MA','22':'PI','23':'CE','24':'RN','25':'PB','26':'PE','27':'AL','28':'SE','29':'BA',
-      '31':'MG','32':'ES','33':'RJ','35':'SP',
-      '41':'PR','42':'SC','43':'RS',
-      '50':'MS','51':'MT','52':'GO','53':'DF'
-    };
+    const ufMap = {'11':'RO','12':'AC','13':'AM','14':'RR','15':'PA','16':'AP','17':'TO','21':'MA','22':'PI','23':'CE','24':'RN','25':'PB','26':'PE','27':'AL','28':'SE','29':'BA','31':'MG','32':'ES','33':'RJ','35':'SP','41':'PR','42':'SC','43':'RS','50':'MS','51':'MT','52':'GO','53':'DF'};
     result.uf = ufMap[ufCode] || 'BR';
-
-    // Ano e Mês (dígitos 3 a 6: AAMM)
     const aa = result.accessKey.substring(2, 4);
     const mm = result.accessKey.substring(4, 6);
-    const year = parseInt(aa, 10) + 2000;
-    const month = mm.padStart(2, '0');
-    result.competence = `${year}-${month}`;
-
-    // CNPJ do emitente (dígitos 7 a 20)
+    result.competence = `${parseInt(aa, 10) + 2000}-${mm.padStart(2, '0')}`;
     const rawCnpj = result.accessKey.substring(6, 20);
     result.cnpj = rawCnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
-
-    // Número da NF (dígitos 26 a 34)
-    const rawNum = result.accessKey.substring(25, 34);
-    result.nNF = parseInt(rawNum, 10).toString();
+    result.nNF = parseInt(result.accessKey.substring(25, 34), 10).toString();
   }
 
-  // 4. Extração de Valor Total (formato Pipe | ou query params)
-  // Padrão SEFAZ p=CHAVE|VERSAO|TP_AMB|C_DEST|VALOR_TOTAL|DIG_VAL...
+  // 4. Extração de Valor e Data por Tokens Pipe (|) e Hexadecimal (SEFAZ v2.0)
   if (text.includes('|')) {
     const pipeParts = text.split('|');
-    for (const part of pipeParts) {
-      if (/^\d+[.,]\d{2}$/.test(part.trim())) {
-        const val = parseFloat(part.trim().replace(',', '.'));
-        if (!isNaN(val) && val > 0 && val !== 2) {
-          result.amount = val;
-          break;
+    for (let i = 1; i < pipeParts.length; i++) {
+      const token = pipeParts[i].trim();
+      if (!token) continue;
+      if (/^\d+[.,]\d{2}$/.test(token) || (/^\d+[.,]\d+$/.test(token) && parseFloat(token.replace(',', '.')) > 0)) {
+        const val = parseFloat(token.replace(',', '.'));
+        if (!isNaN(val) && val > 0 && !(i <= 3 && (val === 1 || val === 2))) {
+          if (!result.amount) result.amount = val;
+        }
+      }
+      const decodedHex = decodeHexAscii(token);
+      if (decodedHex) {
+        if (/^\d+[.,]\d{2}$/.test(decodedHex) || /^\d+[.,]\d+$/.test(decodedHex)) {
+          const valHex = parseFloat(decodedHex.replace(',', '.'));
+          if (!isNaN(valHex) && valHex > 0 && !result.amount) result.amount = valHex;
+        }
+        const dateMatch = decodedHex.match(/(\d{4})-(\d{2})-(\d{2})/) || decodedHex.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+        if (dateMatch && !result.date) {
+          result.date = dateMatch[1].length === 4 ? `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}` : `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
         }
       }
     }
   }
 
-  // Query parameter vTot ou vNF ou valor
   if (!result.amount) {
     const valMatch = text.match(/[?&](?:vTot|vNF|valor|total|amount)=([0-9.,]+)/i);
-    if (valMatch) {
-      result.amount = parseFloat(valMatch[1].replace(',', '.'));
-    }
+    if (valMatch) result.amount = parseFloat(valMatch[1].replace(',', '.'));
   }
 
-  // Se tiver data atual ou da competência da nota
   const today = new Date().toISOString().split('T')[0];
-  if (result.competence) {
-    const todayComp = today.slice(0, 7);
-    if (result.competence === todayComp) {
-      result.date = today;
+  if (!result.date) {
+    if (result.competence) {
+      result.date = result.competence === today.slice(0, 7) ? today : `${result.competence}-01`;
     } else {
-      result.date = `${result.competence}-01`;
+      result.date = today;
+      result.competence = today.slice(0, 7);
     }
-  } else {
-    result.date = today;
-    result.competence = today.slice(0, 7);
   }
 
-  // 5. Reconhecimento de Estabelecimentos por CNPJ, URL ou Palavras-chave
-  const knownMerchants = [
-    { pattern: /zaffari|bourbon|cia.*zaffari/i, name: 'Supermercado Zaffari', cat: 'Alimentação' },
-    { pattern: /carrefour/i, name: 'Carrefour Supermercado', cat: 'Alimentação' },
-    { pattern: /pao.*acucar|extra|sendas|assai/i, name: 'Supermercado', cat: 'Alimentação' },
-    { pattern: /panvel/i, name: 'Farmácia Panvel', cat: 'Saúde' },
-    { pattern: /raia|drogasil/i, name: 'Droga Raia / Drogasil', cat: 'Saúde' },
-    { pattern: /sao.*joao/i, name: 'Farmácia São João', cat: 'Saúde' },
-    { pattern: /pague.*menos/i, name: 'Farmácia Pague Menos', cat: 'Saúde' },
-    { pattern: /ipiranga/i, name: 'Posto Ipiranga', cat: 'Transporte' },
-    { pattern: /shell/i, name: 'Posto Shell', cat: 'Transporte' },
-    { pattern: /petrobras|br.*distribuidora|vibra/i, name: 'Posto Petrobras', cat: 'Transporte' },
-    { pattern: /mcdonald|mc.*donald/i, name: 'McDonald\'s', cat: 'Alimentação' },
-    { pattern: /burger.*king/i, name: 'Burger King', cat: 'Alimentação' },
-    { pattern: /leroy.*merlin/i, name: 'Leroy Merlin', cat: 'Moradia' },
-    { pattern: /cassol/i, name: 'Cassol Centerlar', cat: 'Moradia' },
-    { pattern: /renner/i, name: 'Lojas Renner', cat: 'Vestuário' },
-    { pattern: /riachuelo/i, name: 'Lojas Riachuelo', cat: 'Vestuário' },
-    { pattern: /c&a|cea/i, name: 'Lojas C&A', cat: 'Vestuário' }
-  ];
+  // 5. CNPJ Raiz
+  if (result.cnpj) {
+    const root = result.cnpj.replace(/[^0-9]/g, '').substring(0, 8);
+    const k = KNOWN_CNPJS.find(x => x.root === root);
+    if (k) {
+      result.description = `${k.name}${result.nNF ? ` (NFC-e #${result.nNF})` : ''}`;
+      result.suggestedCategory = k.cat;
+    }
+  }
 
-  for (const m of knownMerchants) {
-    if (m.pattern.test(text)) {
-      result.description = m.name + (result.nNF ? ` (NFC-e #${result.nNF})` : '');
-      result.suggestedCategory = m.cat;
-      break;
+  // 6. Palavras-chave
+  if (!result.description) {
+    const merchants = [
+      { pattern: /zaffari|bourbon/i, name: 'Supermercado Zaffari', cat: 'Alimentação' },
+      { pattern: /carrefour/i, name: 'Carrefour Supermercado', cat: 'Alimentação' },
+      { pattern: /rissul|unidasul|macromix/i, name: 'Supermercados Rissul', cat: 'Alimentação' },
+      { pattern: /pao.*acucar|extra|assai/i, name: 'Supermercado', cat: 'Alimentação' },
+      { pattern: /panvel/i, name: 'Farmácia Panvel', cat: 'Saúde' },
+      { pattern: /raia|drogasil/i, name: 'Droga Raia / Drogasil', cat: 'Saúde' },
+      { pattern: /sao.*joao/i, name: 'Farmácia São João', cat: 'Saúde' },
+      { pattern: /pague.*menos/i, name: 'Farmácia Pague Menos', cat: 'Saúde' },
+      { pattern: /ipiranga/i, name: 'Posto Ipiranga', cat: 'Transporte' },
+      { pattern: /shell/i, name: 'Posto Shell', cat: 'Transporte' },
+      { pattern: /petrobras|vibra/i, name: 'Posto Petrobras', cat: 'Transporte' },
+      { pattern: /mcdonald/i, name: 'McDonald\'s', cat: 'Alimentação' },
+      { pattern: /burger.*king/i, name: 'Burger King', cat: 'Alimentação' },
+      { pattern: /renner/i, name: 'Lojas Renner', cat: 'Vestuário' },
+      { pattern: /riachuelo/i, name: 'Lojas Riachuelo', cat: 'Vestuário' }
+    ];
+    for (const m of merchants) {
+      if (m.pattern.test(text)) {
+        result.description = `${m.name}${result.nNF ? ` (NFC-e #${result.nNF})` : ''}`;
+        result.suggestedCategory = m.cat;
+        break;
+      }
     }
   }
 
   if (!result.description) {
-    if (result.nNF) {
-      result.description = `Compra Cupom Fiscal NFC-e #${result.nNF}`;
-    } else {
-      result.description = `Compra Cupom Fiscal (${result.uf || 'NFC-e'})`;
-    }
+    result.description = result.nNF ? `Compra Cupom Fiscal NFC-e #${result.nNF}` : `Compra Cupom Fiscal (${result.uf || 'NFC-e'})`;
     result.suggestedCategory = 'Alimentação';
   }
-
   return result;
 }
 
-/**
- * Controlador de Câmera e Scanner de QR Code com Motor Híbrido (BarcodeDetector + jsQR)
- */
 const NFCeCameraManager = {
-  videoElement: null,
-  stream: null,
-  track: null,
-  scanIntervalId: null,
-  isScanning: false,
-  currentFacingMode: 'environment',
-  isTorchOn: false,
-  barcodeDetector: null,
+  videoElement: null, stream: null, track: null, scanIntervalId: null, isScanning: false,
+  currentFacingMode: 'environment', isTorchOn: false, barcodeDetector: null,
 
   async initEngines() {
     await ensureJsQRLoaded();
-
     if ('BarcodeDetector' in window) {
       try {
         const formats = await window.BarcodeDetector.getSupportedFormats();
         if (formats.includes('qr_code')) {
           this.barcodeDetector = new window.BarcodeDetector({ formats: ['qr_code', 'ean_13', 'code_128', 'itf'] });
         }
-      } catch (e) {
-        console.debug('[Scanner] BarcodeDetector nativo indisponível:', e);
-      }
+      } catch (e) {}
     }
   },
 
@@ -283,28 +243,13 @@ const NFCeCameraManager = {
     this.videoElement = videoEl;
     this.isScanning = true;
     await this.initEngines();
-
     try {
-      const constraints = {
-        video: {
-          facingMode: { ideal: this.currentFacingMode },
-          width: { min: 640, ideal: 1280, max: 1920 },
-          height: { min: 480, ideal: 720, max: 1080 }
-        },
-        audio: false
-      };
-
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Câmera não suportada neste dispositivo/navegador.');
-      }
-
+      const constraints = { video: { facingMode: { ideal: this.currentFacingMode }, width: { min: 640, ideal: 1280 }, height: { min: 480, ideal: 720 } }, audio: false };
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('Câmera não suportada.');
       this.stream = await navigator.mediaDevices.getUserMedia(constraints);
       this.videoElement.srcObject = this.stream;
       await this.videoElement.play();
-
       this.track = this.stream.getVideoTracks()[0];
-
-      // Inicia loop contínuo de escaneamento
       this.startScanLoop(onResultCallback);
     } catch (err) {
       this.isScanning = false;
@@ -315,20 +260,15 @@ const NFCeCameraManager = {
   startScanLoop(onResultCallback) {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
     const scanFrame = async () => {
       if (!this.isScanning || !this.videoElement || this.videoElement.readyState < 2) {
-        if (this.isScanning) {
-          this.scanIntervalId = requestAnimationFrame(scanFrame);
-        }
+        if (this.isScanning) this.scanIntervalId = requestAnimationFrame(scanFrame);
         return;
       }
-
       const video = this.videoElement;
       const vw = video.videoWidth || 640;
       const vh = video.videoHeight || 480;
 
-      // 1. Tentativa nativa BarcodeDetector (se disponível no navegador)
       if (this.barcodeDetector) {
         try {
           const barcodes = await this.barcodeDetector.detect(video);
@@ -339,57 +279,29 @@ const NFCeCameraManager = {
         } catch (e) {}
       }
 
-      // 2. Tentativa universal robusta via jsQR (CPU Canvas)
       if (typeof window.jsQR === 'function') {
         try {
-          // Escala frame para tamanho ideal (max 800px) para alta velocidade e precisão
           const maxDim = 800;
-          let targetW = vw;
-          let targetH = vh;
-          if (targetW > maxDim) {
-            targetH = Math.round((vh * maxDim) / targetW);
-            targetW = maxDim;
-          }
-
-          canvas.width = targetW;
-          canvas.height = targetH;
+          let targetW = vw, targetH = vh;
+          if (targetW > maxDim) { targetH = Math.round((vh * maxDim) / targetW); targetW = maxDim; }
+          canvas.width = targetW; canvas.height = targetH;
           ctx.drawImage(video, 0, 0, targetW, targetH);
           const imageData = ctx.getImageData(0, 0, targetW, targetH);
-
-          // Passo A: Escaneamento do frame completo
-          let code = window.jsQR(imageData.data, targetW, targetH, {
-            inversionAttempts: 'dontInvert'
-          });
-
-          // Passo B: Se não encontrou, foca no centro (área do retículo viewfinder)
+          let code = window.jsQR(imageData.data, targetW, targetH, { inversionAttempts: 'dontInvert' });
           if (!code) {
-            const cropW = Math.round(targetW * 0.65);
-            const cropH = Math.round(targetH * 0.65);
-            const cropX = Math.round((targetW - cropW) / 2);
-            const cropY = Math.round((targetH - cropH) / 2);
+            const cropW = Math.round(targetW * 0.65), cropH = Math.round(targetH * 0.65);
+            const cropX = Math.round((targetW - cropW) / 2), cropY = Math.round((targetH - cropH) / 2);
             const cropData = ctx.getImageData(cropX, cropY, cropW, cropH);
-            code = window.jsQR(cropData.data, cropW, cropH, {
-              inversionAttempts: 'attemptBoth'
-            });
+            code = window.jsQR(cropData.data, cropW, cropH, { inversionAttempts: 'attemptBoth' });
           }
-
           if (code && code.data) {
             this.handleDetectedCode(code.data, onResultCallback);
             return;
           }
-        } catch (err) {
-          console.debug('[Scanner] Erro na análise de frame jsQR:', err);
-        }
+        } catch (err) {}
       }
-
-      // Reagenda próximo frame
-      if (this.isScanning) {
-        this.scanIntervalId = setTimeout(() => {
-          requestAnimationFrame(scanFrame);
-        }, 80);
-      }
+      if (this.isScanning) this.scanIntervalId = setTimeout(() => requestAnimationFrame(scanFrame), 80);
     };
-
     requestAnimationFrame(scanFrame);
   },
 
@@ -398,28 +310,21 @@ const NFCeCameraManager = {
     this.isScanning = false;
     playScanBeep();
     vibrateDevice(80);
-
     const parsed = parseNFCeUrl(rawText);
     this.stop();
-    if (onResultCallback) {
-      onResultCallback(parsed);
-    }
+    if (onResultCallback) onResultCallback(parsed);
   },
 
   async toggleTorch() {
     if (!this.track) return false;
     try {
-      const capabilities = this.track.getCapabilities ? this.track.getCapabilities() : {};
-      if (capabilities.torch) {
+      const cap = this.track.getCapabilities ? this.track.getCapabilities() : {};
+      if (cap.torch) {
         this.isTorchOn = !this.isTorchOn;
-        await this.track.applyConstraints({
-          advanced: [{ torch: this.isTorchOn }]
-        });
+        await this.track.applyConstraints({ advanced: [{ torch: this.isTorchOn }] });
         return this.isTorchOn;
       }
-    } catch (e) {
-      console.debug('[Scanner] Erro ao alternar lanterna:', e);
-    }
+    } catch (e) {}
     return false;
   },
 
@@ -431,99 +336,53 @@ const NFCeCameraManager = {
 
   async scanImageFile(file, onResultCallback) {
     await this.initEngines();
-
     try {
       const img = new Image();
       const objectUrl = URL.createObjectURL(file);
-
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = objectUrl;
-      });
-
+      await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = objectUrl; });
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-      // Testa em múltiplas resoluções caso a foto seja muito grande (ex: 48MP)
       const testResolutions = [1200, 800, 600, 1800];
       let detectedText = null;
-
       for (const maxDim of testResolutions) {
-        let w = img.naturalWidth || img.width;
-        let h = img.naturalHeight || img.height;
+        let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
         if (w > maxDim || h > maxDim) {
-          if (w >= h) {
-            h = Math.round((h * maxDim) / w);
-            w = maxDim;
-          } else {
-            w = Math.round((w * maxDim) / h);
-            h = maxDim;
-          }
+          if (w >= h) { h = Math.round((h * maxDim) / w); w = maxDim; } else { w = Math.round((w * maxDim) / h); h = maxDim; }
         }
-
-        canvas.width = w;
-        canvas.height = h;
+        canvas.width = w; canvas.height = h;
         ctx.drawImage(img, 0, 0, w, h);
         const imgData = ctx.getImageData(0, 0, w, h);
-
         if (typeof window.jsQR === 'function') {
           const code = window.jsQR(imgData.data, w, h, { inversionAttempts: 'attemptBoth' });
-          if (code && code.data) {
-            detectedText = code.data;
-            break;
-          }
+          if (code && code.data) { detectedText = code.data; break; }
         }
-
         if (this.barcodeDetector) {
           try {
-            const barcodes = await this.barcodeDetector.detect(canvas);
-            if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
-              detectedText = barcodes[0].rawValue;
-              break;
-            }
+            const b = await this.barcodeDetector.detect(canvas);
+            if (b && b.length > 0 && b[0].rawValue) { detectedText = b[0].rawValue; break; }
           } catch (e) {}
         }
       }
-
       URL.revokeObjectURL(objectUrl);
-
-      if (detectedText) {
-        this.handleDetectedCode(detectedText, onResultCallback);
-      } else {
-        toast('Nenhum QR Code legível foi encontrado nesta imagem. Aproxime mais a câmera do código.', 'warning');
-      }
+      if (detectedText) this.handleDetectedCode(detectedText, onResultCallback);
+      else toast('Nenhum QR Code legível encontrado nesta imagem. Tente uma foto mais nítida.', 'warning');
     } catch (err) {
-      console.error('[Scanner] Erro ao escanear imagem:', err);
       toast('Erro ao processar imagem da nota.', 'error');
     }
   },
 
   stop() {
     this.isScanning = false;
-    if (this.scanIntervalId) {
-      clearTimeout(this.scanIntervalId);
-      cancelAnimationFrame(this.scanIntervalId);
-      this.scanIntervalId = null;
-    }
+    if (this.scanIntervalId) { clearTimeout(this.scanIntervalId); cancelAnimationFrame(this.scanIntervalId); this.scanIntervalId = null; }
     if (this.stream) {
-      this.stream.getTracks().forEach(track => {
-        try { track.stop(); } catch (e) {}
-      });
-      this.stream = null;
-      this.track = null;
+      this.stream.getTracks().forEach(t => { try { t.stop(); } catch (e) {} });
+      this.stream = null; this.track = null;
     }
-    if (this.videoElement) {
-      this.videoElement.srcObject = null;
-    }
+    if (this.videoElement) this.videoElement.srcObject = null;
   }
 };
 
-/**
- * Abre o Modal de Leitura de Nota Fiscal com Câmera ao Vivo
- */
 function openNFCeScannerModal(customCallback = null) {
-  // Remove modal anterior se existente
   const oldModal = document.getElementById('nfce-scanner-modal-wrap');
   if (oldModal) oldModal.remove();
 
@@ -533,161 +392,91 @@ function openNFCeScannerModal(customCallback = null) {
   modalWrap.innerHTML = `
     <div class="scanner-modal-card">
       <div class="scanner-modal-header">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 20px;">📷</span>
-          <span style="font-weight: 700; font-size: 15px; color: var(--text-primary);">Leitor de Nota Fiscal (QR Code)</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:20px">📷</span>
+          <span style="font-weight:700;font-size:15px;color:var(--text-primary)">Leitor de Nota Fiscal (QR Code)</span>
         </div>
-        <button class="scanner-close-btn" id="scanner-btn-close" title="Fechar Scanner">✕</button>
+        <button class="scanner-close-btn" id="scanner-btn-close" title="Fechar">✕</button>
       </div>
-
-      <!-- Viewport de Vídeo com Retículo Futurista -->
       <div class="scanner-viewport-container">
         <video id="nfce-scanner-video" class="scanner-video-feed" playsinline muted autoplay></video>
-        
         <div class="scanner-hud-overlay">
           <div class="scanner-viewfinder">
-            <div class="viewfinder-corner tl"></div>
-            <div class="viewfinder-corner tr"></div>
-            <div class="viewfinder-corner bl"></div>
-            <div class="viewfinder-corner br"></div>
+            <div class="viewfinder-corner tl"></div><div class="viewfinder-corner tr"></div>
+            <div class="viewfinder-corner bl"></div><div class="viewfinder-corner br"></div>
             <div class="scanner-laser-line"></div>
           </div>
         </div>
-
-        <div class="scanner-live-badge">
-          <span class="scanner-pulse-dot"></span> Câmera Ao Vivo
-        </div>
-
-        <div id="scanner-error-fallback" class="scanner-error-overlay" style="display: none;">
-          <div style="font-size: 36px; margin-bottom: 8px;">⚠️</div>
-          <div style="font-weight: 600; font-size: 14px; margin-bottom: 6px;" id="scanner-error-msg">Não foi possível acessar a câmera</div>
-          <div style="font-size: 12px; color: var(--text-muted); max-width: 260px; margin-bottom: 12px;">Você pode carregar uma foto da nota fiscal ou digitar a chave de 44 dígitos abaixo.</div>
-          <label class="btn btn-primary btn-sm" style="cursor: pointer;">
-            📁 Carregar Foto da Nota
-            <input type="file" id="scanner-file-fallback" accept="image/*" style="display: none;">
-          </label>
+        <div class="scanner-live-badge"><span class="scanner-pulse-dot"></span> Câmera Ao Vivo</div>
+        <div id="scanner-error-fallback" class="scanner-error-overlay" style="display:none">
+          <div style="font-size:36px;margin-bottom:8px">⚠️</div>
+          <div style="font-weight:600;font-size:14px;margin-bottom:6px" id="scanner-error-msg">Não foi possível acessar a câmera</div>
+          <div style="font-size:12px;color:var(--text-muted);max-width:260px;margin-bottom:12px">Você pode carregar uma foto da nota fiscal abaixo.</div>
+          <label class="btn btn-primary btn-sm" style="cursor:pointer">📁 Carregar Foto da Nota<input type="file" id="scanner-file-fallback" accept="image/*" style="display:none"></label>
         </div>
       </div>
-
-      <!-- Instruções e Controles -->
       <div class="scanner-controls-bar">
-        <div style="font-size: 12px; color: var(--text-muted); text-align: center; margin-bottom: 10px;">
-          Aponte para o <strong>QR Code impresso no cupom fiscal (NFC-e / SAT / Pix)</strong>
+        <div style="font-size:12px;color:var(--text-muted);text-align:center;margin-bottom:10px">Aponte para o <strong>QR Code impresso no cupom fiscal (NFC-e / SAT / Pix)</strong></div>
+        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" id="scanner-btn-switch-cam"><span>🔄</span> Trocar Câmera</button>
+          <button class="btn btn-secondary btn-sm" id="scanner-btn-torch"><span>💡</span> Lanterna</button>
+          <label class="btn btn-secondary btn-sm" style="cursor:pointer;margin:0"><span>📁</span> Foto da Nota<input type="file" id="scanner-file-input" accept="image/*" style="display:none"></label>
         </div>
-
-        <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
-          <button class="btn btn-secondary btn-sm" id="scanner-btn-switch-cam" title="Alternar Câmera">
-            <span>🔄</span> Trocar Câmera
-          </button>
-          
-          <button class="btn btn-secondary btn-sm" id="scanner-btn-torch" title="Alternar Lanterna">
-            <span>💡</span> Lanterna
-          </button>
-
-          <label class="btn btn-secondary btn-sm" style="cursor: pointer; margin: 0;" title="Carregar Foto da Galeria">
-            <span>📁</span> Foto da Nota
-            <input type="file" id="scanner-file-input" accept="image/*" style="display: none;">
-          </label>
-        </div>
-
-        <!-- Entrada Manual de Chave ou Link -->
-        <div style="margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px;">
-          <div style="display: flex; gap: 6px;">
-            <input type="text" id="scanner-manual-input" placeholder="Cole o link da SEFAZ ou chave de 44 dígitos..." style="font-size: 11.5px; padding: 6px 10px; flex: 1; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-surface);">
+        <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+          <div style="display:flex;gap:6px">
+            <input type="text" id="scanner-manual-input" placeholder="Cole o link da SEFAZ ou chave de 44 dígitos..." style="font-size:11.5px;padding:6px 10px;flex:1;border-radius:6px;border:1px solid var(--border);background:var(--bg-surface)">
             <button class="btn btn-primary btn-sm" id="scanner-btn-apply-manual">Processar</button>
           </div>
         </div>
       </div>
     </div>
   `;
-
   document.body.appendChild(modalWrap);
 
   const videoEl = document.getElementById('nfce-scanner-video');
   const errorOverlay = document.getElementById('scanner-error-fallback');
   const errorMsg = document.getElementById('scanner-error-msg');
 
-  // Callback de Sucesso
   const handleSuccess = (parsedData) => {
-    closeScannerModal();
+    NFCeCameraManager.stop();
+    modalWrap.remove();
     handleNFCeScanResult(parsedData, customCallback);
   };
 
-  // Callback de Erro na Câmera
   const handleError = (err) => {
-    console.warn('[Scanner] Erro na câmera:', err);
     if (errorOverlay) {
       errorOverlay.style.display = 'flex';
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        errorMsg.innerText = 'Permissão de câmera negada no navegador';
-      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        errorMsg.innerText = 'Nenhuma câmera detectada neste computador';
-      }
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') errorMsg.innerText = 'Permissão de câmera negada';
+      else if (err.name === 'NotFoundError') errorMsg.innerText = 'Nenhuma câmera detectada';
     }
   };
 
-  function closeScannerModal() {
-    NFCeCameraManager.stop();
-    modalWrap.remove();
-  }
-
-  // Event Listeners
+  const closeScannerModal = () => { NFCeCameraManager.stop(); modalWrap.remove(); };
   document.getElementById('scanner-btn-close').addEventListener('click', closeScannerModal);
-  modalWrap.addEventListener('click', (e) => {
-    if (e.target === modalWrap) closeScannerModal();
-  });
-
-  document.getElementById('scanner-btn-switch-cam').addEventListener('click', () => {
-    NFCeCameraManager.switchCamera(handleSuccess, handleError);
-  });
-
+  modalWrap.addEventListener('click', (e) => { if (e.target === modalWrap) closeScannerModal(); });
+  document.getElementById('scanner-btn-switch-cam').addEventListener('click', () => NFCeCameraManager.switchCamera(handleSuccess, handleError));
   document.getElementById('scanner-btn-torch').addEventListener('click', async () => {
     const isLit = await NFCeCameraManager.toggleTorch();
     const btn = document.getElementById('scanner-btn-torch');
-    if (btn) {
-      btn.style.borderColor = isLit ? 'var(--accent)' : 'var(--border)';
-      btn.style.color = isLit ? 'var(--accent-light)' : 'var(--text-primary)';
-    }
+    if (btn) { btn.style.borderColor = isLit ? 'var(--accent)' : 'var(--border)'; btn.style.color = isLit ? 'var(--accent-light)' : 'var(--text-primary)'; }
   });
 
   const fileInput = document.getElementById('scanner-file-input');
-  fileInput.addEventListener('change', (e) => {
-    if (e.target.files && e.target.files[0]) {
-      NFCeCameraManager.scanImageFile(e.target.files[0], handleSuccess);
-    }
-  });
-
+  fileInput.addEventListener('change', (e) => { if (e.target.files && e.target.files[0]) NFCeCameraManager.scanImageFile(e.target.files[0], handleSuccess); });
   const fileFallback = document.getElementById('scanner-file-fallback');
-  if (fileFallback) {
-    fileFallback.addEventListener('change', (e) => {
-      if (e.target.files && e.target.files[0]) {
-        NFCeCameraManager.scanImageFile(e.target.files[0], handleSuccess);
-      }
-    });
-  }
+  if (fileFallback) fileFallback.addEventListener('change', (e) => { if (e.target.files && e.target.files[0]) NFCeCameraManager.scanImageFile(e.target.files[0], handleSuccess); });
 
   const applyManual = () => {
     const val = document.getElementById('scanner-manual-input').value.trim();
-    if (!val) {
-      toast('Digite ou cole a URL da SEFAZ ou chave da nota.', 'warning');
-      return;
-    }
-    const parsed = parseNFCeUrl(val);
-    handleSuccess(parsed);
+    if (!val) { toast('Digite ou cole a URL da SEFAZ ou chave da nota.', 'warning'); return; }
+    handleSuccess(parseNFCeUrl(val));
   };
-
   document.getElementById('scanner-btn-apply-manual').addEventListener('click', applyManual);
-  document.getElementById('scanner-manual-input').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') applyManual();
-  });
+  document.getElementById('scanner-manual-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') applyManual(); });
 
-  // Inicia a Câmera
   NFCeCameraManager.start(videoEl, handleSuccess, handleError);
 }
 
-/**
- * Abre Pop-up de Confirmação com todos os dados da leitura do QR Code
- */
 function openNFCeConfirmationModal(parsedData, accounts, categories) {
   const today = new Date().toISOString().split('T')[0];
   const dateVal = parsedData.date || today;
@@ -695,7 +484,6 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
   const amountVal = parsedData.amount != null ? parsedData.amount : '';
   const descVal = parsedData.description || 'Compra Cupom Fiscal';
 
-  // Localiza melhor categoria sugerida
   let matchedCatId = '';
   if (parsedData.suggestedCategory) {
     const matchedCat = categories.find(c =>
@@ -706,54 +494,45 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
   }
 
   Modal.open('📋 Conferência da Nota Fiscal', `
-    <div class="nfce-confirm-container">
-      <!-- Card com destaque do valor e dados fiscais lidos -->
-      <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(6, 182, 212, 0.08)); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius); padding: 18px; margin-bottom: 16px; text-align: center;">
-        <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 4px;">
-          <span style="font-size: 24px;">🧾</span>
-          <span style="font-size: 16px; font-weight: 700; color: var(--text-primary);">${descVal}</span>
-          ${parsedData.uf ? `<span class="badge badge-blue" style="font-size: 10px;">${parsedData.uf}</span>` : ''}
+    <div class="nfce-confirm-container" style="display:flex;flex-direction:column;gap:14px">
+      <div style="background:linear-gradient(135deg,rgba(16,185,129,0.12),rgba(6,182,212,0.06));border:1px solid rgba(16,185,129,0.25);border-radius:var(--radius);padding:16px 18px;text-align:center;position:relative;box-shadow:0 4px 16px rgba(0,0,0,0.15)">
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:2px">
+          <span style="font-size:22px">🧾</span>
+          <span style="font-size:15px;font-weight:700;color:var(--text-primary)" id="nfce-preview-desc">${descVal}</span>
+          ${parsedData.uf ? `<span class="badge badge-blue" style="font-size:10px;padding:2px 6px">${parsedData.uf}</span>` : ''}
         </div>
-        
-        <div style="font-size: 32px; font-weight: 900; color: var(--accent-light); letter-spacing: -0.02em; margin: 8px 0;">
+        <div style="font-size:34px;font-weight:900;color:${amountVal !== '' ? 'var(--accent-light)' : '#fbbf24'};letter-spacing:-0.02em;margin:6px 0" id="nfce-preview-amount-display">
           ${amountVal !== '' ? fmt.currency(amountVal) : 'R$ 0,00'}
         </div>
-        
-        <div style="font-size: 12px; color: var(--text-muted); display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;">
-          <span>📅 Data: <strong>${fmt.date(dateVal)}</strong></span>
-          ${parsedData.nNF ? `<span>🔢 Nota: <strong>#${parsedData.nNF}</strong></span>` : ''}
+        <div style="font-size:11.5px;color:var(--text-muted);display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap">
+          <span>📅 Data: <strong id="nfce-preview-date">${fmt.date(dateVal)}</strong></span>
+          ${parsedData.nNF ? `<span>🔢 NF-e: <strong>#${parsedData.nNF}</strong></span>` : ''}
           ${parsedData.cnpj ? `<span>🏢 CNPJ: <strong>${parsedData.cnpj}</strong></span>` : ''}
         </div>
-
-        ${parsedData.accessKey ? `
-          <div style="margin-top: 10px; font-size: 10.5px; color: var(--text-muted); background: rgba(0,0,0,0.2); padding: 4px 8px; border-radius: 6px; word-break: break-all;">
-            🔑 Chave: <code>${parsedData.accessKey}</code>
-          </div>
-        ` : ''}
+        ${parsedData.accessKey ? `<div style="margin-top:10px;font-size:10px;color:var(--text-muted);background:rgba(0,0,0,0.25);padding:4px 8px;border-radius:6px;word-break:break-all">🔑 Chave: <code>${parsedData.accessKey}</code></div>` : ''}
       </div>
 
-      <!-- Formulário de Ajuste Rápido antes de Aceitar -->
-      <div class="form-row">
-        <div class="form-group">
-          <label style="font-size: 12px; font-weight: 600;">Descrição</label>
-          <input type="text" id="nfce-conf-desc" value="${descVal}" style="font-size: 13px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group" style="margin:0">
+          <label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Descrição</label>
+          <input type="text" id="nfce-conf-desc" value="${descVal}" style="font-size:13px;font-weight:600">
         </div>
-        <div class="form-group">
-          <label style="font-size: 12px; font-weight: 600;">Valor (R$)</label>
-          <input type="number" step="0.01" min="0" id="nfce-conf-amount" value="${amountVal}" style="font-size: 13px;">
+        <div class="form-group" style="margin:0">
+          <label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Valor (R$)</label>
+          <input type="number" step="0.01" min="0" id="nfce-conf-amount" placeholder="0,00" value="${amountVal}" style="font-size:13px;font-weight:700;color:var(--accent-light)">
         </div>
       </div>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label style="font-size: 12px; font-weight: 600;">Conta / Cartão Pagador</label>
-          <select id="nfce-conf-account" style="font-size: 13px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group" style="margin:0">
+          <label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Conta / Cartão Pagador</label>
+          <select id="nfce-conf-account" style="font-size:13px">
             ${accounts.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}
           </select>
         </div>
-        <div class="form-group">
-          <label style="font-size: 12px; font-weight: 600;">Categoria</label>
-          <select id="nfce-conf-category" style="font-size: 13px;">
+        <div class="form-group" style="margin:0">
+          <label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Categoria</label>
+          <select id="nfce-conf-category" style="font-size:13px">
             <option value="">Sem categoria</option>
             ${categories.filter(c => c.type === 'expense' || c.type === 'both').map(c => `
               <option value="${c.id}" ${String(c.id) === String(matchedCatId) ? 'selected' : ''}>${c.icon} ${c.name}</option>
@@ -762,34 +541,32 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
         </div>
       </div>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label style="font-size: 12px; font-weight: 600;">Data do Pagamento</label>
-          <input type="date" id="nfce-conf-date" value="${dateVal}" style="font-size: 13px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group" style="margin:0">
+          <label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Data do Pagamento</label>
+          <input type="date" id="nfce-conf-date" value="${dateVal}" style="font-size:13px">
         </div>
-        <div class="form-group">
-          <label style="font-size: 12px; font-weight: 600;">Mês de Referência (Competência)</label>
-          <input type="month" id="nfce-conf-competence" value="${competenceVal}" style="font-size: 13px;">
+        <div class="form-group" style="margin:0">
+          <label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Mês de Competência</label>
+          <input type="month" id="nfce-conf-competence" value="${competenceVal}" style="font-size:13px">
         </div>
       </div>
 
-      <div class="form-group" style="margin-top: 6px;">
-        <label style="font-size: 12.5px; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+      <div class="form-group" style="margin:4px 0 0 0">
+        <label style="font-size:12.5px;display:flex;align-items:center;gap:8px;cursor:pointer">
           <input type="checkbox" id="nfce-conf-paid" checked> Já foi pago / debitado da conta
         </label>
       </div>
 
-      <!-- Rodapé de Ações: Aceitar ou Não Aceitar -->
-      <div class="modal-footer" style="padding: 16px 0 0 0; border-top: 1px solid var(--border); margin-top: 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
-        <button type="button" class="btn btn-secondary" id="nfce-conf-btn-reject" style="color: #f87171; border-color: rgba(239, 68, 68, 0.4); display: flex; align-items: center; gap: 6px;">
-          <span>✕</span> Não Aceitar (Descartar)
+      <div style="padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <button type="button" class="btn btn-secondary" id="nfce-conf-btn-reject" style="color:#f87171;border-color:rgba(239,68,68,0.35);background:rgba(239,68,68,0.06);font-weight:600;padding:8px 16px;border-radius:8px;display:flex;align-items:center;gap:6px">
+          <span>✕</span> Não Aceitar
         </button>
-
-        <div style="display: flex; gap: 8px;">
-          <button type="button" class="btn btn-secondary" id="nfce-conf-btn-more-options" title="Abrir no formulário completo com todas as opções">
+        <div style="display:flex;gap:8px">
+          <button type="button" class="btn btn-secondary" id="nfce-conf-btn-more-options" style="font-weight:600;padding:8px 14px;border-radius:8px;display:flex;align-items:center;gap:6px" title="Abrir no formulário completo com todas as opções">
             <span>✏️</span> Mais Opções
           </button>
-          <button type="button" class="btn btn-primary" id="nfce-conf-btn-accept" style="font-weight: 700; display: flex; align-items: center; gap: 6px;">
+          <button type="button" class="btn btn-primary" id="nfce-conf-btn-accept" style="font-weight:700;padding:8px 20px;border-radius:8px;display:flex;align-items:center;gap:6px;background:linear-gradient(135deg,#10b981,#059669);border:none;box-shadow:0 4px 14px rgba(16,185,129,0.3)">
             <span>✓</span> Aceitar e Criar Lançamento
           </button>
         </div>
@@ -797,19 +574,47 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
     </div>
   `);
 
-  // 1. Botão Não Aceitar / Descartar
+  const amountInput = document.getElementById('nfce-conf-amount');
+  const descInput = document.getElementById('nfce-conf-desc');
+  const previewAmount = document.getElementById('nfce-preview-amount-display');
+  const previewDesc = document.getElementById('nfce-preview-desc');
+  const dateInput = document.getElementById('nfce-conf-date');
+  const previewDate = document.getElementById('nfce-preview-date');
+
+  if (amountInput && previewAmount) {
+    amountInput.addEventListener('input', () => {
+      const val = parseFloat(amountInput.value);
+      if (!isNaN(val) && val > 0) {
+        previewAmount.innerText = fmt.currency(val);
+        previewAmount.style.color = 'var(--accent-light)';
+      } else {
+        previewAmount.innerText = 'R$ 0,00';
+        previewAmount.style.color = '#fbbf24';
+      }
+    });
+    if (amountVal === '' || amountVal === 0) {
+      setTimeout(() => { try { amountInput.focus(); } catch (e) {} }, 100);
+    }
+  }
+
+  if (descInput && previewDesc) {
+    descInput.addEventListener('input', () => { previewDesc.innerText = descInput.value.trim() || 'Compra Cupom Fiscal'; });
+  }
+  if (dateInput && previewDate) {
+    dateInput.addEventListener('change', () => { previewDate.innerText = fmt.date(dateInput.value); });
+  }
+
   document.getElementById('nfce-conf-btn-reject').onclick = () => {
     Modal.close();
     toast('Leitura da nota fiscal descartada.', 'info');
   };
 
-  // 2. Botão Mais Opções (abre formulário avulso completo)
   document.getElementById('nfce-conf-btn-more-options').onclick = () => {
     const updatedPrefill = {
       ...parsedData,
-      description: document.getElementById('nfce-conf-desc').value.trim(),
-      amount: parseFloat(document.getElementById('nfce-conf-amount').value) || null,
-      date: document.getElementById('nfce-conf-date').value,
+      description: descInput.value.trim(),
+      amount: parseFloat(amountInput.value) || null,
+      date: dateInput.value,
       competence: document.getElementById('nfce-conf-competence').value,
       suggestedCategory: categories.find(c => String(c.id) === String(document.getElementById('nfce-conf-category').value))?.name || parsedData.suggestedCategory
     };
@@ -817,95 +622,57 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
     openAvulsoModal(accounts, categories, null, 'expense', updatedPrefill);
   };
 
-  // 3. Botão Aceitar e Criar Lançamento Direto
   document.getElementById('nfce-conf-btn-accept').onclick = async () => {
     try {
-      const amount = parseFloat(document.getElementById('nfce-conf-amount').value);
-      const date = document.getElementById('nfce-conf-date').value;
+      const amount = parseFloat(amountInput.value);
+      const date = dateInput.value;
       const account_id = parseInt(document.getElementById('nfce-conf-account').value);
-      const description = document.getElementById('nfce-conf-desc').value.trim();
+      const description = descInput.value.trim();
       const category_id = parseInt(document.getElementById('nfce-conf-category').value) || null;
       const competenceMonthVal = document.getElementById('nfce-conf-competence').value;
       const competence_date = competenceMonthVal ? `${competenceMonthVal}-01` : null;
       const is_paid = document.getElementById('nfce-conf-paid').checked ? 1 : 0;
 
       if (!amount || amount <= 0) {
-        toast('Informe um valor válido para a nota fiscal.', 'error');
+        toast('Informe o valor da compra.', 'error');
+        amountInput.focus();
         return;
       }
-      if (!date) {
-        toast('Informe a data da compra.', 'error');
-        return;
-      }
-      if (!account_id || isNaN(account_id)) {
-        toast('Selecione a conta pagadora.', 'error');
-        return;
-      }
+      if (!date) { toast('Informe a data da compra.', 'error'); return; }
+      if (!account_id || isNaN(account_id)) { toast('Selecione a conta pagadora.', 'error'); return; }
 
       const txData = {
-        user_id: State.user.id,
-        account_id,
-        category_id,
-        recurring_item_id: null,
-        type: 'expense',
-        amount,
-        description: description || 'Compra Cupom Fiscal',
-        date,
-        is_paid,
-        is_avulso: 1,
-        notes: parsedData.accessKey ? `Chave NFC-e: ${parsedData.accessKey}` : null,
-        credit_product: 'normal',
-        due_date: null,
-        competence_date
+        user_id: State.user.id, account_id, category_id, recurring_item_id: null,
+        type: 'expense', amount, description: description || 'Compra Cupom Fiscal',
+        date, is_paid, is_avulso: 1, notes: parsedData.accessKey ? `Chave NFC-e: ${parsedData.accessKey}` : null,
+        credit_product: 'normal', due_date: null, competence_date
       };
 
       const res = await window.api.transactions.create(txData);
-      if (res && res.error) {
-        toast(res.error, 'error');
-        return;
-      }
+      if (res && res.error) { toast(res.error, 'error'); return; }
 
       Modal.close();
       toast(`✅ Lançamento de ${fmt.currency(amount)} criado com sucesso!`, 'success');
 
-      // Atualiza visualizações
-      if (typeof renderRecurring === 'function' && State.currentPage === 'recurring') {
-        renderRecurring();
-      }
-      if (typeof renderDashboard === 'function' && (State.currentPage === 'dashboard' || !State.currentPage)) {
-        renderDashboard();
-      }
+      if (typeof renderRecurring === 'function' && State.currentPage === 'recurring') renderRecurring();
+      if (typeof renderDashboard === 'function' && (State.currentPage === 'dashboard' || !State.currentPage)) renderDashboard();
     } catch (err) {
-      console.error('[Scanner] Erro ao salvar lançamento aceito:', err);
       toast('Erro ao criar lançamento: ' + err.message, 'error');
     }
   };
 }
 
-/**
- * Processa os dados extraídos da Nota Fiscal e abre o Pop-up de Confirmação
- */
 async function handleNFCeScanResult(parsedData, customCallback = null) {
-  if (!parsedData) {
-    toast('Não foi possível extrair dados válidos da nota fiscal.', 'error');
-    return;
-  }
-
-  if (customCallback && typeof customCallback === 'function') {
-    customCallback(parsedData);
-    return;
-  }
+  if (!parsedData) { toast('Não foi possível extrair dados válidos da nota fiscal.', 'error'); return; }
+  if (customCallback && typeof customCallback === 'function') { customCallback(parsedData); return; }
 
   try {
     const [accounts, categories] = await Promise.all([
       window.api.accounts.getAll(State.user.id),
       window.api.categories.getAll(State.user.id)
     ]);
-
-    // Abre o Pop-up de Confirmação com opções de Aceitar ou Não Aceitar
     openNFCeConfirmationModal(parsedData, accounts, categories);
   } catch (err) {
-    console.error('[Scanner] Erro ao abrir pop-up de confirmação da nota:', err);
     toast('Erro ao carregar dados para confirmação do lançamento.', 'error');
   }
 }
