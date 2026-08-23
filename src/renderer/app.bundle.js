@@ -1,7 +1,7 @@
 /* ============================================
  * app.bundle.js — FamilyFinancas Renderer
  * Gerado por: npm run build:renderer
- * 2026-08-23T04:01:28.463Z
+ * 2026-08-23T04:08:54.103Z
  * Modulos: 21
  * ============================================ */
 
