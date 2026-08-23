@@ -498,57 +498,15 @@ async function openSettingsModal(activeTab = 'profile') {
       bindBackupTabEvents(capitalizedMonth);
 
     } else if (tab === 'wiki') {
-      bodyEl.innerHTML = `
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
-          <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
-            <span>📚 Base de Conhecimento (Wiki)</span>
-          </h3>
-          <span class="badge badge-purple" style="font-size: 10px; padding: 2px 8px; border-radius: 10px; background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3);">Guia Oficial</span>
-        </div>
+      renderSettingsWikiTab(bodyEl);
+    } else if (tab === 'lgpd') {
+      renderSettingsLgpdTab(bodyEl);
+    }
+  };
 
-        <!-- BREADCRUMB / TRILHA DE NAVEGAÇÃO -->
-        <div id="wiki-breadcrumb" style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); margin-bottom: 12px; background: rgba(255,255,255,0.03); padding: 8px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border); flex-wrap: wrap;">
-          <span style="font-weight: 700; color: var(--text-muted); cursor: pointer;" id="wiki-crumb-root">📚 WIKI</span>
-          <span style="opacity: 0.4;">›</span>
-          <span id="wiki-crumb-cat" style="color: #60a5fa; font-weight: 600;">💳 Cartões de Crédito</span>
-          <span style="opacity: 0.4;">›</span>
-          <span id="wiki-crumb-sub" style="color: var(--accent-light); font-weight: 700;">Competência vs Vencimento</span>
-        </div>
+  document.querySelectorAll('.settings-modal-tab-btn').forEach(btn => {
+    btn.onclick = () => renderTabContent(btn.dataset.tab);
+  });
 
-        <!-- BUSCA GLOBAL NA WIKI -->
-        <div style="margin-bottom: 12px; position: relative;">
-          <input type="text" id="wiki-search-input" placeholder="🔍 Pesquisar em todos os tópicos da Wiki..."
-                 style="width: 100%; padding: 8px 12px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-primary); font-size: 12.5px; outline: none;">
-        </div>
-
-        <!-- CONTAINER PRINCIPAL: MENU EM ÁRVORE (ESQUERDA) + CONTEÚDO (DIREITA) -->
-        <div style="display: flex; gap: 14px; height: 430px; overflow: hidden;">
-          
-          <!-- MENU EM ÁRVORE DE ASSUNTOS E SUBMENUS -->
-          <div id="wiki-tree-sidebar" style="width: 240px; min-width: 240px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 6px; scrollbar-width: thin;">
-            
-            <!-- GRUPO 1: CARTÕES DE CRÉDITO -->
-            <div class="wiki-tree-group">
-              <div class="wiki-tree-header" data-cat="cartoes" style="padding: 8px 10px; border-radius: 6px; font-weight: 700; font-size: 12px; color: #60a5fa; background: rgba(59,130,246,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-                <span>💳 Cartões de Crédito</span>
-                <span class="wiki-tree-arrow">▾</span>
-              </div>
-              <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
-                <div class="wiki-tree-item active" data-cat="cartoes" data-topic="cartao-competencia" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-primary); cursor: pointer; border-left: 2px solid var(--accent); background: var(--bg-raised);">
-                  • Competência vs Vencimento
-                </div>
-                <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-ciclo" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-                  • Ciclo & Melhor Dia
-                </div>
-                <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-limite" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-                  • Limite Comprometido
-                </div>
-                <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-pagamento" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-                  • Pagamento & Baixa Atômica
-                </div>
-                <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-acordo" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-                  • Renegociação & Acordos
-                </div>
-                <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-reabertura" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-                  • Reabertura & Estorno
-                </div>
+  await renderTabContent(activeTab);
+}
