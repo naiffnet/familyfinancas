@@ -1,7 +1,7 @@
 /* ============================================
  * app.bundle.js — FamilyFinancas Renderer
  * Gerado por: npm run build:renderer
- * 2026-08-23T15:28:09.730Z
+ * 2026-08-23T15:33:42.595Z
  * Modulos: 22
  * ============================================ */
 
@@ -4512,18 +4512,47 @@ function parseNFCeUrl(raw) {
     result.nNF = parseInt(result.accessKey.substring(25, 34), 10).toString();
   }
 
-  // 4. Extração de Valor e Data por Tokens Pipe (|) e Hexadecimal (SEFAZ v2.0)
+  // 4. Extração de Valor e Data por Tokens Pipe (|), Hexadecimal e Query Params
+  // 4A. Query parameters explícitos de data (dhEmi, dEmi, data, date)
+  const qDateMatch = text.match(/[?&](?:dhEmi|dEmi|data|date)=([^&|]+)/i);
+  if (qDateMatch) {
+    const rawD = decodeURIComponent(qDateMatch[1]).trim();
+    const isoM = rawD.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (isoM) { result.date = `${isoM[1]}-${isoM[2]}-${isoM[3]}`; result.competence = `${isoM[1]}-${isoM[2]}`; }
+    const brM = rawD.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (brM) { result.date = `${brM[3]}-${brM[2]}-${brM[1]}`; result.competence = `${brM[3]}-${brM[2]}`; }
+    const compM = rawD.match(/^(\d{4})(\d{2})(\d{2})/);
+    if (compM) { result.date = `${compM[1]}-${compM[2]}-${compM[3]}`; result.competence = `${compM[1]}-${compM[2]}`; }
+  }
+
+  // 4B. Tokens do Pipe (|)
   if (text.includes('|')) {
     const pipeParts = text.split('|');
     for (let i = 1; i < pipeParts.length; i++) {
       const token = pipeParts[i].trim();
       if (!token) continue;
+
+      // Se for decimal direto (ex: 84.50 ou 148,90)
       if (/^\d+[.,]\d{2}$/.test(token) || (/^\d+[.,]\d+$/.test(token) && parseFloat(token.replace(',', '.')) > 0)) {
         const val = parseFloat(token.replace(',', '.'));
         if (!isNaN(val) && val > 0 && !(i <= 3 && (val === 1 || val === 2))) {
           if (!result.amount) result.amount = val;
         }
       }
+
+      // Se for data direta em formato ISO ou BR no pipe
+      const pIsoM = token.match(/(\d{4})-(\d{2})-(\d{2})/);
+      if (pIsoM && !result.date) {
+        result.date = `${pIsoM[1]}-${pIsoM[2]}-${pIsoM[3]}`;
+        result.competence = `${pIsoM[1]}-${pIsoM[2]}`;
+      }
+      const pBrM = token.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      if (pBrM && !result.date) {
+        result.date = `${pBrM[3]}-${pBrM[2]}-${pBrM[1]}`;
+        result.competence = `${pBrM[3]}-${pBrM[2]}`;
+      }
+
+      // Se for Hexadecimal ASCII (SEFAZ v2.0)
       const decodedHex = decodeHexAscii(token);
       if (decodedHex) {
         if (/^\d+[.,]\d{2}$/.test(decodedHex) || /^\d+[.,]\d+$/.test(decodedHex)) {
@@ -4533,6 +4562,35 @@ function parseNFCeUrl(raw) {
         const dateMatch = decodedHex.match(/(\d{4})-(\d{2})-(\d{2})/) || decodedHex.match(/(\d{2})\/(\d{2})\/(\d{4})/);
         if (dateMatch && !result.date) {
           result.date = dateMatch[1].length === 4 ? `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}` : `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
+          result.competence = result.date.slice(0, 7);
+        }
+        const compDateM = decodedHex.match(/^(\d{4})(\d{2})(\d{2})/);
+        if (compDateM && !result.date) {
+          result.date = `${compDateM[1]}-${compDateM[2]}-${compDateM[3]}`;
+          result.competence = `${compDateM[1]}-${compDateM[2]}`;
+        }
+        const aaMmDd = decodedHex.match(/^(\d{2})(\d{2})(\d{2})$/);
+        if (aaMmDd && !result.date && result.competence) {
+          const yr = parseInt(aaMmDd[1], 10) + 2000;
+          const mo = aaMmDd[2];
+          const dy = aaMmDd[3];
+          if (parseInt(mo, 10) >= 1 && parseInt(mo, 10) <= 12 && parseInt(dy, 10) >= 1 && parseInt(dy, 10) <= 31) {
+            result.date = `${yr}-${mo}-${dy}`;
+            result.competence = `${yr}-${mo}`;
+          }
+        }
+      }
+
+      // Unix Timestamp em Hex (8 dígitos hex)
+      if (token.length === 8 && /^[0-9a-fA-F]{8}$/.test(token) && !result.date) {
+        const ts = parseInt(token, 16);
+        if (ts > 1577836800 && ts < 1893456000) {
+          const d = new Date(ts * 1000);
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          result.date = `${y}-${m}-${day}`;
+          result.competence = `${y}-${m}`;
         }
       }
     }
@@ -4543,14 +4601,18 @@ function parseNFCeUrl(raw) {
     if (valMatch) result.amount = parseFloat(valMatch[1].replace(',', '.'));
   }
 
+  // Se a data exata do dia não foi codificada na URL, usa a competência da chave
   const today = new Date().toISOString().split('T')[0];
   if (!result.date) {
+    result.isEstimatedDate = true;
     if (result.competence) {
       result.date = result.competence === today.slice(0, 7) ? today : `${result.competence}-01`;
     } else {
       result.date = today;
       result.competence = today.slice(0, 7);
     }
+  } else {
+    result.isEstimatedDate = false;
   }
 
   // 5. CNPJ Raiz
@@ -4976,7 +5038,13 @@ function openNFCeConfirmationModal(parsedData, accounts, categories) {
     descInput.addEventListener('input', () => { previewDesc.innerText = descInput.value.trim() || 'Compra Cupom Fiscal'; });
   }
   if (dateInput && previewDate) {
-    dateInput.addEventListener('change', () => { previewDate.innerText = fmt.date(dateInput.value); });
+    dateInput.addEventListener('change', () => {
+      if (dateInput.value) {
+        previewDate.innerText = fmt.date(dateInput.value);
+        const compInput = document.getElementById('nfce-conf-competence');
+        if (compInput) compInput.value = dateInput.value.slice(0, 7);
+      }
+    });
   }
 
   document.getElementById('nfce-conf-btn-reject').onclick = () => {
