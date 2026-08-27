@@ -166,6 +166,9 @@ class DbCore {
       this.db.exec("ALTER TABLE transactions ADD COLUMN penalty_fixed_rate REAL DEFAULT 0");
     } catch (e) {}
     try {
+      this.db.exec("UPDATE accounts SET balance = 0 WHERE type = 'credit' AND balance != 0");
+    } catch (e) {}
+    try {
       this.db.exec(`
         CREATE TABLE IF NOT EXISTS invoices (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
