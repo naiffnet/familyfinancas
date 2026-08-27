@@ -77,6 +77,7 @@ app.whenReady().then(() => {
   }
 
   // Desktop native file dialog overrides
+  ipcMain.removeHandler('backup:export');
   ipcMain.handle('backup:export', async () => {
     const { filePath } = await dialog.showSaveDialog({
       defaultPath: `backup-financeiro-${new Date().toISOString().split('T')[0]}.db`,
@@ -86,6 +87,7 @@ app.whenReady().then(() => {
     return { success: false };
   });
 
+  ipcMain.removeHandler('backup:exportExcel');
   ipcMain.handle('backup:exportExcel', async (e, { userId, month, year, type }) => {
     try {
       const { filePath } = await dialog.showSaveDialog({
@@ -110,6 +112,7 @@ app.whenReady().then(() => {
     }
   });
 
+  ipcMain.removeHandler('backup:exportJson');
   ipcMain.handle('backup:exportJson', async (e, { userId }) => {
     try {
       const { filePath } = await dialog.showSaveDialog({
@@ -127,6 +130,7 @@ app.whenReady().then(() => {
     }
   });
 
+  ipcMain.removeHandler('backup:exportCsv');
   ipcMain.handle('backup:exportCsv', async (e, { userId, month, year, type }) => {
     try {
       const filename = type === 'monthly'

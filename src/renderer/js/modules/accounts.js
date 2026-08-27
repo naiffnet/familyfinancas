@@ -196,7 +196,7 @@ async function renderAccounts() {
                 
                 <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
                   <div>
-                    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600;letter-spacing:0.02em;">Fatura / Usado</div>
+                    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600;letter-spacing:0.02em;" title="Soma das faturas abertas + todas as parcelas futuras que consom o limite">Comprometido Total</div>
                     <div style="font-size:16px;font-weight:700;color:#f87171;">${fmt.currency(spent)}</div>
                   </div>
                   <div style="text-align: right;">

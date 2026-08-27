@@ -231,16 +231,29 @@ function openGoalDepositModal(goalId, goals) {
 async function renderReports() {
   const page = document.getElementById('page-reports');
   page.innerHTML = `
-    <div class="page-header"><div><h2 class="page-title">Relatórios</h2></div><div id="report-period"></div></div>
+    <div class="page-header">
+      <div><h2 class="page-title">Relatórios</h2></div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="btn btn-secondary btn-sm" id="btn-print-report" style="display:flex;align-items:center;gap:6px" title="Imprimir Relatório ou Salvar em PDF">
+          <span>🖨️</span> Imprimir / PDF
+        </button>
+        <div id="report-period"></div>
+      </div>
+    </div>
     <div class="report-tabs">
       <button class="report-tab active" data-tab="cashflow">Fluxo de Caixa</button>
       <button class="report-tab" data-tab="categories">Por Categoria</button>
       <button class="report-tab" data-tab="patrimony">Patrimônio</button>
+      <button class="report-tab" data-tab="interest">Auditoria de Juros</button>
     </div>
     <div id="report-content"></div>`;
 
   document.getElementById('report-period').appendChild(buildPeriodSelector(() => loadTab(currentTab)));
   let currentTab = 'cashflow';
+
+  document.getElementById('btn-print-report')?.addEventListener('click', () => {
+    window.print();
+  });
 
   document.querySelectorAll('.report-tab').forEach(btn => {
     btn.onclick = () => { document.querySelectorAll('.report-tab').forEach(b => b.classList.remove('active')); btn.classList.add('active'); currentTab = btn.dataset.tab; loadTab(currentTab); };
@@ -250,8 +263,8 @@ async function renderReports() {
     const content = document.getElementById('report-content');
     if (tab === 'cashflow') {
       const txs = await window.api.reports.getCashflow({ userId: State.user.id, month: State.currentMonth, year: State.currentYear });
-      const inc = txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-      const exp = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+      const inc = txs.filter(t => t.type === 'income').reduce((s, t) => s + (t.amount || 0) + (t.penalty_amount || 0) - (t.discount_amount || 0), 0);
+      const exp = txs.filter(t => t.type === 'expense').reduce((s, t) => s + (t.amount || 0) + (t.penalty_amount || 0) - (t.discount_amount || 0), 0);
       content.innerHTML = `
         <p style="font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 20px; background: rgba(255,255,255,0.02); padding: 12px 16px; border-left: 3px solid #10b981; border-radius: var(--radius-sm);">
           💡 <strong>Fluxo de Caixa:</strong> Este relatório apresenta a listagem completa de todas as receitas e despesas realizadas na competência selecionada, junto com o balanço consolidado do período. É a ferramenta ideal para você auditar a entrada e saída de recursos e verificar o saldo líquido exato de cada lançamento.
@@ -262,16 +275,23 @@ async function renderReports() {
           <div class="card" style="flex:1;text-align:center"><div style="color:var(--text-muted);font-size:12px;margin-bottom:6px">Saldo</div><div style="font-size:20px;font-weight:800;color:${inc-exp>=0?'var(--accent-light)':'#f87171'}">${fmt.currency(inc-exp)}</div></div>
         </div>
         <div class="card"><div class="table-wrapper"><table>
-          <thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Conta</th><th>Tipo</th><th class="text-right">Valor</th></tr></thead>
+          <thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Conta</th><th>Tipo</th><th class="text-right">Valor Líquido</th></tr></thead>
           <tbody>${txs.length === 0 ? '<tr><td colspan="6" class="no-data">Sem lançamentos</td></tr>' :
-            txs.map(t => `<tr>
-              <td style="color:var(--text-muted)">${fmt.date(t.date)}</td>
-              <td>${t.description || '—'}</td>
-              <td>${t.category_icon || ''} ${t.category_name || '—'}</td>
-              <td>${t.account_name || '—'}</td>
-              <td><span class="badge ${t.type === 'income' ? 'badge-green' : 'badge-red'}">${t.type === 'income' ? 'Receita' : 'Despesa'}</span></td>
-              <td class="text-right" style="font-weight:600;color:${t.type === 'income' ? 'var(--accent-light)' : '#f87171'}">${t.type === 'income' ? '+' : '-'}${fmt.currency(t.amount)}</td>
-            </tr>`).join('')}
+            txs.map(t => {
+              const net = (t.amount || 0) + (t.is_paid ? ((t.penalty_amount || 0) - (t.discount_amount || 0)) : 0);
+              const hasAdjustment = t.is_paid && (t.penalty_amount > 0 || t.discount_amount > 0);
+              return `<tr>
+                <td style="color:var(--text-muted)">${fmt.date(t.date)}</td>
+                <td>
+                  ${t.description || '—'}
+                  ${hasAdjustment ? `<div style="font-size:10.5px;color:var(--text-muted)">Base: ${fmt.currency(t.amount)}${t.penalty_amount > 0 ? ` (+${fmt.currency(t.penalty_amount)} juros)` : ''}${t.discount_amount > 0 ? ` (-${fmt.currency(t.discount_amount)} desc)` : ''}</div>` : ''}
+                </td>
+                <td>${t.category_icon || ''} ${t.category_name || '—'}</td>
+                <td>${t.account_name || '—'}</td>
+                <td><span class="badge ${t.type === 'income' ? 'badge-green' : 'badge-red'}">${t.type === 'income' ? 'Receita' : 'Despesa'}</span></td>
+                <td class="text-right" style="font-weight:600;color:${t.type === 'income' ? 'var(--accent-light)' : '#f87171'}">${t.type === 'income' ? '+' : '-'}${fmt.currency(net)}</td>
+              </tr>`;
+            }).join('')}
           </tbody></table></div></div>`;
     } else if (tab === 'categories') {
       const txs = await window.api.reports.getCashflow({ userId: State.user.id, month: State.currentMonth, year: State.currentYear });
@@ -282,7 +302,7 @@ async function renderReports() {
         <div class="card" id="categories-report-interactive-wrapper"></div>
       `;
       setupCategoryInteractiveChart('categories-report-interactive-wrapper', 'repCat', txs);
-    } else {
+    } else if (tab === 'patrimony') {
       const data = await window.api.reports.getPatrimony({ userId: State.user.id });
       content.innerHTML = `
         <p style="font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 20px; background: rgba(255,255,255,0.02); padding: 12px 16px; border-left: 3px solid #3b82f6; border-radius: var(--radius-sm);">
@@ -292,6 +312,178 @@ async function renderReports() {
       if (State.charts.patrimony) State.charts.patrimony.destroy();
       const vals = data.map(d => d.net);
       State.charts.patrimony = new Chart(document.getElementById('chart-patrimony'), { type: 'line', data: { labels: data.map(d => d.month), datasets: [{ label: 'Patrimônio', data: vals, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', fill: true, tension: 0.4, pointBackgroundColor: '#10b981', pointRadius: 4 }] }, options: chartOptions('bar') });
+    } else if (tab === 'interest') {
+      const audit = await window.api.reports.getInterestAudit({ userId: State.user.id, month: State.currentMonth, year: State.currentYear });
+      const summary = audit.summary || { totalPenalty: 0, totalDiscount: 0, penaltyCount: 0, discountCount: 0, avgDaysLate: 0, avgDailyRate: 0 };
+      const byCat = audit.byCategory || [];
+      const bySup = audit.bySupplier || [];
+      const byAcc = audit.byAccount || [];
+      const txs = audit.transactions || [];
+
+      content.innerHTML = `
+        <p style="font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 20px; background: rgba(255,255,255,0.02); padding: 12px 16px; border-left: 3px solid #f59e0b; border-radius: var(--radius-sm);">
+          💡 <strong>Auditoria de Juros e Encargos:</strong> Monitore todos os valores pagos em atraso, multas, taxa média de juros ao dia (% a.d.) e economias com descontos obtidos. Identifique onde você mais gasta com juros por categoria, fornecedor ou conta bancária.
+        </p>
+
+        <!-- KPI CARDS -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px;">
+          <div class="card" style="text-align: center; border-top: 3px solid #ef4444;">
+            <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">⚠️ Total Pago em Juros / Multas</div>
+            <div style="font-size: 22px; font-weight: 800; color: #f87171;">${fmt.currency(summary.totalPenalty)}</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">${summary.penaltyCount} pagamento(s) com acréscimo</div>
+          </div>
+          <div class="card" style="text-align: center; border-top: 3px solid #10b981;">
+            <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">🏷️ Total de Descontos Obtidos</div>
+            <div style="font-size: 22px; font-weight: 800; color: var(--accent-light);">${fmt.currency(summary.totalDiscount)}</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">${summary.discountCount} pagamento(s) com desconto</div>
+          </div>
+          <div class="card" style="text-align: center; border-top: 3px solid #f59e0b;">
+            <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">📅 Média de Dias de Atraso</div>
+            <div style="font-size: 22px; font-weight: 800; color: #fbbf24;">${summary.avgDaysLate.toFixed(1)} <span style="font-size: 13px; font-weight: 600;">dias</span></div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Tempo médio de atraso pago</div>
+          </div>
+          <div class="card" style="text-align: center; border-top: 3px solid #06b6d4;">
+            <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">📈 Taxa Média de Juros Diária</div>
+            <div style="font-size: 22px; font-weight: 800; color: #38bdf8;">${summary.avgDailyRate.toFixed(3)}% <span style="font-size: 13px; font-weight: 600;">a.d.</span></div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Custo médio diário do atraso</div>
+          </div>
+        </div>
+
+        <!-- BREAKDOWN GRIDS: CATEGORIA, FORNECEDOR E CONTA -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px;">
+          <!-- POR CATEGORIA -->
+          <div class="card">
+            <h3 style="font-size: 14px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+              <span>📂 Juros por Categoria</span>
+              <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">${byCat.length} categorias</span>
+            </h3>
+            ${byCat.length === 0 ? '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:16px">Nenhum juro registrado no período.</div>' : `
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                ${byCat.map(c => {
+                  const pct = summary.totalPenalty > 0 ? ((c.total_penalty / summary.totalPenalty) * 100).toFixed(1) : 0;
+                  return `
+                    <div>
+                      <div style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px;">
+                        <span>${c.category_icon || '📁'} <strong>${c.category_name}</strong> <span style="color:var(--text-muted);font-size:11px">(${c.count}x)</span></span>
+                        <span style="font-weight: 700; color: #f87171;">${fmt.currency(c.total_penalty)} <span style="font-size:11px;color:var(--text-muted)">(${pct}%)</span></span>
+                      </div>
+                      <div style="height: 6px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden;">
+                        <div style="height: 100%; width: ${pct}%; background: ${c.category_color || '#ef4444'}; border-radius: 4px;"></div>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `}
+          </div>
+
+          <!-- POR FORNECEDOR / CREDOR -->
+          <div class="card">
+            <h3 style="font-size: 14px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+              <span>🏢 Juros por Fornecedor / Credor</span>
+              <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">Top credores</span>
+            </h3>
+            ${bySup.length === 0 ? '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:16px">Nenhum juro registrado no período.</div>' : `
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                ${bySup.slice(0, 6).map((s, idx) => {
+                  const pct = summary.totalPenalty > 0 ? ((s.total_penalty / summary.totalPenalty) * 100).toFixed(1) : 0;
+                  return `
+                    <div>
+                      <div style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px;">
+                        <span><strong style="color:var(--text-primary)">${idx + 1}. ${s.supplier}</strong> <span style="color:var(--text-muted);font-size:11px">(${s.count}x)</span></span>
+                        <span style="font-weight: 700; color: #f87171;">${fmt.currency(s.total_penalty)}</span>
+                      </div>
+                      <div style="height: 6px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden;">
+                        <div style="height: 100%; width: ${pct}%; background: #f59e0b; border-radius: 4px;"></div>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `}
+          </div>
+
+          <!-- POR CONTA BANCÁRIA -->
+          <div class="card">
+            <h3 style="font-size: 14px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+              <span>🏦 Juros por Conta Pagadora</span>
+              <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">Origem dos pagamentos</span>
+            </h3>
+            ${byAcc.length === 0 ? '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:16px">Nenhum juro registrado no período.</div>' : `
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                ${byAcc.map(a => {
+                  const pct = summary.totalPenalty > 0 ? ((a.total_penalty / summary.totalPenalty) * 100).toFixed(1) : 0;
+                  return `
+                    <div>
+                      <div style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px;">
+                        <span>💳 <strong>${a.account_name}</strong> <span style="color:var(--text-muted);font-size:11px">(${a.count}x)</span></span>
+                        <span style="font-weight: 700; color: #f87171;">${fmt.currency(a.total_penalty)}</span>
+                      </div>
+                      <div style="height: 6px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden;">
+                        <div style="height: 100%; width: ${pct}%; background: ${a.account_color || '#3b82f6'}; border-radius: 4px;"></div>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `}
+          </div>
+        </div>
+
+        <!-- TABELA DETALHADA DE AUDITORIA -->
+        <div class="card">
+          <h3 style="font-size: 14px; font-weight: 700; margin-bottom: 12px;">📋 Extrato Detalhado de Pagamentos com Ajuste (Juros ou Descontos)</h3>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Vencimento</th>
+                  <th>Pagamento</th>
+                  <th>Atraso / Ant.</th>
+                  <th>Descrição</th>
+                  <th>Categoria</th>
+                  <th>Conta</th>
+                  <th class="text-right">Valor Base</th>
+                  <th class="text-right">Ajuste (Juros/Desc.)</th>
+                  <th class="text-right">Taxa Diária</th>
+                  <th class="text-right">Total Pago</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${txs.length === 0 ? '<tr><td colspan="10" class="no-data" style="padding:24px;text-align:center">Nenhum pagamento com juros ou desconto registrado neste período. 🎉</td></tr>' :
+                  txs.map(t => {
+                    const isPenalty = t.penalty_amount > 0;
+                    const isDiscount = t.discount_amount > 0;
+                    const diffDays = t.days_late;
+                    let delayLabel = '—';
+                    if (diffDays > 0) delayLabel = `<span style="color:#f87171;font-weight:700">+${diffDays}d atraso</span>`;
+                    else if (diffDays < 0) delayLabel = `<span style="color:var(--accent-light);font-weight:700">${Math.abs(diffDays)}d antecip.</span>`;
+                    else delayLabel = `<span style="color:var(--text-muted)">no dia</span>`;
+
+                    return `
+                      <tr>
+                        <td style="color:var(--text-muted)">${fmt.date(t.due_date || t.date)}</td>
+                        <td style="font-weight:600;color:var(--text-primary)">${fmt.date(t.payment_date)}</td>
+                        <td>${delayLabel}</td>
+                        <td style="font-weight:600">${t.description || '—'}</td>
+                        <td>${t.category_icon || ''} ${t.category_name || '—'}</td>
+                        <td>${t.account_name || '—'}</td>
+                        <td class="text-right" style="color:var(--text-muted)">${fmt.currency(t.base_amount)}</td>
+                        <td class="text-right" style="font-weight:700;color:${isPenalty ? '#f87171' : (isDiscount ? 'var(--accent-light)' : 'var(--text-muted)')}">
+                          ${isPenalty ? `+${fmt.currency(t.penalty_amount)}` : (isDiscount ? `-${fmt.currency(t.discount_amount)}` : 'R$ 0,00')}
+                        </td>
+                        <td class="text-right" style="font-size:12px;color:${isPenalty ? '#fbbf24' : 'var(--text-muted)'}">
+                          ${isPenalty && t.daily_rate_pct ? `${t.daily_rate_pct.toFixed(3)}% a.d.` : '—'}
+                        </td>
+                        <td class="text-right" style="font-weight:800;color:var(--text-primary)">${fmt.currency(t.net_amount)}</td>
+                      </tr>
+                    `;
+                  }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
     }
   }
   await loadTab('cashflow');

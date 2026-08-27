@@ -283,3 +283,288 @@ function openRenegotiateInvoiceModal(inv, accounts) {
     }
   };
 }
+
+/**
+ * Abre o Pop-up com todas as informações detalhadas do lançamento
+ * e os 3 botões de ação: Excluir, Editar e Pagar.
+ */
+function openTransactionDetailsModal({ tx, item, accounts = [], categories = [], type = 'expense', onUpdate = null }) {
+  const isPaid = tx ? !!tx.is_paid : false;
+  const description = tx ? (tx.description || (item ? item.name : 'Lançamento')) : (item ? item.name : 'Lançamento');
+  const baseAmount = tx ? (tx.amount || 0) : (item ? (item.amount || 0) : 0);
+  const penalty = tx ? (tx.penalty_amount || 0) : 0;
+  const discount = tx ? (tx.discount_amount || 0) : 0;
+  const netAmount = baseAmount + (isPaid ? (penalty - discount) : 0);
+
+  const txDate = tx ? tx.date : (item ? `${State.currentYear}-${String(State.currentMonth).padStart(2, '0')}-${String(item.due_day || 1).padStart(2, '0')}` : null);
+  const payDate = tx ? tx.payment_date : null;
+  const compDate = tx ? tx.competence_date : null;
+
+  // Account
+  const accId = (tx ? tx.account_id : null) || (item ? item.account_id : null);
+  const acc = accounts.find(a => a.id === accId) || {};
+  const isCreditCard = acc.type === 'credit' || (item && item.account_type === 'credit');
+
+  // Category
+  const catId = (tx ? tx.category_id : null) || (item ? item.category_id : null);
+  const cat = categories.find(c => c.id === catId) || {};
+  const catName = cat.name || (tx ? tx.category_name : null) || (item ? item.category_name : null) || 'Sem Categoria';
+  const catIcon = cat.icon || (tx ? tx.category_icon : null) || (item ? item.icon : null) || (type === 'income' ? '💰' : '📋');
+  const catColor = cat.color || (item ? item.color : null) || '#94a3b8';
+
+  // User
+  const userName = (tx ? tx.user_name : null) || (acc ? acc.user_name : null) || (item ? item.user_name : null) || (State.user ? State.user.name : 'Titular');
+  const userColor = (tx ? tx.user_avatar_color : null) || (acc ? acc.user_avatar_color : null) || '#10b981';
+
+  // Notes & PIX
+  const notes = (tx ? tx.notes : null) || (item ? item.notes : null) || '';
+  const pixCode = (tx ? tx.pix_code : null) || (item ? item.pix_code : null) || (notes && notes.includes('000201') ? notes : null);
+
+  // Overdue calculation
+  const todayStr = new Date().toISOString().split('T')[0];
+  const isOverdue = !isPaid && txDate && txDate < todayStr;
+  const holidayOrWeekend = txDate && typeof isWeekendOrHoliday === 'function' && isWeekendOrHoliday(txDate);
+  const nextBusinessDay = holidayOrWeekend && typeof getNextBusinessDay === 'function' ? getNextBusinessDay(txDate) : null;
+
+  // Projected interest if overdue
+  let proj = null;
+  if (isOverdue && typeof calculateOverdueProjections === 'function') {
+    const dailyRate = (item && item.interest_rate) || 0.033;
+    const penaltyRate = (item && item.penalty_fixed_rate) || 2.0;
+    proj = calculateOverdueProjections(baseAmount, txDate, todayStr, dailyRate, penaltyRate);
+  }
+
+  // Nature (Fixo / Parcela / Avulso)
+  let natureLabel = 'Lançamento Avulso (Variável)';
+  if (item) {
+    if (item.repeat_months > 0) {
+      natureLabel = `Parcelamento (${item.repeat_months}x)`;
+    } else {
+      natureLabel = 'Lançamento Fixo Recorrente';
+    }
+  }
+
+  // Can user edit
+  const canEdit = State.user.profile_type === 1 || (State.permissions && State.permissions.can_edit_all) || (tx && tx.user_id === State.user.id) || (item && item.user_id === State.user.id);
+
+  // Status Badge
+  let statusBadgeHtml = '';
+  if (isPaid) {
+    statusBadgeHtml = `<span class="badge badge-green" style="font-size: 11px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px;">✓ Pago${payDate ? ' em ' + fmt.date(payDate) : ''}</span>`;
+  } else if (isOverdue) {
+    statusBadgeHtml = `<span class="badge badge-danger" style="font-size: 11px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px;">⚠️ Em Atraso${proj ? ` (${proj.daysLate} dias)` : ''}</span>`;
+  } else {
+    statusBadgeHtml = `<span class="badge badge-yellow" style="font-size: 11px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px;">⏳ Pendente</span>`;
+  }
+
+  Modal.open('Detalhes do Lançamento', `
+    <div style="padding: 2px;">
+      <!-- Top Card Header -->
+      <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px; margin-bottom: 16px; position: relative; overflow: hidden;">
+        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 14px;">
+          <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+            <div style="width: 48px; height: 48px; border-radius: 12px; background: ${catColor}22; border: 1px solid ${catColor}44; display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0;">
+              ${catIcon}
+            </div>
+            <div style="min-width: 0;">
+              <h3 style="font-size: 16px; font-weight: 800; color: var(--text-primary); margin: 0 0 4px 0; line-height: 1.3; word-break: break-word;">
+                ${item && item.is_priority ? '<span title="Item Prioritário" style="margin-right: 4px;">⭐</span>' : ''}${description}
+              </h3>
+              <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                <span class="badge ${type === 'income' ? 'badge-green' : 'badge-red'}" style="font-size: 10px; text-transform: uppercase;">
+                  ${type === 'income' ? 'Receita' : 'Despesa'}
+                </span>
+                <span class="badge" style="font-size: 10px; background: rgba(255,255,255,0.06); color: var(--text-secondary); border: 1px solid var(--border);">
+                  ${natureLabel}
+                </span>
+                ${statusBadgeHtml}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Big Highlight Amount -->
+        <div style="padding-top: 12px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">
+              ${isPaid ? 'Valor Líquido Liquidado' : 'Valor Total'}
+            </div>
+            <div style="font-size: 26px; font-weight: 900; color: ${type === 'income' ? 'var(--accent-light)' : '#f87171'}; letter-spacing: -0.02em;">
+              ${type === 'income' ? '+' : '-'}${fmt.currency(netAmount)}
+            </div>
+          </div>
+          ${(penalty > 0 || discount > 0) && isPaid ? `
+            <div style="text-align: right; font-size: 11px; color: var(--text-muted); background: rgba(255,255,255,0.02); padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border);">
+              <div>Base: <strong>${fmt.currency(baseAmount)}</strong></div>
+              ${penalty > 0 ? `<div style="color: #f87171;">Juros/Multa: +${fmt.currency(penalty)}</div>` : ''}
+              ${discount > 0 ? `<div style="color: var(--accent-light);">Desconto: -${fmt.currency(discount)}</div>` : ''}
+            </div>
+          ` : ''}
+          ${!isPaid && isOverdue && proj && proj.penaltyAmount > 0 ? `
+            <div style="text-align: right; font-size: 11.5px; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); padding: 6px 10px; border-radius: 6px; color: #fbbf24;">
+              <div>Atualizado hoje: <strong>${fmt.currency(proj.projectedAmount)}</strong></div>
+              <div style="font-size: 10px; opacity: 0.8;">(+${fmt.currency(proj.penaltyAmount)} encargos)</div>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+
+      <!-- Information Grid -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 16px;">
+        <!-- Vencimento -->
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px;">
+          <div style="font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">📅 Vencimento / Competência</div>
+          <div style="font-size: 13px; font-weight: 700; color: var(--text-primary);">${txDate ? fmt.date(txDate) : '—'}</div>
+          ${nextBusinessDay && !isPaid ? `
+            <div style="font-size: 10px; color: #60a5fa; font-weight: 600; margin-top: 2px;">
+              📅 Prorroga: ${fmt.date(nextBusinessDay)} (1º dia útil)
+            </div>
+          ` : ''}
+          ${compDate ? `
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">
+              Ref: ${fmtCompetence(compDate)}
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- Conta / Cartão -->
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px;">
+          <div style="font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">💳 Conta / Cartão</div>
+          <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+            ${isCreditCard ? '💳' : '🏦'} ${acc.name || 'Conta Geral'}
+          </div>
+          <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">
+            ${acc.bank ? (BANKS[acc.bank]?.name || acc.bank) : 'Geral'} • ${isCreditCard ? 'Cartão de Crédito' : (ACCOUNT_TYPES[acc.type] || 'Conta Corrente')}
+          </div>
+        </div>
+
+        <!-- Categoria -->
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px;">
+          <div style="font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">📁 Categoria</div>
+          <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+            <span>${catIcon}</span> ${catName}
+          </div>
+        </div>
+
+        <!-- Responsável -->
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px;">
+          <div style="font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">👤 Responsável / Membro</div>
+          <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background: ${userColor}; display: inline-block;"></span>
+            ${userName}
+          </div>
+        </div>
+      </div>
+
+      <!-- Notes / PIX details if present -->
+      ${notes ? `
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 16px;">
+          <div style="font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">📝 Observações</div>
+          <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; word-break: break-word;">${notes}</div>
+        </div>
+      ` : ''}
+
+      ${pixCode ? `
+        <div style="background: rgba(6,182,212,0.08); border: 1px solid rgba(6,182,212,0.3); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+          <div style="min-width: 0; flex: 1;">
+            <div style="font-size: 11px; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
+              <span>⚡</span> Chave PIX / Código Copia e Cola
+            </div>
+            <div style="font-size: 10.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: monospace;">
+              ${pixCode}
+            </div>
+          </div>
+          <button class="btn btn-sm" id="tdm-btn-copy-pix" style="background: rgba(6,182,212,0.2); color: #38bdf8; border-color: rgba(6,182,212,0.5); font-size: 11px; font-weight: 700; flex-shrink: 0; padding: 4px 10px; border-radius: 6px;">
+            📋 Copiar
+          </button>
+        </div>
+      ` : ''}
+
+      <!-- 3 Botões de Ação Principais: Excluir, Editar e Pagar -->
+      <div style="display: flex; gap: 10px; align-items: center; padding-top: 14px; border-top: 1px solid var(--border); flex-wrap: wrap;">
+        <!-- Botão 1: Excluir -->
+        <button type="button" class="btn btn-outline" id="tdm-btn-delete" style="border-color: rgba(239,68,68,0.4); color: #f87171; font-weight: 700; display: flex; align-items: center; gap: 6px; padding: 10px 16px; border-radius: 8px;" ${!canEdit ? 'disabled' : ''}>
+          <span>🗑️</span> Excluir
+        </button>
+
+        <!-- Botão 2: Editar -->
+        <button type="button" class="btn btn-outline" id="tdm-btn-edit" style="border-color: rgba(139,92,246,0.4); color: #c084fc; font-weight: 700; display: flex; align-items: center; gap: 6px; padding: 10px 16px; border-radius: 8px;" ${!canEdit ? 'disabled' : ''}>
+          <span>✏️</span> Editar
+        </button>
+
+        <!-- Botão 3: Pagar / Desfazer -->
+        ${isPaid ? `
+          <button type="button" class="btn btn-secondary" id="tdm-btn-pay" style="flex: 1; min-width: 150px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 16px; border-radius: 8px; background: rgba(255,255,255,0.06);" ${!canEdit ? 'disabled' : ''}>
+            <span>↩️</span> Desfazer Pagamento
+          </button>
+        ` : `
+          <button type="button" class="btn btn-primary" id="tdm-btn-pay" style="flex: 1; min-width: 150px; background: #10b981; border-color: #10b981; color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 16px; border-radius: 8px;" ${!canEdit ? 'disabled' : ''}>
+            <span>✅</span> Liquidar / Pagar
+          </button>
+        `}
+      </div>
+    </div>
+  `);
+
+  // 1. Copy PIX handler
+  const copyBtn = document.getElementById('tdm-btn-copy-pix');
+  if (copyBtn && pixCode) {
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(pixCode);
+      toast('Código PIX copiado para a área de transferência!', 'success');
+    };
+  }
+
+  // 2. Action: Excluir
+  const delBtn = document.getElementById('tdm-btn-delete');
+  if (delBtn) {
+    delBtn.onclick = () => {
+      Modal.close();
+      if (item) {
+        const delEl = document.querySelector(`.rec-delete[data-id="${item.id}"]`);
+        if (delEl) delEl.click();
+      } else if (tx) {
+        const delEl = document.querySelector(`.avl-delete[data-id="${tx.id}"]`);
+        if (delEl) delEl.click();
+      }
+    };
+  }
+
+  // 3. Action: Editar
+  const editBtn = document.getElementById('tdm-btn-edit');
+  if (editBtn) {
+    editBtn.onclick = () => {
+      Modal.close();
+      if (item) {
+        const editEl = document.querySelector(`.rec-edit[data-id="${item.id}"]`);
+        if (editEl) editEl.click();
+      } else if (tx) {
+        const editEl = document.querySelector(`.avl-edit[data-id="${tx.id}"]`);
+        if (editEl) editEl.click();
+      }
+    };
+  }
+
+  // 4. Action: Pagar / Desfazer
+  const payBtn = document.getElementById('tdm-btn-pay');
+  if (payBtn) {
+    payBtn.onclick = async () => {
+      if (isPaid && tx) {
+        Modal.close();
+        await window.api.transactions.togglePaid(tx.id);
+        toast('Pagamento desfeito! Lançamento voltou para pendente.');
+        onUpdate?.();
+      } else if (tx) {
+        Modal.close();
+        openPaymentDateModal(tx.id, tx.date, () => {
+          onUpdate?.();
+        });
+      } else if (item) {
+        Modal.close();
+        openPaymentDateModal(item.id, txDate, () => {
+          onUpdate?.();
+        });
+      }
+    };
+  }
+}

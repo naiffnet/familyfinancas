@@ -104,7 +104,7 @@ function createOwnershipChecks(db) {
     'categories:create': (session, d) => isSameFamilyUser(db, d ? (d.user_id || d.userId) : null, session),
     'categories:update': (session, d) => db.checkCategoryFamily(d.id, session.familyId),
     'categories:delete': (session, id) => db.checkCategoryFamily(id, session.familyId),
-    'recurring:getAll': (session, d) => isSameFamilyUser(db, d.userId, session.familyId),
+    'recurring:getAll': (session, d) => isSameFamilyUser(db, (d && typeof d === 'object' && d.userId && typeof d.userId === 'object') ? d.userId.userId : (d && typeof d === 'object' ? d.userId : d), session.familyId),
     'recurring:create': (session, d) => isSameFamilyUser(db, d.user_id, session.familyId),
     'recurring:update': (session, d) => db.checkRecurringFamily(d.id, session.familyId),
     'recurring:delete': (session, d) => db.checkRecurringFamily(d.id, session.familyId),
@@ -137,17 +137,24 @@ function createOwnershipChecks(db) {
     'dashboard:getCategoryChart': (session, d) => isSameFamilyUser(db, d.userId, session.familyId),
     'reports:getCashflow': (session, d) => isSameFamilyUser(db, d.userId, session.familyId),
     'reports:getPatrimony': (session, d) => isSameFamilyUser(db, d.userId, session.familyId),
+    'reports:getInterestAudit': (session, d) => isSameFamilyUser(db, d.userId, session.familyId),
     'permissions:get': (session, userId) => isSameFamilyUser(db, userId, session.familyId),
     'permissions:update': (session, d) => {
       if (session.profileType !== 1 && session.profileType !== 2) return false;
       return isSameFamilyUser(db, d.targetUserId, session.familyId);
     },
-    'families:getAll': (session) => session.isSystemAdmin === 1 || session.profileType === 1,
+    'families:getAll': (session) => !!session,
     'families:create': (session) => session.isSystemAdmin === 1 || session.profileType === 1,
     'families:update': (session) => session.isSystemAdmin === 1 || session.profileType === 1,
     'families:delete': (session) => session.isSystemAdmin === 1 || session.profileType === 1,
     'server:getLogs': (session) => session.profileType === 1 || session.profileType === 2,
+    'server:getMetrics': (session) => session.isSystemAdmin === 1 || session.profileType === 1 || session.profileType === 2,
     'logs:getByFamily': (session, id) => id === session.familyId,
+    'audit:getLogs': (session, d) => session.isSystemAdmin === 1 || session.profileType === 1 || session.profileType === 2 || isSameFamilyUser(db, d ? d.userId : null, session.familyId),
+    'cards:anticipateInstallments': (session, d) => isSameFamilyUser(db, d.userId, session.familyId),
+    'cards:payInvoicePartial': (session, d) => isSameFamilyUser(db, d.userId, session.familyId),
+    'transactions:refund': (session, d) => isSameFamilyUser(db, d.userId, session.familyId),
+    'backup:testIntegrity': (session) => session.isSystemAdmin === 1 || session.profileType === 1,
     'backup:exportExcel': (session, d) => isSameFamilyUser(db, d.userId, session.familyId),
     'backup:exportJson': (session, d) => isSameFamilyUser(db, d.userId, session.familyId),
     'backup:exportCsv': (session, d) => isSameFamilyUser(db, d.userId, session.familyId),
@@ -179,19 +186,41 @@ function buildHandlers(db) {
     'auth:updatePositions': (d) => db.updateUserPositions(d.positions),
     'auth:getRecoveryQuestion': (username) => db.getRecoveryQuestion(username),
     'auth:resetPasswordWithAnswer': ({ username, answer, newPassword }) => db.resetPasswordWithAnswer(username, answer, newPassword),
-    'settings:get': (userId) => db.getSettings(userId),
+    'settings:get': (userId) => db.getSettings((typeof userId === 'object' && userId !== null) ? (userId.userId || userId.id || 1) : (userId || 1)),
     'settings:set': ({ userId, key, value }) => db.setSetting(userId, key, value),
-    'accounts:getAll': (userId) => db.getAccounts(userId),
+    'accounts:getAll': (d) => {
+      const uid = (typeof d === 'object' && d !== null) ? (d.userId || d.id || 1) : (d || 1);
+      return db.getAccounts(uid);
+    },
     'accounts:create': (d) => db.createAccount(d),
     'accounts:update': (d) => db.updateAccount(d),
-    'accounts:delete': (id) => db.deleteAccount(id),
+    'accounts:delete': (id) => db.deleteAccount(typeof id === 'object' ? (id.id || id) : id),
     'accounts:transfer': (d) => db.transferBetweenAccounts(d),
-    'categories:getAll': (userId) => db.getCategories(userId),
+    'categories:getAll': (d) => {
+      const uid = (typeof d === 'object' && d !== null) ? (d.userId || d.id || 1) : (d || 1);
+      return db.getCategories(uid);
+    },
     'categories:create': (d) => db.createCategory(d),
     'categories:update': (d) => db.updateCategory(d),
-    'categories:delete': (id) => db.deleteCategory(id),
-    'recurring:getAll': ({ userId, type, month, year }) => db.getRecurringItems(userId, type, month, year),
-    'recurring:create': (d) => db.createRecurringItem(d),
+    'recurring:getAll': (d) => {
+      let userId, type, month, year;
+      if (d && typeof d === 'object') {
+        if (d.userId && typeof d.userId === 'object') {
+          userId = d.userId.userId;
+          type = d.type || d.userId.type;
+          month = d.month || d.userId.month;
+          year = d.year || d.userId.year;
+        } else {
+          userId = d.userId;
+          type = d.type;
+          month = d.month;
+          year = d.year;
+        }
+      } else {
+        userId = d;
+      }
+      return db.getRecurringItems(userId, type, month, year);
+    },
     'recurring:update': (d) => db.updateRecurringItem(d),
     'recurring:delete': ({ id, fromDate }) => db.deleteRecurringItem(id, fromDate),
     'recurring:togglePriority': (id) => db.toggleRecurringPriority(id),
@@ -223,6 +252,7 @@ function buildHandlers(db) {
     'dashboard:getCategoryChart': (d) => db.getCategoryChart(d.userId, d.month, d.year),
     'reports:getCashflow': (d) => db.getCashflow(d.userId, d.month, d.year),
     'reports:getPatrimony': (d) => db.getPatrimony(d.userId),
+    'reports:getInterestAudit': (d) => db.getInterestAuditReport(d.userId, d.month, d.year),
     'permissions:get': (userId) => db.getUserPermissions(userId),
     'permissions:update': (data) => db.updateUserPermissions(data),
     'families:getAll': () => db.getFamilies(),
@@ -231,7 +261,26 @@ function buildHandlers(db) {
     'families:delete': (id) => db.deleteFamily(id),
     'families:checkName': (name) => db.checkFamilyName(name),
     'server:getLogs': () => db.getServerLogs(),
+    'server:getMetrics': () => db.getSystemMetrics(),
     'logs:getByFamily': (id) => db.getFamilyLogs(id),
+    'audit:getLogs': (d) => db.getAuditLogs(d || {}),
+    'cards:anticipateInstallments': (d) => db.anticipateCardInstallments(d),
+    'cards:payInvoicePartial': (d) => db.payCardInvoicePartial(d),
+    'transactions:refund': (d) => db.refundTransaction(d),
+    'backup:testIntegrity': (d) => {
+      if (d && d.fileData) {
+        const fs = require('fs');
+        const path = require('path');
+        const scratchDir = path.join(__dirname, '..', '..', 'scratch');
+        if (!fs.existsSync(scratchDir)) fs.mkdirSync(scratchDir, { recursive: true });
+        const tempTestPath = path.join(scratchDir, `test-integrity-${Date.now()}.db`);
+        fs.writeFileSync(tempTestPath, Buffer.from(d.fileData, 'base64'));
+        const result = db.testBackupIntegrity(tempTestPath);
+        try { fs.unlinkSync(tempTestPath); } catch (e) {}
+        return result;
+      }
+      return db.testBackupIntegrity(d ? d.filePath : null);
+    },
     'importer:parseOfx': ({ ofxString }) => db.parseOfxStatement(ofxString),
     'importer:parseCsv': ({ csvString }) => db.parseCsvStatement(csvString),
     'importer:importBatch': (d) => db.importBankTransactions(d),
@@ -481,22 +530,22 @@ function createExpressApp(db) {
   const handlers = buildHandlers(db);
 
   app.use(helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-        fontSrc: ["'self'", "https://fonts.gstatic.com"],
-        imgSrc: ["'self'", "data:"],
-        connectSrc: ["'self'", "*"],
-      },
-    },
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
   }));
 
   const corsOptions = {
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
-      if (origin.endsWith('.fly.dev') || origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
+      if (
+        origin.endsWith('.fly.dev') ||
+        origin.startsWith('http://localhost') ||
+        origin.startsWith('http://127.0.0.1') ||
+        origin.startsWith('http://192.168.') ||
+        origin.startsWith('http://10.') ||
+        origin.startsWith('http://172.') ||
+        process.env.NODE_ENV !== 'production'
+      ) {
         return callback(null, true);
       }
       callback(new Error('Bloqueado por política de CORS'));
@@ -511,7 +560,31 @@ function createExpressApp(db) {
     res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  app.use(express.static(path.join(__dirname, '..', 'renderer')));
+  app.get('/favicon.ico', (req, res) => {
+    const iconPath = path.join(__dirname, '..', 'renderer', 'icon-192.png');
+    if (fs.existsSync(iconPath)) {
+      res.sendFile(iconPath);
+    } else {
+      res.status(204).end();
+    }
+  });
+
+  // Servir o App diretamente na rota raiz (para celular e desktop)
+  app.get('/', (req, res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.sendFile(path.join(__dirname, '..', 'renderer', 'app.html'));
+  });
+
+  app.use(express.static(path.join(__dirname, '..', 'renderer'), {
+    maxAge: 0,
+    etag: false,
+    lastModified: false,
+    setHeaders: (res) => {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }));
 
   const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -542,8 +615,9 @@ function createExpressApp(db) {
     if (!fs.existsSync(db.dbPath)) {
       return res.status(404).json({ error: 'Banco de dados não encontrado.' });
     }
-    const filename = `backup-financeiro-admin-${new Date().toISOString().split('T')[0]}.db`;
-    res.download(db.dbPath, filename);
+    res.setHeader('Content-Type', 'application/x-sqlite3');
+    res.setHeader('Content-Disposition', `attachment; filename="backup-financeiro-${new Date().toISOString().split('T')[0]}.db"`);
+    res.sendFile(db.dbPath);
   });
 
   app.post('/api/rpc', sensitiveChannelLimiter, async (req, res) => {
@@ -592,6 +666,13 @@ function createExpressApp(db) {
       let result;
       if (channel === 'auth:getUsers') {
         result = await db.getUsers({ familyId: session.familyId });
+      } else if (channel === 'families:getAll') {
+        const allFamilies = await handler(...(args || []));
+        if (session && session.isSystemAdmin !== 1 && session.profileType !== 1) {
+          result = Array.isArray(allFamilies) ? allFamilies.filter(f => f.id === session.familyId) : [];
+        } else {
+          result = allFamilies;
+        }
       } else {
         result = await handler(...(args || []));
       }

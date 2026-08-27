@@ -321,6 +321,21 @@ module.exports = (Base) => class extends Base {
 
   // ── PERMISSIONS ───────────────────────────────────────────────
   getUserPermissions(userId) {
+    if (typeof userId === 'object' && userId !== null) {
+      userId = userId.userId || userId.id;
+    }
+    if (!userId) {
+      return {
+        can_view_all: 0,
+        can_edit_all: 0,
+        allow_dashboard: 1,
+        allow_recurring: 1,
+        allow_accounts: 1,
+        allow_budget: 1,
+        allow_goals: 1,
+        allow_reports: 1
+      };
+    }
     const perm = this.db.prepare('SELECT * FROM user_permissions WHERE user_id = ?').get(userId);
     if (!perm) {
       return {

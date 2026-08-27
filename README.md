@@ -1,82 +1,152 @@
-# 💰 FinançasFamília
+# 💰 FinançasFamília (MVP v1.0)
 
-> Um aplicativo híbrido premium para controle financeiro pessoal e familiar. Desenvolvido com **Electron**, **SQLite** (via `better-sqlite3`), **Express** (para acesso via rede local/LAN) e **Chart.js** para visualização gráfica inteligente.
+> Plataforma híbrida premium de **Gestão Financeira Pessoal e Familiar**. Desenvolvida para operar de forma nativa e **100% offline no Desktop (Electron + SQLite)**, com sincronização em tempo real via **Rede Local (LAN)** para dispositivos **Mobile (Smartphones / PWA)** e navegadores web.
+
+---
+
+## 🌟 Destaques do MVP
+
+### 🖥️ 1. Desktop Nativo (Offline-First)
+- **Zero Dependência Externa:** Funciona 100% sem conexão com a internet através do motor embutido em C++ **SQLite** (`better-sqlite3`).
+- **Janela Moderna & Frameless:** Interface dark glassmorphic com tema esmeralda, cabeçalho limpo e alternância de temas.
+- **Exportações Nativas:** Integração com caixas de diálogo do Windows para exportar banco `.db`, relatórios em Excel `.xlsx`, extratos `.csv` e backups em `.json`.
+
+### 📱 2. Experiência Mobile Enxuta (One-Handed UX)
+- **Top Bar Minimalista:** Navegador de meses ultra-rápido (`‹ Ago 2026 ›`).
+- **Hero Card com Saldo Consolidado:** Patrimônio líquido em contas, receitas (+), despesas (-) e saldo operacional.
+- **Lançamentos em 1 Toque:** Botões táteis de ação rápida:
+  - 💸 **+ Despesa** (Lançamento imediato ou no cartão)
+  - 💰 **+ Receita**
+  - 📷 **Scanner Inteligente** (Leitor de Cupom Fiscal NFC-e, QR Code PIX e PDF via câmera ou upload)
+- **Carrossel Horizontal de Cartões:** Visualização estilo *Apple Wallet / Nubank* com limites disponíveis em destaque grande e barra de progresso visual de uso da fatura.
+- **Extrato Tátil com Quitação Rápida:** Botão **Pagar** em 1 clique com cálculo automático de descontos, juros e multas.
+
+### 💳 3. Motor Financeiro & Regras de Negócio Avançadas
+- **Cartões de Crédito & Faturas:** Fechamento automático de ciclo de faturas, controle de limite comprometido vs disponível, pagamento parcial com saldo rotativo e encargos.
+- **Calendário Inteligente de Vencimentos:** Prorrogação automática de vencimentos que caem em fins de semana e feriados nacionais móveis/fixos (Páscoa, Tiradentes, Natal, etc.).
+- **Juros e Multas Moratórias:** Cálculo automático *pro-rata die* ao liquidar despesas atrasadas.
+- **Planejamento Recorrente:** Projeção mensal de contas fixas com ordenação por prioridade e funcionalidade de adiar parcelas.
+
+### 🛡️ 4. Segurança, LGPD & Isolamento Multi-Família
+- **Wizard de Cadastro Familiar:** Cadastro guiado em 3 etapas com aceite de Termos de Uso e Política de Privacidade (LGPD).
+- **Recuperação de Acesso:** Pergunta e resposta secreta de segurança para recuperação de senha sem depender de provedores de e-mail externos.
+- **Isolamento de Dados:** Cada família possui seu espaço restrito com permissões granulares por membro (exibir tudo, editar tudo, ocultar abas).
+
+---
+
+## 🏗️ Arquitetura do Sistema
+
+```mermaid
+graph TD
+    subgraph Desktop ["🖥️ Desktop App (Electron)"]
+        UI_Desktop["Renderer UI (SPA / Vanilla CSS)"]
+        IPC["Preload Bridge (Electron IPC)"]
+        UI_Desktop --> IPC
+    end
+
+    subgraph Mobile ["📱 Mobile & Web (LAN / PWA)"]
+        UI_Mobile["Mobile Lean UI (PWA)"]
+        HTTP_RPC["RPC Bridge (fetch /api/rpc)"]
+        UI_Mobile --> HTTP_RPC
+    end
+
+    subgraph Core ["⚙️ Core Backend (Node.js)"]
+        LAN_Server["Express Server (Port 3000)"]
+        Handlers["Core RPC Handlers (82 Canais)"]
+        Ownership["Ownership & Permissions Guards"]
+        
+        HTTP_RPC --> LAN_Server
+        LAN_Server --> Handlers
+        IPC --> Handlers
+        Handlers --> Ownership
+    end
+
+    subgraph Database ["🗄️ SQLite Engine (better-sqlite3)"]
+        DB["financeiro.db (WAL Mode + Foreign Keys)"]
+        Ownership --> DB
+    end
+```
 
 ---
 
 ## 🚀 Como Executar o Projeto
 
-Siga os passos abaixo para preparar o ambiente e rodar o aplicativo no seu computador.
+### Pré-requisitos
+- **Node.js** (v18 ou superior)
+- **npm**
 
-### Prerrequisitos
-- **Node.js** (versão 16 ou superior recomendado)
-- **npm** (instalado junto com o Node.js)
-
-### 1. Clonar o Repositório e Instalar Dependências
-No seu terminal, navegue até a pasta do projeto e instale as dependências:
+### 1. Instalação
 ```bash
-# Instalar dependências do projeto
+# Clonar o repositório
+git clone https://github.com/naiffnet/familyfinancas.git
+cd familyfinancas
+
+# Instalar dependências
 npm install
 ```
 
-### 2. Compilar Dependências Nativas (Se necessário)
-Como o projeto utiliza o `better-sqlite3` (uma dependência em C++ nativa), pode ser necessário recompilá-lo para que ele rode perfeitamente na versão do Electron instalada:
+### 2. Executar no Desktop (Electron)
 ```bash
-# Recompilar bibliotecas nativas para o Electron
-npm run rebuild
-```
-
-### 3. Rodar o Aplicativo (Electron)
-Para abrir o aplicativo Desktop completo:
-```bash
-# Rodar em modo de desenvolvimento (Electron Desktop)
-npm run dev
-```
-ou
-```bash
-# Executar a aplicação
 npm start
 ```
+*Ou `npm run dev`.*
 
-### 4. Rodar Somente o Servidor de Rede Local (Modo LAN)
-Se você deseja expor o banco de dados apenas para os celulares ou outros navegadores na mesma rede sem abrir a interface de desktop:
-```bash
-npm run start:server
+### 3. Acessar pelo Celular / Rede Local (LAN)
+Com o aplicativo aberto no Desktop, conecte o celular no mesmo Wi-Fi e acesse pelo navegador:
+```
+http://<SEU_IP_LOCAL>:3000
+```
+*(Exemplo: `http://192.168.1.7:3000`)*
+
+---
+
+## 🧪 Scripts e Ferramentas
+
+| Comando | Descrição |
+| :--- | :--- |
+| `npm start` | Inicia o aplicativo Desktop com o servidor de rede local embutido |
+| `npm run build:renderer` | Concatena e empacota os módulos frontend em `app.bundle.js` e `style.css` |
+| `npm run watch:renderer` | Modo de desenvolvimento contínuo (recompila o bundle ao salvar) |
+| `npm test` | Executa a suíte completa de testes automatizados (7 suítes de teste) |
+| `npm run rebuild` | Recompila o `better-sqlite3` para a versão atual do Electron |
+| `npm run start:server` | Inicia somente o servidor web standalone em Node.js (sem abrir janela Electron) |
+
+---
+
+## 📂 Estrutura de Diretórios
+
+```text
+├── src/
+│   ├── database/               # Camada de Dados Modularizada (Mixins SQLite)
+│   │   ├── db-core.js          # Inicialização, Schemas, Migrations e Backups
+│   │   ├── db-accounts.js      # Gestão de Contas e Limites de Cartão
+│   │   ├── db-recurring.js     # Planejamento, Recorrências e Ordenação
+│   │   ├── db-transactions.js  # Lançamentos, Liquidações e Extratos
+│   │   ├── db-card-invoices.js # Ciclos de Fatura, Fechamento e Rotativo
+│   │   ├── db-reports.js       # Dashboards, Fluxo de Caixa e Patrimônio
+│   │   ├── db-sync-dedup.js    # Sincronização e Deduplicação Inteligente
+│   │   └── db-family-users.js  # Perfis, Famílias e Permissões
+│   │
+│   ├── server/                 # Servidor Express & Barramento RPC
+│   │   └── core.js             # Handlers RPC 1:1, Helmet, Rate Limiter e CORS
+│   │
+│   ├── renderer/               # Frontend SPA (Vanilla JS + CSS)
+│   │   ├── app.html            # Estrutura base da SPA
+│   │   ├── style.css           # Folha de estilos consolidada
+│   │   ├── app.bundle.js       # Bundle compilado de scripts
+│   │   ├── css/                # Folhas de estilo modulares
+│   │   └── js/modules/         # Módulos JS limpos (<1000 linhas)
+│   │
+│   ├── main.js                 # Processo Principal do Electron
+│   └── preload.js              # Ponte de Segurança IPC Desktop
+│
+├── tests/                      # Bateria de Testes Automatizados (TAP)
+├── scripts/                    # Scripts de Build, Concatenação e Testes
+└── package.json
 ```
 
 ---
 
-## 🛠️ Arquitetura do Sistema
+## 📄 Licença e Termos
 
-A aplicação adota um padrão de arquitetura híbrida dividida em três camadas principais:
-
-1. **Main Process (`src/main.js`)**: O backend que roda diretamente no Node.js. Gerencia a janela nativa do Electron, inicializa o servidor de sincronização Express (LAN Server) e processa operações pesadas de E/S como importação e exportação de backups e planilhas do Excel.
-2. **Preload Bridge (`src/preload.js`)**: Ponte de segurança isolada que expõe APIs seguras para a interface gráfica por meio do `contextBridge`.
-3. **Renderer Process (`src/renderer/`)**: Interface gráfica em formato Single Page Application (SPA), estilizada em CSS Vanilla puro com suporte a gradientes fluidos, modo escuro profundo, efeitos de vidro (glassmorphism) e design responsivo.
-
----
-
-## 🌀 Sincronização Local (LAN Web Server)
-O aplicativo possui suporte nativo para uso concorrente por múltiplos membros da família:
-- Ao abrir o app no Desktop, ele inicializa um servidor local Express na porta `3000`.
-- Outros dispositivos conectados à mesma rede Wi-Fi podem ler o QR Code exibido na tela ou digitar `http://<IP_DO_COMPUTADOR>:3000` em seus navegadores.
-- O arquivo `app.js` detecta automaticamente quando está rodando fora do Electron (em navegadores de smartphones) e redireciona todas as ações para a API JSON-RPC do servidor, oferecendo a mesma experiência e interface do app Desktop.
-
----
-
-## 🗄️ Detalhes do Banco de Dados
-A persistência utiliza **SQLite** em modo WAL (Write-Ahead Logging) para garantir escritas ultra-rápidas e integridade dos dados sob acessos concorrentes via celulares. As tabelas principais incluem:
-- **`users`**: Armazena perfis e hashes de senhas criptografadas com `bcryptjs`.
-- **`accounts`**: Gerencia limites, fechamentos e vencimentos de cartões e contas correntes.
-- **`recurring_items`**: Agenda e calcula recorrências automatizadas.
-- **`transactions`**: Registra o fluxo de caixa histórico (receitas, despesas e transferências).
-- **`user_permissions`**: Regras de visualização e edição detalhada entre familiares.
-
----
-
-## 📄 Documentação Completa do Projeto
-
-Para obter detalhes ainda mais profundos sobre a implementação técnica e o modelo arquitetural, consulte os seguintes arquivos locais:
-
-- 📑 **[Explicação Arquitetural e Funcional](file:///x:/Programas/MEUS%20APPs/1%20APPs%20em%20dois%20ter%C3%A7os/app.financeiro/EXPLICACAO.md)**: Detalha o motor de recorrências, permissões de usuários, fallbacks de rede e o design system do app.
-- 🔧 **[Especificações Técnicas (SPEC)](file:///x:/Programas/MEUS%20APPs/1%20APPs%20em%20dois%20ter%C3%A7os/app.financeiro/SPEC.md)**: Contém o DDL do banco de dados (esquema SQLite completo), rotas de rede, protocolos IPC e APIs expostas.
+Este software é protegido por direitos autorais e regulado pelos Termos de Uso e Política de Privacidade em conformidade com a LGPD (Lei nº 13.709/2018).

@@ -7,6 +7,10 @@ const { parseCsvStatement } = require('./importers/csvParser');
 
 module.exports = (Base) => class extends Base {
   getAccounts(userId) {
+    if (typeof userId === 'object' && userId !== null) {
+      userId = userId.userId || userId.id;
+    }
+    userId = userId || 1;
     const user = this.db.prepare('SELECT family_id, profile_type FROM users WHERE id = ?').get(userId);
     const familyId = user ? user.family_id : null;
     const profileType = user ? user.profile_type : 2;
@@ -23,7 +27,7 @@ module.exports = (Base) => class extends Base {
       `).all();
     } else {
       const perm = this.getUserPermissions(userId);
-      if (perm.can_view_all === 1) {
+      if (perm.can_view_all === 1 && familyId) {
         accounts = this.db.prepare(`
           SELECT a.*, u.name as user_name, u.avatar_color as user_avatar_color, u.username as user_username
           FROM accounts a
@@ -114,6 +118,9 @@ module.exports = (Base) => class extends Base {
     }
 
     const payload = {
+      bank: 'outro',
+      balance: 0,
+      color: '#10b981',
       credit_limit: null,
       closing_day: null,
       due_day: null,
@@ -135,11 +142,24 @@ module.exports = (Base) => class extends Base {
     `).run(payload);
     const familyId = user ? user.family_id : null;
     this.logEvent('account:create', `Conta bancária "${data.name}" criada (Saldo inicial: R$ ${data.balance || 0}).`, familyId);
+    this.logAudit({
+      userId: data.user_id,
+      familyId,
+      action: 'ACCOUNT_CREATE',
+      entityType: 'account',
+      entityId: r.lastInsertRowid,
+      description: `Criou conta: "${data.name}" (${data.type}, Saldo: R$ ${data.balance || 0})`,
+      newValues: { name: data.name, type: data.type, bank: data.bank, balance: data.balance, credit_limit: data.credit_limit }
+    });
     return { success: true, id: r.lastInsertRowid };
   }
 
   updateAccount(data) {
+    const old = this.db.prepare('SELECT * FROM accounts WHERE id = ?').get(data.id);
     const payload = {
+      bank: 'outro',
+      balance: 0,
+      color: '#10b981',
       credit_limit: null,
       closing_day: null,
       due_day: null,
@@ -152,6 +172,7 @@ module.exports = (Base) => class extends Base {
       benefit_monthly_credit: 0,
       benefit_credit_day: 1,
       card_last_digits: null,
+      ...old,
       ...data
     };
     this.db.prepare(`
@@ -162,14 +183,37 @@ module.exports = (Base) => class extends Base {
       benefit_type=@benefit_type, benefit_monthly_credit=@benefit_monthly_credit, benefit_credit_day=@benefit_credit_day, card_last_digits=@card_last_digits
       WHERE id=@id
     `).run(payload);
+
+    if (old) {
+      this.logAudit({
+        userId: data.user_id || old.user_id,
+        action: 'ACCOUNT_UPDATE',
+        entityType: 'account',
+        entityId: data.id,
+        description: `Alterou conta: "${old.name}" ➔ "${data.name}"`,
+        oldValues: { name: old.name, balance: old.balance, credit_limit: old.credit_limit },
+        newValues: { name: data.name, balance: data.balance, credit_limit: data.credit_limit }
+      });
+    }
+
     return { success: true };
   }
 
   deleteAccount(id) {
-    const acc = this.db.prepare('SELECT a.name, u.family_id FROM accounts a JOIN users u ON a.user_id = u.id WHERE a.id = ?').get(id);
+    const acc = this.db.prepare('SELECT a.name, a.user_id, u.family_id FROM accounts a JOIN users u ON a.user_id = u.id WHERE a.id = ?').get(id);
     this.db.prepare('UPDATE accounts SET is_active = 0 WHERE id = ?').run(id);
     if (acc) {
       this.logEvent('account:delete', `Conta bancária "${acc.name}" foi arquivada.`, acc.family_id);
+      this.logAudit({
+        userId: acc.user_id,
+        familyId: acc.family_id,
+        action: 'ACCOUNT_DELETE',
+        entityType: 'account',
+        entityId: id,
+        description: `Arquivou conta bancária: "${acc.name}"`,
+        oldValues: { name: acc.name, is_active: 1 },
+        newValues: { is_active: 0 }
+      });
     }
     return { success: true };
   }
@@ -181,11 +225,26 @@ module.exports = (Base) => class extends Base {
       this.db.prepare(`INSERT INTO transactions (user_id, account_id, type, amount, description, date, is_paid, is_avulso) VALUES (?, ?, 'transfer', ?, ?, ?, 1, 1)`).run(user_id, from_account_id, amount, description || 'Transferência', date);
     });
     t();
+
+    const fromAcc = this.db.prepare('SELECT name FROM accounts WHERE id = ?').get(from_account_id);
+    const toAcc = this.db.prepare('SELECT name FROM accounts WHERE id = ?').get(to_account_id);
+    this.logAudit({
+      userId: user_id,
+      action: 'ACCOUNT_TRANSFER',
+      entityType: 'account',
+      description: `Transferência de R$ ${amount} de "${fromAcc ? fromAcc.name : from_account_id}" para "${toAcc ? toAcc.name : to_account_id}"`,
+      newValues: { from_account_id, to_account_id, amount, date, description }
+    });
+
     return { success: true };
   }
 
   // ── CATEGORIES ───────────────────────────────────────────────
   getCategories(userId) {
+    if (typeof userId === 'object' && userId !== null) {
+      userId = userId.userId || userId.id;
+    }
+    userId = userId || 1;
     const user = this.db.prepare('SELECT family_id, profile_type FROM users WHERE id = ?').get(userId);
     const familyId = user ? user.family_id : null;
     const profileType = user ? user.profile_type : 2;
@@ -196,7 +255,7 @@ module.exports = (Base) => class extends Base {
     }
 
     const perm = this.getUserPermissions(userId);
-    if (perm.can_view_all === 1) {
+    if (perm.can_view_all === 1 && familyId) {
       return this.db.prepare(`
         SELECT c.* FROM categories c
         LEFT JOIN users u ON c.user_id = u.id

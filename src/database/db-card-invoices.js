@@ -109,6 +109,18 @@ module.exports = (Base) => class extends Base {
     })();
 
     this.logEvent('invoice:pay', `Fatura do cartão "${cardAcc ? cardAcc.name : 'Cartão'}" (Ref: ${inv.month}/${inv.year}) quitada no valor total de R$ ${netAmount.toFixed(2)} através da conta "${payAcc ? payAcc.name : 'Conta'}".`, user ? user.family_id : null);
+
+    this.logAudit({
+      userId,
+      familyId: user ? user.family_id : null,
+      userName: user ? user.name : null,
+      action: 'INVOICE_PAY',
+      entityType: 'invoice',
+      entityId: invoiceId,
+      description: `Quitou fatura do cartão "${cardAcc ? cardAcc.name : 'Cartão'}" (Ref: ${inv.month}/${inv.year}, Total Líquido: R$ ${netAmount.toFixed(2)})`,
+      newValues: { card_account_id: inv.card_account_id, amount: inv.amount, penalty, discount, netAmount, payment_account_id: paymentAccountId, payment_date: payDate }
+    });
+
     return { success: true };
   }
 
@@ -393,6 +405,164 @@ module.exports = (Base) => class extends Base {
     }
 
     return { success: true, amount: totalAmount };
+  }
+
+  anticipateCardInstallments({ cardAccountId, transactionIds, targetMonth, targetYear, discountAmount = 0, userId }) {
+    const cardAcc = this.db.prepare('SELECT * FROM accounts WHERE id = ?').get(cardAccountId);
+    if (!cardAcc) return { success: false, error: 'Cartão de crédito não encontrado' };
+
+    const user = this.db.prepare('SELECT family_id, name FROM users WHERE id = ?').get(userId);
+    const familyId = user ? user.family_id : null;
+
+    if (!Array.isArray(transactionIds) || transactionIds.length === 0) {
+      return { success: false, error: 'Nenhuma parcela selecionada para antecipação.' };
+    }
+
+    const tM = parseInt(targetMonth, 10);
+    const tY = parseInt(targetYear, 10);
+    const targetCycle = getCardBillingCycle(cardAcc.closing_day, cardAcc.due_day, tM, tY);
+    const targetDate = targetCycle.end;
+
+    const discount = parseFloat(discountAmount) || 0;
+    const discountPerTx = discount > 0 ? (discount / transactionIds.length) : 0;
+
+    const res = this.db.transaction(() => {
+      let totalAnticipated = 0;
+      for (const txId of transactionIds) {
+        const tx = this.db.prepare('SELECT * FROM transactions WHERE id = ? AND account_id = ?').get(txId, cardAccountId);
+        if (tx && tx.is_paid === 0) {
+          totalAnticipated += tx.amount;
+          this.db.prepare(`
+            UPDATE transactions
+            SET date = ?, discount_amount = COALESCE(discount_amount, 0) + ?
+            WHERE id = ?
+          `).run(targetDate, discountPerTx, txId);
+        }
+      }
+      return totalAnticipated;
+    })();
+
+    this.recalculateCardInvoiceByMonthYear(cardAccountId, tM, tY);
+
+    this.logAudit({
+      userId,
+      familyId,
+      action: 'CARD_ANTICIPATION',
+      entityType: 'invoice',
+      entityId: cardAccountId,
+      description: `Antecipou ${transactionIds.length} parcelas (Total: R$ ${res.toFixed(2)}, Desc: R$ ${discount.toFixed(2)}) para a fatura de ${String(tM).padStart(2, '0')}/${tY}`,
+      newValues: { cardAccountId, transactionIds, targetMonth: tM, targetYear: tY, discountAmount: discount }
+    });
+
+    return { success: true, totalAnticipated: res, discountApplied: discount };
+  }
+
+  payCardInvoicePartial({ invoiceId, paymentAccountId, paidAmount, nextMonthRevolvingRate = 5, userId }) {
+    const inv = this.db.prepare('SELECT * FROM invoices WHERE id = ?').get(invoiceId);
+    if (!inv) return { success: false, error: 'Fatura não encontrada' };
+    if (inv.is_paid) return { success: false, error: 'Esta fatura já foi quitada' };
+
+    const paid = parseFloat(paidAmount) || 0;
+    if (paid <= 0 || paid >= inv.amount) {
+      return { success: false, error: 'Valor de pagamento parcial inválido. Deve ser maior que zero e menor que o total da fatura.' };
+    }
+
+    const cardAcc = this.db.prepare('SELECT * FROM accounts WHERE id = ?').get(inv.card_account_id);
+    const payAcc = this.db.prepare('SELECT * FROM accounts WHERE id = ?').get(paymentAccountId);
+    const user = this.db.prepare('SELECT family_id, name FROM users WHERE id = ?').get(userId);
+    const familyId = user ? user.family_id : null;
+
+    const remainingBalance = inv.amount - paid;
+    const rate = parseFloat(nextMonthRevolvingRate) || 0;
+    const revolvingInterest = (remainingBalance * rate) / 100;
+    const nextInvoiceCharge = Math.round((remainingBalance + revolvingInterest) * 100) / 100;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    let nextMonth = inv.month + 1;
+    let nextYear = inv.year;
+    if (nextMonth > 12) { nextMonth = 1; nextYear++; }
+
+    this.db.transaction(() => {
+      this.db.prepare('UPDATE accounts SET balance = balance - ? WHERE id = ?').run(paid, paymentAccountId);
+
+      this.db.prepare(`
+        UPDATE invoices
+        SET is_paid = 1, payment_account_id = ?, payment_date = ?, discount_amount = ?
+        WHERE id = ?
+      `).run(paymentAccountId, todayStr, remainingBalance, invoiceId);
+
+      this.db.prepare('UPDATE transactions SET is_paid = 1, payment_date = ? WHERE invoice_id = ?').run(todayStr, invoiceId);
+
+      const nextCycle = getCardBillingCycle(cardAcc.closing_day, cardAcc.due_day, nextMonth, nextYear);
+      this.db.prepare(`
+        INSERT INTO transactions (user_id, account_id, type, amount, description, date, is_paid, is_avulso, notes)
+        VALUES (?, ?, 'expense', ?, ?, ?, 0, 1, ?)
+      `).run(
+        userId,
+        inv.card_account_id,
+        nextInvoiceCharge,
+        `Saldo Rotativo Fatura Ant. (${String(inv.month).padStart(2, '0')}/${inv.year})`,
+        nextCycle.start,
+        `Saldo remanescente: R$ ${remainingBalance.toFixed(2)} + Encargos (${rate}%): R$ ${revolvingInterest.toFixed(2)}`
+      );
+    })();
+
+    this.logAudit({
+      userId,
+      familyId,
+      action: 'INVOICE_PARTIAL_PAY',
+      entityType: 'invoice',
+      entityId: invoiceId,
+      description: `Pagamento parcial da fatura ${cardAcc ? cardAcc.name : ''} (${String(inv.month).padStart(2, '0')}/${inv.year}): Pago R$ ${paid.toFixed(2)}, Rotativo R$ ${nextInvoiceCharge.toFixed(2)} para ${String(nextMonth).padStart(2, '0')}/${nextYear}`,
+      newValues: { invoiceId, paidAmount: paid, remainingBalance, nextInvoiceCharge, nextMonth, nextYear }
+    });
+
+    return { success: true, paidAmount: paid, remainingBalance, nextInvoiceCharge };
+  }
+
+  refundTransaction({ transactionId, refundReason = '', userId }) {
+    const tx = this.db.prepare('SELECT t.*, u.family_id, a.type as account_type FROM transactions t LEFT JOIN users u ON t.user_id = u.id LEFT JOIN accounts a ON t.account_id = a.id WHERE t.id = ?').get(transactionId);
+    if (!tx) return { success: false, error: 'Lançamento não encontrado' };
+
+    const netAmount = (tx.amount + (tx.penalty_amount || 0) - (tx.discount_amount || 0));
+
+    this.db.transaction(() => {
+      if (tx.is_paid && tx.account_type !== 'credit') {
+        const delta = tx.type === 'income' ? -netAmount : netAmount;
+        this.db.prepare('UPDATE accounts SET balance = balance + ? WHERE id = ?').run(delta, tx.account_id);
+      }
+
+      this.db.prepare(`
+        UPDATE transactions
+        SET is_avulso = 2, notes = COALESCE(notes, '') || ?
+        WHERE id = ?
+      `).run(` [ESTORNADO: ${refundReason || 'Cancelamento/Devolução'}]`, transactionId);
+
+      if (tx.invoice_id) {
+        this.recalculateCardInvoice({ invoiceId: tx.invoice_id, userId });
+      }
+    })();
+
+    this.logAudit({
+      userId,
+      familyId: tx.family_id,
+      action: 'TRANSACTION_REFUND',
+      entityType: 'transaction',
+      entityId: transactionId,
+      description: `Estornou lançamento: "${tx.description}" (R$ ${tx.amount}) - Motivo: ${refundReason || 'Devolução/Estorno'}`,
+      oldValues: { id: tx.id, amount: tx.amount, is_paid: tx.is_paid }
+    });
+
+    return { success: true, refundedAmount: netAmount };
+  }
+
+  recalculateCardInvoiceByMonthYear(cardAccountId, month, year) {
+    const cardAcc = this.db.prepare('SELECT * FROM accounts WHERE id = ?').get(cardAccountId);
+    if (!cardAcc) return;
+    const inv = this.db.prepare('SELECT * FROM invoices WHERE card_account_id = ? AND month = ? AND year = ?').get(cardAccountId, month, year);
+    if (inv) {
+      this.recalculateCardInvoice({ invoiceId: inv.id, userId: cardAcc.user_id });
+    }
   }
 
 };

@@ -28,6 +28,12 @@ function getSettingsWikiSidebarHtml() {
           <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-pagamento" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
             • Pagamento & Baixa Atômica
           </div>
+          <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-antecipacao" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • Antecipação de Parcelas
+          </div>
+          <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-rotativo" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • Pagamento Parcial & Rotativo
+          </div>
           <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-acordo" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
             • Renegociação & Acordos
           </div>
@@ -55,6 +61,9 @@ function getSettingsWikiSidebarHtml() {
           </div>
           <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-juros" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
             • Juros, Multas e Descontos
+          </div>
+          <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-feriados" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • Feriados & Prorrogação Útil
           </div>
         </div>
       </div>
@@ -224,6 +233,36 @@ function getSettingsWikiTopicsHtml() {
       </div>
     </div>
 
+    <!-- TÓPICO: CARTÕES > ANTECIPAÇÃO -->
+    <div class="wiki-topic-content" id="topic-cartao-antecipacao" style="display: none;">
+      <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #60a5fa; font-weight: 700;">
+        ⚡ Antecipação de Parcelas Futuras com Desconto
+      </h4>
+      <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Deseja adiantar parcelas de compras parceladas e aproveitar descontos concedidos pela emissora do cartão?</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
+          <li>Abra a fatura do cartão e selecione <strong>"Antecipar Parcelas"</strong>.</li>
+          <li>Marque quais parcelas dos próximos meses deseja transferir para o mês atual.</li>
+          <li>Informe o valor do desconto (se houver). O sistema aplica o abatimento proporcional e recalcula as faturas futuras.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- TÓPICO: CARTÕES > ROTATIVO -->
+    <div class="wiki-topic-content" id="topic-cartao-rotativo" style="display: none;">
+      <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #60a5fa; font-weight: 700;">
+        🔄 Pagamento Parcial & Saldo Rotativo Automático
+      </h4>
+      <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Se no fechamento do mês você não puder pagar o valor total da fatura:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
+          <li>No modal de quitação da fatura, informe o <strong>Valor Parcial</strong> pago.</li>
+          <li>O valor pago é debitado da conta corrente selecionada.</li>
+          <li>O saldo remanescente acrescido dos encargos do rotativo é <strong>lançado automaticamente na fatura do mês seguinte</strong>.</li>
+        </ul>
+      </div>
+    </div>
+
     <!-- TÓPICO: CARTÕES > REABERTURA & ESTORNO -->
     <div class="wiki-topic-content" id="topic-cartao-reabertura" style="display: none;">
       <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #60a5fa; font-weight: 700;">
@@ -287,6 +326,18 @@ function getSettingsWikiTopicsHtml() {
       <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
         <p style="margin-bottom: 8px;">• <strong>Desconto:</strong> Ao pagar antecipado com desconto, o sistema debita do saldo da conta apenas o valor líquido real.</p>
         <p style="margin: 0;">• <strong>Juros / Multa:</strong> Ao pagar em atraso, registre o acréscimo para que o valor real debitado corresponda exatamente ao extrato do banco.</p>
+      </div>
+    </div>
+
+    <!-- TÓPICO: LANÇAMENTOS > FERIADOS & PRORROGAÇÃO -->
+    <div class="wiki-topic-content" id="topic-lanc-feriados" style="display: none;">
+      <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #34d399; font-weight: 700;">
+        📅 Feriados Nacionais & Prorrogação para Dia Útil
+      </h4>
+      <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 8px;">• <strong>Regra Bancária:</strong> Contas vencendo em fins de semana ou feriados nacionais brasileiros são prorrogadas para o 1º dia útil seguinte.</p>
+        <p style="margin-bottom: 8px;">• <strong>Tag Informativa:</strong> O app exibe a tag azul <code>📅 Prorroga: DD/MM</code> nos lançamentos com vencimento em feriado ou fim de semana.</p>
+        <p style="margin: 0;">• <strong>Isenção de Mora:</strong> Pagamentos efetuados até o dia útil prorrogado não sofrem cálculo de juros por atraso.</p>
       </div>
     </div>
 
@@ -629,3 +680,122 @@ function renderSettingsLgpdTab(bodyEl) {
 
   bindLgpdTabEvents();
 }
+
+/**
+ * Renderiza a aba de Trilha de Auditoria no Modal de Configurações
+ */
+async function renderSettingsAuditTab(bodyEl) {
+  bodyEl.innerHTML = `
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+      <div>
+        <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text-primary);">
+          🛡️ Trilha de Auditoria & Modificações
+        </h3>
+        <p style="margin: 3px 0 0 0; font-size: 12px; color: var(--text-muted);">
+          Rastreabilidade de alterações cadastrais e financeiras (Quem, Quando, O quê, Valores Anteriores e Novos)
+        </p>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <select id="audit-filter-entity" style="padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-primary); font-size: 12px; outline: none; cursor: pointer;">
+          <option value="">Todas as Entidades</option>
+          <option value="transaction">Lançamentos</option>
+          <option value="account">Contas</option>
+          <option value="recurring_item">Planejamento</option>
+          <option value="invoice">Faturas de Cartão</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" id="btn-refresh-audit" style="font-size: 12px; padding: 6px 12px;">
+          🔄 Atualizar
+        </button>
+      </div>
+    </div>
+
+    <div id="audit-logs-container" style="height: 400px; overflow-y: auto; scrollbar-width: thin;">
+      <div style="text-align: center; padding: 30px; color: var(--text-muted); font-size: 13px;">
+        Carregando registros de auditoria...
+      </div>
+    </div>
+  `;
+
+  const loadAuditLogs = async () => {
+    const container = document.getElementById('audit-logs-container');
+    const entityFilter = document.getElementById('audit-filter-entity')?.value || null;
+
+    try {
+      const logs = await window.api.audit.getLogs({
+        familyId: State.user.family_id,
+        entityType: entityFilter,
+        limit: 100
+      });
+
+      if (!logs || logs.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
+            <div style="font-size: 32px; margin-bottom: 8px;">🛡️</div>
+            <div style="font-weight: 600; font-size: 14px; color: var(--text-primary);">Nenhum registro de auditoria encontrado</div>
+            <div style="font-size: 12px; margin-top: 4px;">As próximas ações de criação, alteração ou exclusão serão registradas aqui automaticamente.</div>
+          </div>
+        `;
+        return;
+      }
+
+      const getActionBadge = (action) => {
+        if (action.includes('CREATE')) return '<span class="badge" style="background: rgba(16,185,129,0.15); color: #34d399; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">CRIOU</span>';
+        if (action.includes('UPDATE')) return '<span class="badge" style="background: rgba(59,130,246,0.15); color: #60a5fa; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">ALTEROU</span>';
+        if (action.includes('DELETE')) return '<span class="badge" style="background: rgba(239,68,68,0.15); color: #f87171; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">EXCLUIU</span>';
+        if (action.includes('PAY')) return '<span class="badge" style="background: rgba(245,158,11,0.15); color: #fbbf24; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">QUITOU</span>';
+        return `<span class="badge" style="background: var(--bg-raised); color: var(--text-muted); font-size: 10px; padding: 2px 6px; border-radius: 4px;">${action}</span>`;
+      };
+
+      container.innerHTML = `
+        <table class="data-table" style="width: 100%; font-size: 12px; border-collapse: collapse;">
+          <thead>
+            <tr style="border-bottom: 1px solid var(--border); text-align: left; color: var(--text-muted); font-size: 11px;">
+              <th style="padding: 8px 10px;">DATA/HORA</th>
+              <th style="padding: 8px 10px;">USUÁRIO</th>
+              <th style="padding: 8px 10px;">AÇÃO</th>
+              <th style="padding: 8px 10px;">ENTIDADE</th>
+              <th style="padding: 8px 10px;">DESCRIÇÃO / HISTÓRICO</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${logs.map(l => {
+              const dt = new Date(l.created_at);
+              const dateFormatted = !isNaN(dt) ? dt.toLocaleString('pt-BR') : l.created_at;
+              return `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle;">
+                  <td style="padding: 8px 10px; color: var(--text-muted); font-family: monospace; white-space: nowrap; font-size: 11px;">
+                    ${dateFormatted}
+                  </td>
+                  <td style="padding: 8px 10px; font-weight: 600; color: var(--text-primary); white-space: nowrap;">
+                    👤 ${l.user_name || 'Sistema'}
+                  </td>
+                  <td style="padding: 8px 10px; white-space: nowrap;">
+                    ${getActionBadge(l.action)}
+                  </td>
+                  <td style="padding: 8px 10px; color: var(--text-muted); text-transform: capitalize; white-space: nowrap; font-size: 11px;">
+                    ${l.entity_type}
+                  </td>
+                  <td style="padding: 8px 10px; color: var(--text-primary); line-height: 1.4;">
+                    <div>${l.description || '—'}</div>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    } catch (err) {
+      container.innerHTML = `
+        <div style="padding: 20px; text-align: center; color: #f87171; font-size: 13px;">
+          Erro ao carregar trilha de auditoria: ${err.message}
+        </div>
+      `;
+    }
+  };
+
+  document.getElementById('audit-filter-entity')?.addEventListener('change', loadAuditLogs);
+  document.getElementById('btn-refresh-audit')?.addEventListener('click', loadAuditLogs);
+
+  await loadAuditLogs();
+}
+

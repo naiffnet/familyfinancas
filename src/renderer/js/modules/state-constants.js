@@ -55,6 +55,151 @@ const fmt = {
   }
 };
 
+/**
+ * Retorna os feriados nacionais bancários no Brasil (Anbima/Febraban) para o ano especificado
+ */
+function getNationalHolidays(year) {
+  const y = parseInt(year, 10) || new Date().getFullYear();
+  const holidays = new Set([
+    `${y}-01-01`, // Confraternização Universal
+    `${y}-04-21`, // Tiradentes
+    `${y}-05-01`, // Dia do Trabalho
+    `${y}-09-07`, // Independência do Brasil
+    `${y}-10-12`, // Nossa Senhora Aparecida
+    `${y}-11-02`, // Finados
+    `${y}-11-15`, // Proclamação da República
+    `${y}-11-20`, // Dia Nacional da Consciência Negra
+    `${y}-12-25`, // Natal
+  ]);
+
+  // Feriados Móveis baseados na Páscoa (Algoritmo de Meeus/Jones/Butcher)
+  const a = y % 19;
+  const b = Math.floor(y / 100);
+  const c = y % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+
+  const easter = new Date(y, month - 1, day);
+  const carnaval = new Date(easter.getTime() - 47 * 86400000);
+  const goodFriday = new Date(easter.getTime() - 2 * 86400000);
+  const corpusChristi = new Date(easter.getTime() + 60 * 86400000);
+
+  const formatIso = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+  
+  holidays.add(formatIso(carnaval));
+  holidays.add(formatIso(goodFriday));
+  holidays.add(formatIso(corpusChristi));
+
+  return holidays;
+}
+
+function isBusinessDay(dateStr) {
+  if (!dateStr) return true;
+  const clean = dateStr.split(' ')[0];
+  const parts = clean.split('-');
+  if (parts.length !== 3) return true;
+  const y = parseInt(parts[0], 10);
+  const d = new Date(clean + 'T12:00:00');
+  const dayOfWeek = d.getDay(); // 0 = Domingo, 6 = Sábado
+  if (dayOfWeek === 0 || dayOfWeek === 6) return false;
+
+  const holidays = getNationalHolidays(y);
+  return !holidays.has(clean);
+}
+
+function getNextBusinessDay(dateStr) {
+  if (!dateStr) return dateStr;
+  const clean = dateStr.split(' ')[0];
+  let d = new Date(clean + 'T12:00:00');
+  let currentIso = clean;
+  
+  while (!isBusinessDay(currentIso)) {
+    d = new Date(d.getTime() + 86400000);
+    currentIso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  return currentIso;
+}
+
+function isWeekendOrHoliday(dateStr) {
+  return !isBusinessDay(dateStr);
+}
+
+/**
+ * Calcula projeção de juros e encargos com base nas regras do contrato / instituição
+ * e aplica prorrogação legal automática para o próximo dia útil se vencer em fim de semana/feriado.
+ */
+function calculateProjectedInterest(baseAmount, dueDateStr, targetDateStr, rule = {}) {
+  const base = parseFloat(baseAmount) || 0;
+  if (!base || !dueDateStr || !targetDateStr) {
+    return { projectedAmount: base, penaltyAmount: 0, daysLate: 0, dailyRatePct: 0, fixedPenalty: 0, isLate: false };
+  }
+  const cleanDue = dueDateStr.split(' ')[0];
+  const cleanTarget = targetDateStr.split(' ')[0];
+  
+  // Prorrogação legal bancária: vencimento em fim de semana ou feriado prorroga para o 1º dia útil
+  const effectiveDue = getNextBusinessDay(cleanDue);
+  
+  const dEffectiveDue = new Date(effectiveDue + 'T00:00:00');
+  const dTarget = new Date(cleanTarget + 'T00:00:00');
+  const diffDays = Math.round((dTarget - dEffectiveDue) / 86400000);
+  const isLate = diffDays > 0;
+  const daysLate = isLate ? diffDays : 0;
+
+  if (!isLate) {
+    return { 
+      projectedAmount: base, 
+      penaltyAmount: 0, 
+      daysLate: 0, 
+      dailyRatePct: 0, 
+      fixedPenalty: 0, 
+      isLate: false, 
+      daysEarly: Math.abs(diffDays),
+      isProrogated: cleanDue !== effectiveDue,
+      effectiveDueDate: effectiveDue
+    };
+  }
+
+  const rate = parseFloat(rule.interest_rate) || 0;
+  const type = rule.interest_type || 'daily';
+  const fixedRate = parseFloat(rule.penalty_fixed_rate) || 0;
+
+  const fixedPenalty = (base * fixedRate) / 100;
+  let dailyRatePct = 0;
+
+  if (type === 'daily') {
+    dailyRatePct = rate;
+  } else if (type === 'monthly') {
+    dailyRatePct = rate / 30;
+  } else if (type === 'yearly') {
+    dailyRatePct = rate / 365;
+  } else if (type === 'installment' || type === 'contract') {
+    dailyRatePct = 0;
+  }
+
+  const dailyInterest = (base * (dailyRatePct / 100)) * daysLate;
+  const totalPenalty = Math.round((fixedPenalty + dailyInterest) * 100) / 100;
+
+  return {
+    projectedAmount: Math.round((base + totalPenalty) * 100) / 100,
+    penaltyAmount: totalPenalty,
+    daysLate,
+    dailyRatePct: parseFloat(dailyRatePct.toFixed(4)),
+    fixedPenalty,
+    isLate: true,
+    isProrogated: cleanDue !== effectiveDue,
+    effectiveDueDate: effectiveDue
+  };
+}
+
 // ── Bank Config ────────────────────────
 const BANKS = {
   nubank:    { name: 'Nubank',         color: '#820ad1', bg: '#f3e8ff', emoji: '💜', abbr: 'Nu' },
@@ -181,8 +326,10 @@ function navigate(page) {
     page = firstAllowed;
   }
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.mobile-nav-tab').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelector(`[data-page="${page}"]`)?.classList.add('active');
+  document.querySelector(`.sidebar-nav [data-page="${page}"]`)?.classList.add('active');
+  document.querySelector(`.mobile-bottom-nav [data-page="${page}"]`)?.classList.add('active');
   document.getElementById(`page-${page}`)?.classList.add('active');
   State.currentPage = page;
   renderPage(page);

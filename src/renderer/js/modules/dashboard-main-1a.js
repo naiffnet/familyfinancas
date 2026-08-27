@@ -10,6 +10,14 @@ async function renderDashboard() {
     return;
   }
 
+  // Se estiver em ambiente Mobile / Smartphone, renderizar o Dashboard Mobile focado em Lançamentos & Limites de Cartão
+  if (document.body.classList.contains('is-mobile-env') || window.innerWidth <= 768) {
+    if (typeof renderMobileAppDashboard === 'function') {
+      await renderMobileAppDashboard(page);
+      return;
+    }
+  }
+
   const currentMode = State.dashboardLayoutMode || 'executive';
   const modeLabels = {
     executive: '🌟 Executivo',
@@ -134,8 +142,8 @@ async function renderDashboard() {
     const effectiveUnpaidExpenses = effectiveTxs.filter(t => t.type === 'expense' && (t.is_paid === 0 || t.is_paid === false));
     const effectivePaidIncomes = effectiveTxs.filter(t => t.type === 'income' && (t.is_paid === 1 || t.is_paid === true));
 
-    const income = effectivePaidIncomes.reduce((acc, t) => acc + (t.amount || 0), 0);
-    const expense = effectivePaidExpenses.reduce((acc, t) => acc + (t.amount || 0), 0);
+    const income = effectivePaidIncomes.reduce((acc, t) => acc + (t.amount || 0) + (t.penalty_amount || 0) - (t.discount_amount || 0), 0);
+    const expense = effectivePaidExpenses.reduce((acc, t) => acc + (t.amount || 0) + (t.penalty_amount || 0) - (t.discount_amount || 0), 0);
     const pending = effectiveUnpaidExpenses.reduce((acc, t) => acc + (t.amount || 0), 0);
     const balance = income - expense;
 

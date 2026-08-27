@@ -312,6 +312,380 @@ input[type="checkbox"] {
 }
 .icon-btn:hover, .icon-btn.selected { border-color: var(--accent); background: var(--accent-dim); }
 
+/* Choice Option Cards (Modals de Decisão & Seleção Interativa) */
+.choice-options-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 16px 0 8px;
+}
+
+.choice-option-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.choice-option-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.choice-option-card:active {
+  transform: translateY(0);
+}
+
+.choice-option-card.card-accent-emerald:hover {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.06);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.12);
+}
+
+.choice-option-card.card-accent-indigo:hover {
+  border-color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.06);
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.12);
+}
+
+.choice-option-card.card-accent-amber:hover {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.06);
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.12);
+}
+
+.choice-option-card.card-accent-danger:hover {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.06);
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.12);
+}
+
+.choice-icon-wrap {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.choice-option-card:hover .choice-icon-wrap {
+  transform: scale(1.08);
+}
+
+.choice-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.choice-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.choice-desc {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.choice-chevron {
+  font-size: 18px;
+  color: var(--text-muted);
+  opacity: 0.5;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  font-weight: 300;
+}
+
+.choice-option-card:hover .choice-chevron {
+  opacity: 1;
+  transform: translateX(4px);
+  color: var(--text-primary);
+}
+
+/* ════════════════════════════════════════
+   INVOICE CARDS (FATURAS DE CARTÃO)
+═════════════════════════════════════════ */
+.invoices-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 14px;
+}
+
+.invoice-card-item {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 18px 14px 18px;
+  border-radius: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.invoice-card-top-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3.5px;
+  border-radius: 14px 14px 0 0;
+}
+
+.invoice-card-item:hover {
+  border-color: var(--card-bank-color, #3b82f6);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+}
+
+.invoice-card-item.invoice-card-selected {
+  background: var(--bg-surface);
+  border-color: var(--card-bank-color, #3b82f6);
+  box-shadow: 0 0 0 2px var(--card-bank-color, #3b82f6), 0 8px 24px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+.invoice-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+}
+
+.invoice-bank-logo-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.invoice-card-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.invoice-card-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  line-height: 1.3;
+}
+
+.invoice-card-name {
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.invoice-ref-tag {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  background: var(--bg-raised, rgba(0, 0, 0, 0.04));
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.invoice-card-meta {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.invoice-card-meta .meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-raised, rgba(0, 0, 0, 0.03));
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.invoice-card-middle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--bg-raised, rgba(0, 0, 0, 0.03));
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.invoice-card-amount-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.invoice-amount-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.invoice-card-amount {
+  font-size: 22px;
+  font-weight: 900;
+  color: #ef4444;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.invoice-card-status-wrap {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.invoice-status-pill {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.invoice-status-pill.status-reneg {
+  background: rgba(168, 85, 247, 0.12);
+  color: #a855f7;
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.invoice-status-pill.status-paid {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.invoice-status-pill.status-pending {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.invoice-status-pill.status-overdue {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.invoice-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.invoice-highlight-btn {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.invoice-highlight-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  border-color: var(--card-bank-color, #3b82f6);
+}
+
+.invoice-highlight-btn.btn-highlight-active {
+  background: var(--card-bank-color, #3b82f6);
+  color: #ffffff;
+  border-color: var(--card-bank-color, #3b82f6);
+}
+
+.invoice-card-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.invoice-card-actions .renegotiate-invoice-btn {
+  background: #f59e0b;
+  border-color: #f59e0b;
+  color: #000;
+  font-weight: 700;
+  padding: 8px 14px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+.invoice-card-actions .pay-invoice-btn {
+  font-weight: 700;
+  padding: 8px 16px;
+  font-size: 12px;
+  border-radius: 8px;
+  color: #fff;
+}
+
+.invoice-card-actions .reopen-invoice-btn {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
 /* ════════════════════════════════════════
    TOAST NOTIFICATIONS
 ═════════════════════════════════════════ */
@@ -709,5 +1083,73 @@ tbody td { padding: 12px 16px; font-size: 13px; }
   animation: highlightPulseGlow 1.2s ease-in-out 3;
   border-color: #ef4444 !important;
   background: rgba(239, 68, 68, 0.12) !important;
+}
+
+/* ═════════════════════════════════════════
+   ESTILOS DE IMPRESSÃO & EXPORTAÇÃO EM PDF (FASE 13 & 18)
+   ═════════════════════════════════════════ */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt;
+  }
+
+  .sidebar,
+  .app-sidebar,
+  .page-header button,
+  .report-tabs,
+  .period-nav-btn,
+  .btn,
+  .modal-overlay,
+  .toast,
+  #btn-print-report,
+  #report-period button {
+    display: none !important;
+  }
+
+  .main-content,
+  .page,
+  #page-reports,
+  #report-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    background: transparent !important;
+  }
+
+  .card,
+  .chart-card {
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    page-break-inside: avoid;
+    margin-bottom: 16px;
+  }
+
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  table th,
+  table td {
+    border: 1px solid #cbd5e1 !important;
+    color: #0f172a !important;
+    padding: 6px 8px !important;
+  }
+
+  table th {
+    background: #f1f5f9 !important;
+    font-weight: 700 !important;
+  }
+
+  .badge {
+    border: 1px solid #94a3b8 !important;
+    background: transparent !important;
+    color: #0f172a !important;
+  }
 }
 

@@ -22,10 +22,10 @@ async function openPaymentDateModal(txId, currentDate, onComplete) {
     const allTxs = await window.api.transactions.getAll({ userId: State.user.id });
     tx = allTxs.find(t => t.id == txId);
     if (tx && tx.recurring_item_id) {
-      const allRec = await window.api.recurring.getAll({ userId: State.user.id });
+      const allRec = await window.api.recurring.getAll(State.user.id);
       recItem = allRec.find(r => r.id == tx.recurring_item_id);
     } else if (!tx) {
-      const allRec = await window.api.recurring.getAll({ userId: State.user.id });
+      const allRec = await window.api.recurring.getAll(State.user.id);
       recItem = allRec.find(r => r.id == txId);
       if (recItem) tx = allTxs.find(t => t.recurring_item_id == recItem.id);
     }
@@ -63,11 +63,23 @@ async function openPaymentDateModal(txId, currentDate, onComplete) {
     if (m) boletoCode = (m[1] || m[0]).replace(/[^0-9]/g, '');
   }
 
+  const rule = {
+    interest_rate: (tx && tx.interest_rate !== undefined && tx.interest_rate !== null) ? tx.interest_rate : (recItem ? recItem.interest_rate : 0),
+    interest_type: (tx && tx.interest_type) ? tx.interest_type : (recItem ? recItem.interest_type : 'daily'),
+    penalty_fixed_rate: (tx && tx.penalty_fixed_rate !== undefined && tx.penalty_fixed_rate !== null) ? tx.penalty_fixed_rate : (recItem ? recItem.penalty_fixed_rate : 0),
+  };
+
+  const initialProjection = calculateProjectedInterest(baseAmount, compDate, cleanDate, rule);
+  const initialPaymentValue = (tx && tx.is_paid && tx.penalty_amount)
+    ? (baseAmount + (tx.penalty_amount || 0) - (tx.discount_amount || 0))
+    : initialProjection.projectedAmount;
+
   Modal.open('Confirmar Pagamento / Liquidação', `
     <div style="padding: 14px 16px;">
       <div style="text-align: center; margin-bottom: 14px;">
         <div style="font-size: 15px; font-weight: 800; color: var(--text-primary); margin-bottom: 2px;">${desc}</div>
         <div style="font-size: 26px; font-weight: 900; color: var(--accent-light); letter-spacing: -0.02em;">${fmt.currency(baseAmount)}</div>
+        <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">Vencimento Original: <strong>${fmt.date(compDate)}</strong></div>
       </div>
 
       <!-- PAINEL PIX E BOLETO -->
@@ -121,19 +133,26 @@ async function openPaymentDateModal(txId, currentDate, onComplete) {
       </div>
 
       <p style="margin-bottom: 12px; font-size: 12.5px; color: var(--text-secondary); text-align: center;">
-        Informe a data do efetivo pagamento e eventuais ajustes (juros ou desconto):
+        Informe a <strong>Data</strong> e o <strong>Valor Pago</strong> para cálculo automático de encargos:
       </p>
       
-      <div class="form-group" style="margin-bottom: 14px;">
-        <label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Data do Efetivo Pagamento</label>
-        <input type="date" id="payment-date-input" value="${cleanDate}" style="width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-raised); color: var(--text-primary); text-align: center; font-weight: 600; font-size: 13px;">
+      <!-- VALORES E DATAS DE PAGAMENTO -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Data do Pagamento</label>
+          <input type="date" id="payment-date-input" value="${cleanDate}" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-raised); color: var(--text-primary); text-align: center; font-weight: 700; font-size: 13px;">
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Valor Pago (R$)</label>
+          <input type="number" step="0.01" min="0" id="payment-amount-input" value="${initialPaymentValue.toFixed(2)}" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-raised); color: var(--text-primary); text-align: center; font-weight: 800; font-size: 14px;">
+        </div>
       </div>
 
-      <div id="payment-options-container" style="background: var(--bg-raised); padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 14px;">
-      </div>
+      <!-- CARD DINÂMICO DE JUROS / DIAS / TAXA DIÁRIA -->
+      <div id="payment-interest-calc-card" style="margin-bottom: 14px;"></div>
 
       <div id="payment-summary-box" style="padding: 10px; background: rgba(16, 185, 129, 0.1); border-radius: var(--radius-sm); font-size: 13px; margin-bottom: 14px; text-align: center; border: 1px solid rgba(16, 185, 129, 0.3);">
-        <strong>Total a Debitar da Conta:</strong> <span id="payment-total-preview" style="font-weight:700; font-size:15px; color:var(--accent-light);">${fmt.currency(baseAmount)}</span>
+        <strong>Total a Debitar da Conta:</strong> <span id="payment-total-preview" style="font-weight:700; font-size:15px; color:var(--accent-light);">${fmt.currency(initialPaymentValue)}</span>
       </div>
 
       <div style="display: flex; gap: 12px; justify-content: center;">
@@ -146,87 +165,81 @@ async function openPaymentDateModal(txId, currentDate, onComplete) {
   `);
 
   const dateInput = document.getElementById('payment-date-input');
-  const optContainer = document.getElementById('payment-options-container');
+  const amountInput = document.getElementById('payment-amount-input');
+  const calcCard = document.getElementById('payment-interest-calc-card');
   const totalPreview = document.getElementById('payment-total-preview');
 
-  function updatePaymentOptionsUI() {
-    const selDate = dateInput.value;
-    let html = '';
-    let isEarly = selDate < compDate;
-    let isLate = selDate > compDate;
+  let hasManuallyEditedAmount = false;
+  amountInput.oninput = () => {
+    hasManuallyEditedAmount = true;
+    recalcPaymentUI();
+  };
 
-    if (isEarly) {
+  dateInput.onchange = () => {
+    if (!hasManuallyEditedAmount) {
+      const proj = calculateProjectedInterest(baseAmount, compDate, dateInput.value, rule);
+      amountInput.value = proj.projectedAmount.toFixed(2);
+    }
+    recalcPaymentUI();
+  };
+
+  function recalcPaymentUI() {
+    const selDate = dateInput.value;
+    const paidVal = parseFloat(amountInput.value) || 0;
+    const diff = Math.round((paidVal - baseAmount) * 100) / 100;
+
+    let daysDiff = 0;
+    if (selDate && compDate) {
+      const d1 = new Date(selDate + 'T00:00:00');
+      const d2 = new Date(compDate + 'T00:00:00');
+      daysDiff = Math.round((d1 - d2) / 86400000);
+    }
+    const daysLate = Math.max(0, daysDiff);
+    const daysEarly = Math.max(0, -daysDiff);
+
+    let html = '';
+    if (diff > 0.005) {
+      const totalPct = baseAmount > 0 ? ((diff / baseAmount) * 100).toFixed(2) : '0.00';
+      const dailyRatePct = daysLate > 0 ? (totalPct / daysLate).toFixed(3) : totalPct;
+      const dailyVal = daysLate > 0 ? (diff / daysLate) : diff;
+
       html = `
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;font-weight:600;color:var(--accent-light)">
-            <input type="checkbox" id="chk-discount"> 🏷️ Aplicar desconto por antecipação
-          </label>
-          <div id="row-discount-val" style="display:none;margin-top:4px">
-            <label style="font-size:11px;color:var(--text-muted)">Valor do Desconto (R$)</label>
-            <input type="number" step="0.01" min="0" id="input-discount-val" placeholder="0.00" style="width:100%;padding:6px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-surface);color:var(--text-primary);font-size:12.5px">
+        <div style="background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(239,68,68,0.08)); border: 1px solid rgba(245,158,11,0.35); border-radius: var(--radius-sm); padding: 12px; text-align: center;">
+          <div style="display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 800; font-size: 13.5px; color: #f59e0b; margin-bottom: 6px;">
+            <span>⚠️</span> Juros / Encargos: +${fmt.currency(diff)} (+${totalPct}%)
+          </div>
+          <div style="font-size: 12px; color: var(--text-secondary); display: flex; justify-content: center; gap: 14px; flex-wrap: wrap;">
+            ${daysLate > 0 ? `<span>📅 <strong>${daysLate} ${daysLate === 1 ? 'dia' : 'dias'} de atraso</strong></span>` : `<span>⚡ Pago na data c/ encargos</span>`}
+            ${daysLate > 0 ? `<span>📈 Taxa diária: <strong style="color:#fbbf24">${dailyRatePct}% ao dia</strong> (${fmt.currency(dailyVal)}/dia)</span>` : ''}
           </div>
         </div>
       `;
-    } else if (isLate) {
+    } else if (diff < -0.005) {
+      const absDiff = Math.abs(diff);
+      const discPct = baseAmount > 0 ? ((absDiff / baseAmount) * 100).toFixed(2) : '0.00';
       html = `
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;font-weight:600;color:#fbbf24">
-            <input type="checkbox" id="chk-penalty"> ⚠️ Aplicar juros/multa por atraso
-          </label>
-          <div id="row-penalty-val" style="display:none;margin-top:4px">
-            <label style="font-size:11px;color:var(--text-muted)">Valor de Juros/Multa (R$)</label>
-            <input type="number" step="0.01" min="0" id="input-penalty-val" placeholder="0.00" style="width:100%;padding:6px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-surface);color:var(--text-primary);font-size:12.5px">
+        <div style="background: linear-gradient(135deg, rgba(16,185,129,0.12), rgba(6,182,212,0.08)); border: 1px solid rgba(16,185,129,0.35); border-radius: var(--radius-sm); padding: 12px; text-align: center;">
+          <div style="display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 800; font-size: 13.5px; color: var(--accent-light); margin-bottom: 6px;">
+            <span>🏷️</span> Desconto Obtido: -${fmt.currency(absDiff)} (-${discPct}%)
+          </div>
+          <div style="font-size: 12px; color: var(--text-secondary);">
+            ${daysEarly > 0 ? `📅 Pago com <strong>${daysEarly} ${daysEarly === 1 ? 'dia' : 'dias'} de antecedência</strong>` : `🏷️ Desconto concedido no vencimento`}
           </div>
         </div>
       `;
     } else {
-      html = `<div style="font-size:12px;color:var(--text-muted);text-align:center">Pagamento na data exata de vencimento (${fmt.date(compDate)})</div>`;
+      html = `
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px; text-align: center; font-size: 12px; color: var(--text-muted);">
+          ✅ Pagamento no valor original exato (sem juros nem descontos)
+        </div>
+      `;
     }
-    optContainer.innerHTML = html;
 
-    const chkDiscount = document.getElementById('chk-discount');
-    const chkPenalty = document.getElementById('chk-penalty');
-    const inputDiscount = document.getElementById('input-discount-val');
-    const inputPenalty = document.getElementById('input-penalty-val');
-
-    if (chkDiscount) {
-      chkDiscount.onchange = () => {
-        document.getElementById('row-discount-val').style.display = chkDiscount.checked ? 'block' : 'none';
-        recalcTotal();
-      };
-    }
-    if (chkPenalty) {
-      chkPenalty.onchange = () => {
-        document.getElementById('row-penalty-val').style.display = chkPenalty.checked ? 'block' : 'none';
-        recalcTotal();
-      };
-    }
-    if (inputDiscount) inputDiscount.oninput = recalcTotal;
-    if (inputPenalty) inputPenalty.oninput = recalcTotal;
-
-    recalcTotal();
+    calcCard.innerHTML = html;
+    totalPreview.innerText = fmt.currency(paidVal);
   }
 
-  function recalcTotal() {
-    let penaltyVal = 0;
-    let discountVal = 0;
-    const chkDiscount = document.getElementById('chk-discount');
-    const chkPenalty = document.getElementById('chk-penalty');
-    const inputDiscount = document.getElementById('input-discount-val');
-    const inputPenalty = document.getElementById('input-penalty-val');
-
-    if (chkDiscount && chkDiscount.checked && inputDiscount) {
-      discountVal = parseFloat(inputDiscount.value) || 0;
-    }
-    if (chkPenalty && chkPenalty.checked && inputPenalty) {
-      penaltyVal = parseFloat(inputPenalty.value) || 0;
-    }
-    const finalNet = baseAmount + penaltyVal - discountVal;
-    totalPreview.innerText = fmt.currency(finalNet);
-  }
-
-  dateInput.onchange = updatePaymentOptionsUI;
-  updatePaymentOptionsUI();
+  recalcPaymentUI();
 
   // Render QR Code PIX se existente
   if (pixCode) {
@@ -281,7 +294,8 @@ async function openPaymentDateModal(txId, currentDate, onComplete) {
         toast('✅ QR Code PIX gerado com sucesso!', 'success');
         if (tx && tx.id) {
           try {
-            await window.api.transactions.update(tx.id, {
+            await window.api.transactions.update({
+              id: tx.id,
               notes: (tx.notes ? tx.notes + '\n' : '') + `PIX Copia e Cola: ${rawPix}`
             });
           } catch(e) {}
@@ -316,29 +330,28 @@ async function openPaymentDateModal(txId, currentDate, onComplete) {
   document.getElementById('btn-pay-cancel').onclick = Modal.close;
   document.getElementById('btn-pay-confirm').onclick = async () => {
     const selectedDate = dateInput.value;
+    const paidVal = parseFloat(amountInput.value);
     if (!selectedDate) {
       toast('Selecione uma data válida', 'error');
       return;
     }
+    if (isNaN(paidVal) || paidVal < 0) {
+      toast('Informe um valor de pagamento válido', 'error');
+      return;
+    }
 
-    let penalty_amount = 0;
-    let discount_amount = 0;
-    const chkDiscount = document.getElementById('chk-discount');
-    const chkPenalty = document.getElementById('chk-penalty');
-    const inputDiscount = document.getElementById('input-discount-val');
-    const inputPenalty = document.getElementById('input-penalty-val');
-
-    if (chkDiscount && chkDiscount.checked && inputDiscount) discount_amount = parseFloat(inputDiscount.value) || 0;
-    if (chkPenalty && chkPenalty.checked && inputPenalty) penalty_amount = parseFloat(inputPenalty.value) || 0;
+    const diff = Math.round((paidVal - baseAmount) * 100) / 100;
+    const penalty_amount = diff > 0 ? diff : 0;
+    const discount_amount = diff < 0 ? Math.abs(diff) : 0;
 
     try {
       await window.api.transactions.togglePaidWithDate(txId, selectedDate, { penalty_amount, discount_amount });
-      toast('Pagamento confirmado com sucesso!');
+      toast('Pagamento confirmado com sucesso!', 'success');
       Modal.close();
       if (onComplete) onComplete();
     } catch (err) {
       console.error(err);
-      toast('Erro ao atualizar status', 'error');
+      toast('Erro ao atualizar status: ' + err.message, 'error');
     }
   };
 }

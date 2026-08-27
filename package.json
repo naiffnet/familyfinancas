@@ -11,7 +11,8 @@
     "start:server": "node server.js",
     "start:server:local": "electron server.js",
     "build:renderer": "node scripts/concat-modules.js",
-    "watch:renderer": "node scripts/concat-modules.js --watch"
+    "watch:renderer": "node scripts/concat-modules.js --watch",
+    "test": "electron scripts/run-tests.js"
   },
   "engines": {
     "node": ">=18.0.0"

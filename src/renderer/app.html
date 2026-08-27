@@ -11,11 +11,27 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="js/vendor/jsQR.js"></script>
-  <script src="js/vendor/qrcode.min.js"></script>
-  <script src="js/vendor/pdf.min.js"></script>
+  <script>
+    // Immediate cleanup of any stale Service Worker or cache
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        for (var r of regs) r.unregister();
+      }).catch(function() {});
+      if (window.caches) {
+        caches.keys().then(function(keys) {
+          for (var k of keys) caches.delete(k);
+        }).catch(function() {});
+      }
+    }
+  </script>
+  <style>
+    .hidden { display: none !important; }
+  </style>
+  <link rel="stylesheet" href="style.css?v=2.1">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+  <script src="js/vendor/jsQR.js" defer></script>
+  <script src="js/vendor/qrcode.min.js" defer></script>
+  <script src="js/vendor/pdf.min.js" defer></script>
   <script>
     (function() {
       const savedTheme = localStorage.getItem('financas_theme') || 'dark-emerald';
@@ -229,6 +245,104 @@
     <div id="page-settings" class="page"></div>
     <div id="page-families" class="page"></div>
   </main>
+
+  <!-- ════════════════════════════════════════
+       NATIVE MOBILE OPERATIONAL ENVIRONMENT
+       ═════════════════════════════════════════ -->
+  
+  <!-- Backdrop for Speed Dial FAB -->
+  <div class="mobile-fab-backdrop" id="mobile-fab-backdrop"></div>
+
+  <!-- Speed Dial Menu (Ações Rápidas) -->
+  <div class="mobile-fab-menu" id="mobile-fab-menu">
+    <div class="mobile-fab-item" data-action="scanner">
+      <span class="fab-item-label">📷 Escanear QR / Fatura</span>
+      <div class="fab-item-icon" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">📷</div>
+    </div>
+    <div class="mobile-fab-item" data-action="expense">
+      <span class="fab-item-label">💸 Nova Despesa</span>
+      <div class="fab-item-icon" style="background: rgba(239, 68, 68, 0.15); color: #ef4444;">💸</div>
+    </div>
+    <div class="mobile-fab-item" data-action="income">
+      <span class="fab-item-label">💰 Nova Receita</span>
+      <div class="fab-item-icon" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">💰</div>
+    </div>
+    <div class="mobile-fab-item" data-action="recurring">
+      <span class="fab-item-label">🔄 Nova Conta Fixa</span>
+      <div class="fab-item-icon" style="background: rgba(59, 130, 246, 0.15); color: #3b82f6;">🔄</div>
+    </div>
+  </div>
+
+  <!-- Floating Action Button (FAB) -->
+  <button class="mobile-quick-fab" id="mobile-quick-fab" title="Ações Rápidas" aria-label="Adicionar lançamento rápido">
+    <span>+</span>
+  </button>
+
+  <!-- Backdrop for "Mais" Drawer -->
+  <div class="mobile-fab-backdrop" id="mobile-more-backdrop"></div>
+
+  <!-- "Mais" Bottom Sheet Drawer -->
+  <div class="mobile-more-drawer" id="mobile-more-drawer">
+    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+      <span style="font-size: 15px; font-weight: 800; color: var(--text-primary);">Mais Recursos</span>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="MobileShell.toggleMoreDrawer(false)" style="padding: 4px 10px; min-height: 32px !important; font-size: 12px !important;">✕ Fechar</button>
+    </div>
+    <div class="mobile-more-grid">
+      <div class="mobile-more-item" data-page="goals">
+        <span class="more-icon">🎯</span>
+        <span class="more-label">Metas</span>
+      </div>
+      <div class="mobile-more-item" data-page="reports">
+        <span class="more-icon">📈</span>
+        <span class="more-label">Relatórios</span>
+      </div>
+      <div class="mobile-more-item" data-page="manual">
+        <span class="more-icon">📖</span>
+        <span class="more-label">Manual</span>
+      </div>
+      <div class="mobile-more-item" data-page="settings">
+        <span class="more-icon">⚙️</span>
+        <span class="more-label">Ajustes</span>
+      </div>
+      <div class="mobile-more-item" data-action="sync">
+        <span class="more-icon">🛡️</span>
+        <span class="more-label">Conciliação</span>
+      </div>
+      <div class="mobile-more-item" data-action="theme">
+        <span class="more-icon">🌓</span>
+        <span class="more-label">Tema</span>
+      </div>
+      <div class="mobile-more-item" data-action="logout" style="grid-column: 1 / -1; background: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.2); color: #ef4444;">
+        <span class="more-icon">⏻</span>
+        <span class="more-label">Sair da Conta</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Navigation Bar Fixa -->
+  <nav class="mobile-bottom-nav" id="mobile-bottom-nav">
+    <button class="mobile-nav-tab active" data-page="dashboard" aria-label="Início">
+      <span class="tab-icon">📊</span>
+      <span class="tab-label">Início</span>
+    </button>
+    <button class="mobile-nav-tab" data-page="recurring" aria-label="Planejamento">
+      <span class="tab-icon">🔄</span>
+      <span class="tab-label">Planejamento</span>
+    </button>
+    <button class="mobile-nav-tab" data-page="accounts" aria-label="Contas & Cartões">
+      <span class="tab-icon">🏦</span>
+      <span class="tab-label">Contas</span>
+    </button>
+    <button class="mobile-nav-tab" data-page="budget" aria-label="Orçamento">
+      <span class="tab-icon">📋</span>
+      <span class="tab-label">Orçamento</span>
+    </button>
+    <button class="mobile-nav-tab" data-action="more" aria-label="Mais Opções">
+      <span class="tab-icon">☰</span>
+      <span class="tab-label">Mais</span>
+    </button>
+  </nav>
+
 </div>
 
 <!-- ════════════════════════════════════════
@@ -247,7 +361,7 @@
 <!-- ════════════════════════════════════════
      SIGNUP WIZARD OVERLAY MODAL
      ═════════════════════════════════════════ -->
-<div id="signup-wizard-overlay" class="signup-wizard-overlay">
+<div id="signup-wizard-overlay" class="signup-wizard-overlay" style="display: none;">
   <div class="signup-wizard-card">
     <div class="wizard-orb wizard-orb-1"></div>
     <div class="wizard-orb wizard-orb-2"></div>
@@ -385,6 +499,6 @@
   </div>
 </div>
 
-<script src="app.bundle.js"></script>
+<script src="app.bundle.js?v=2.1"></script>
 </body>
 </html>

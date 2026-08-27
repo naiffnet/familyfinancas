@@ -186,7 +186,35 @@ function attachRealtimeDuplicateChecker({ amountInput, dateInput, descInput, acc
   return scheduleCheck;
 }
 
-function openRecurringModal(item, accounts, categories, type) {
+async function openRecurringModal(item, accounts, categories, type) {
+  if (typeof item === 'string') {
+    type = item;
+    item = null;
+  }
+  if (!type) type = 'expense';
+
+  if (!Array.isArray(accounts) || accounts.length === 0) {
+    try {
+      const accRes = await window.api.accounts.getAll(State.user?.id || 1);
+      accounts = Array.isArray(accRes) ? accRes : [];
+    } catch (e) {
+      accounts = [];
+    }
+  }
+
+  if (!Array.isArray(categories) || categories.length === 0) {
+    if (Array.isArray(State.categories) && State.categories.length > 0) {
+      categories = State.categories;
+    } else {
+      try {
+        const catRes = await window.api.categories.getAll(State.user?.id || 1);
+        categories = Array.isArray(catRes) ? catRes : [];
+      } catch (e) {
+        categories = [];
+      }
+    }
+  }
+
   const isEdit = !!item;
   if (isEdit) {
     const canEdit = State.permissions.can_edit_all === 1 || item.user_id === State.user.id;
@@ -213,6 +241,14 @@ function openRecurringModal(item, accounts, categories, type) {
   }
 
   Modal.open(isEdit ? 'Editar Item Recorrente' : `Nova ${type === 'income' ? 'Receita' : 'Despesa'} Fixa`, `
+    <div style="margin-bottom: 14px;">
+      <button type="button" class="btn btn-outline" id="rec-scan-qr" style="width: 100%; border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.08); color: var(--accent-light); font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px; border-radius: 8px; font-size: 13px;">
+        <span>📷</span> Escanear Fatura / QR Code / Pix
+      </button>
+    </div>
+    <div id="rec-scanned-info" style="display:none; margin-bottom:12px; padding:8px 12px; border-radius:6px; background:rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.3); font-size:11.5px; color:#38bdf8; animation:fadeIn 0.25s ease;">
+      <div id="rec-scanned-text">⚡ Dados extraídos da fatura!</div>
+    </div>
     <div id="rec-dup-warning" style="display:none; margin-bottom:12px; padding:10px 14px; border-radius:8px; font-size:12px; animation:fadeIn 0.25s ease;"></div>
     <div class="form-group">
       <label>Nome</label>
@@ -246,7 +282,6 @@ function openRecurringModal(item, accounts, categories, type) {
         </select>
       </div>
     </div>
-    </div>
     <div class="form-row">
       <div class="form-group">
         <label title="Mês em que a primeira cobrança/lançamento será gerada">📅 Mês de Vencimento <span style="font-size:11px;opacity:0.65;font-weight:400">(1ª ocorrência)</span></label>
@@ -277,6 +312,36 @@ function openRecurringModal(item, accounts, categories, type) {
       <label><input type="checkbox" id="rec-paid"> ${type === 'income' ? '💰 Já foi recebida este mês' : '💸 Já foi paga este mês'}</label>
     </div>
     ` : ''}
+    <!-- SEÇÃO DE JUROS E PREVISIBILIDADE CONTRATUAL -->
+    <div style="background: rgba(255,255,255,0.02); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 14px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+        <span style="font-size: 12px; font-weight: 700; color: var(--text-primary);">📈 Regra de Juros / Encargos (Opcional)</span>
+        <span style="font-size: 11px; color: var(--text-muted);">Para projeção de valor atualizado</span>
+      </div>
+      <div class="form-row" style="margin-bottom: 8px;">
+        <div class="form-group" style="flex: 1.2;">
+          <label style="font-size: 11px; color: var(--text-muted);">Taxa de Juros</label>
+          <input type="number" step="0.001" min="0" id="rec-interest-rate" placeholder="Ex: 0.033 ou 2.0" value="${item?.interest_rate || ''}">
+        </div>
+        <div class="form-group" style="flex: 1.5;">
+          <label style="font-size: 11px; color: var(--text-muted);">Periodicidade dos Juros</label>
+          <select id="rec-interest-type" style="width: 100%; padding: 8px; font-size: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-primary);">
+            <option value="daily" ${(item?.interest_type === 'daily' || !item?.interest_type) ? 'selected' : ''}>% ao Dia (ex: 0,033% a.d. mora)</option>
+            <option value="monthly" ${item?.interest_type === 'monthly' ? 'selected' : ''}>% ao Mês (ex: 2,0% a.m.)</option>
+            <option value="yearly" ${item?.interest_type === 'yearly' ? 'selected' : ''}>% ao Ano (ex: 15% a.a.)</option>
+            <option value="installment" ${item?.interest_type === 'installment' ? 'selected' : ''}>Fixo por Parcela</option>
+            <option value="contract" ${item?.interest_type === 'contract' ? 'selected' : ''}>Fixo por Contrato</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom: 0;">
+        <div class="form-group" style="flex: 1;">
+          <label style="font-size: 11px; color: var(--text-muted);">Multa Fixa por Atraso (%)</label>
+          <input type="number" step="0.01" min="0" id="rec-penalty-fixed-rate" placeholder="Ex: 2.0" value="${item?.penalty_fixed_rate || ''}">
+        </div>
+      </div>
+    </div>
+
     <div class="form-group">
       <label>Observação (opcional)</label>
       <input type="text" id="rec-notes" placeholder="Anotação sobre este item..." value="${item?.notes || ''}">
@@ -300,6 +365,57 @@ function openRecurringModal(item, accounts, categories, type) {
       <button class="btn btn-primary" id="rec-save">${isEdit ? 'Salvar' : 'Adicionar'}</button>
     </div>
   `);
+
+  // QR Code Scanner Integration for Recurring Items
+  const recScanBtn = document.getElementById('rec-scan-qr');
+  if (recScanBtn && typeof openNFCeScannerModal === 'function') {
+    recScanBtn.onclick = () => {
+      openNFCeScannerModal((parsed) => {
+        if (!parsed) return;
+        const updated = [];
+        if (parsed.description && (!document.getElementById('rec-name').value || document.getElementById('rec-name').value.startsWith('Nova '))) {
+          const nameEl = document.getElementById('rec-name');
+          if (nameEl) { nameEl.value = parsed.description; updated.push(`Nome: "${parsed.description}"`); }
+        }
+        if (parsed.amount != null && parsed.amount > 0) {
+          const amtEl = document.getElementById('rec-amount');
+          if (amtEl) { amtEl.value = parsed.amount; updated.push(`Valor: ${fmt.currency(parsed.amount)}`); }
+        }
+        const targetDate = parsed.dueDate || parsed.date;
+        if (targetDate) {
+          const day = parseInt(targetDate.split('-')[2], 10);
+          const dayEl = document.getElementById('rec-due-day');
+          if (dayEl && day >= 1 && day <= 31) { dayEl.value = day; updated.push(`Dia: ${day}`); }
+        }
+        if (parsed.competence) {
+          const compEl = document.getElementById('rec-competence-month');
+          if (compEl) { compEl.value = parsed.competence; updated.push(`Competência: ${parsed.competence}`); }
+        }
+        if (parsed.suggestedCategory) {
+          const catNameLower = parsed.suggestedCategory.toLowerCase();
+          const matchCat = filteredCats.find(c => c.name.toLowerCase().includes(catNameLower) || catNameLower.includes(c.name.toLowerCase()));
+          if (matchCat) {
+            const catEl = document.getElementById('rec-category');
+            if (catEl) { catEl.value = matchCat.id; updated.push(`Categoria: ${matchCat.name}`); }
+          }
+        }
+        if (parsed.pixCode || parsed.notes) {
+          const notesEl = document.getElementById('rec-notes');
+          if (notesEl) {
+            const extra = parsed.pixCode ? `PIX: ${parsed.pixCode}` : (parsed.notes || '');
+            notesEl.value = (notesEl.value ? notesEl.value + ' | ' : '') + extra;
+          }
+        }
+        const infoBox = document.getElementById('rec-scanned-info');
+        const infoText = document.getElementById('rec-scanned-text');
+        if (infoBox && infoText) {
+          infoBox.style.display = 'block';
+          infoText.innerHTML = `✅ <strong>QR Code Lido:</strong> ${updated.join(' • ')}`;
+        }
+        toast(`✅ Dados da fatura aplicados! (${updated.join(', ')})`, 'success');
+      });
+    };
+  }
 
   let icon = item?.icon || (type === 'income' ? '💰' : '📋');
   let color = item?.color || '#10b981';
@@ -396,6 +512,9 @@ function openRecurringModal(item, accounts, categories, type) {
         repeat_months: parseInt(document.getElementById('rec-repeat-months').value) || 0,
         start_installment: parseInt(document.getElementById('rec-start-installment').value) || 1,
         competence_offset,
+        interest_rate: parseFloat(document.getElementById('rec-interest-rate')?.value) || 0,
+        interest_type: document.getElementById('rec-interest-type')?.value || 'daily',
+        penalty_fixed_rate: parseFloat(document.getElementById('rec-penalty-fixed-rate')?.value) || 0,
         created_at
       };
       if (!isEdit) {
@@ -446,8 +565,21 @@ function openEditMonthTransactionModal(tx, item, accounts, categories, type) {
   const categoryVal = tx.category_id || item.category_id || '';
   
   const defaultComp = tx.competence_date ? tx.competence_date.slice(0,7) : `${State.currentYear}-${String(State.currentMonth).padStart(2,'0')}`;
+  let scannedPixCode = tx.pix_code || (item && item.pix_code) || null;
+  let currentNotes = tx.notes || (item && item.notes) || '';
 
   Modal.open(`Editar Lançamento do Mês (${MONTHS[State.currentMonth - 1]} / ${State.currentYear})`, `
+    <div style="margin-bottom: 14px;">
+      <button type="button" class="btn btn-outline" id="mod-tx-scan-qr" style="width: 100%; border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.08); color: var(--accent-light); font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px; border-radius: 8px; font-size: 13px;">
+        <span>📷</span> Escanear Fatura / QR Code / Pix
+      </button>
+    </div>
+    <div id="mod-tx-scanned-info" style="display: ${scannedPixCode ? 'block' : 'none'}; margin-bottom: 12px; padding: 8px 12px; border-radius: 6px; background: rgba(6, 182, 212, 0.1); border: 1px solid rgba(6, 182, 212, 0.3); font-size: 11.5px; color: #38bdf8; animation: fadeIn 0.25s ease;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap;">
+        <span id="mod-tx-scanned-text">${scannedPixCode ? '⚡ Chave/Código PIX vinculado à fatura' : '⚡ Dados atualizados via QR Code!'}</span>
+        ${scannedPixCode ? `<span class="badge badge-cyan" style="font-size: 10px; padding: 2px 6px;">PIX Anexado</span>` : ''}
+      </div>
+    </div>
     <div id="mod-tx-dup-warning" style="display:none; margin-bottom:12px; padding:10px 14px; border-radius:8px; font-size:12px; animation:fadeIn 0.25s ease;"></div>
     <div class="form-row">
       <div class="form-group">
@@ -494,6 +626,58 @@ function openEditMonthTransactionModal(tx, item, accounts, categories, type) {
     </div>
   `);
 
+  // QR Code Scanner Integration for Monthly Transaction Edit
+  const scanBtn = document.getElementById('mod-tx-scan-qr');
+  if (scanBtn && typeof openNFCeScannerModal === 'function') {
+    scanBtn.onclick = () => {
+      openNFCeScannerModal((parsed) => {
+        if (!parsed) return;
+        const updatedFields = [];
+        if (parsed.amount != null && parsed.amount > 0) {
+          const amtEl = document.getElementById('mod-tx-amount');
+          if (amtEl) {
+            amtEl.value = parsed.amount;
+            amtEl.style.borderColor = 'var(--accent)';
+            updatedFields.push(`Valor: ${fmt.currency(parsed.amount)}`);
+          }
+        }
+        const targetDate = parsed.dueDate || parsed.date;
+        if (targetDate) {
+          const dateEl = document.getElementById('mod-tx-date');
+          if (dateEl) {
+            dateEl.value = targetDate;
+            dateEl.style.borderColor = 'var(--accent)';
+            updatedFields.push(`Vencimento: ${fmt.date(targetDate)}`);
+          }
+        }
+        const targetComp = parsed.competence || (targetDate ? targetDate.slice(0, 7) : null);
+        if (targetComp) {
+          const compEl = document.getElementById('mod-tx-competence');
+          if (compEl) {
+            compEl.value = targetComp;
+            compEl.style.borderColor = 'var(--accent)';
+            updatedFields.push(`Competência: ${targetComp}`);
+          }
+        }
+        if (parsed.pixCode) {
+          scannedPixCode = parsed.pixCode;
+          updatedFields.push('Chave PIX');
+        }
+        if (parsed.notes) {
+          currentNotes = (currentNotes ? currentNotes + '\n' : '') + parsed.notes;
+        }
+
+        const infoBox = document.getElementById('mod-tx-scanned-info');
+        const infoText = document.getElementById('mod-tx-scanned-text');
+        if (infoBox && infoText) {
+          infoBox.style.display = 'block';
+          infoText.innerHTML = `✅ <strong>QR Code Lido:</strong> ${updatedFields.join(' • ')}`;
+        }
+        toast(`✅ Fatura escaneada com sucesso! (${updatedFields.join(', ')})`, 'success');
+      });
+    };
+  }
+
   attachRealtimeDuplicateChecker({
     amountInput: document.getElementById('mod-tx-amount'),
     dateInput: document.getElementById('mod-tx-date'),
@@ -535,7 +719,8 @@ function openEditMonthTransactionModal(tx, item, accounts, categories, type) {
         date,
         competence_date,
         is_paid: tx.is_paid,
-        notes: tx.notes
+        notes: currentNotes || tx.notes,
+        pix_code: scannedPixCode || tx.pix_code || null
       });
       if (res && res.error) {
         toast(res.error, 'error');

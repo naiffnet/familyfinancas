@@ -1,158 +1,288 @@
 /* manual-b.js - parte 2/2 */
 
 /**
- * Retorna o HTML dos tópicos 6 a 10 (incluindo FAQ) do painel de conteúdo
+ * Retorna o HTML dos tópicos dos Capítulos 7 a 13 do painel de leitura
  */
 function getManualTopicsPart2Html() {
   return `
-    <!-- TÓPICO 6.1: SYNC > UUIDS & MULTI-APARELHO -->
-    <div class="manual-topic-content" id="topic-sync-uuid" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #38bdf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>🔑 Identificadores Globais Universais (UUID v4) & Multi-Dispositivo</span>
-        <span class="badge badge-blue">Smart Sync</span>
+    <!-- CAPÍTULO 7.1: ORÇAMENTOS > TETOS -->
+    <div class="manual-topic-content" id="topic-orc-tetos" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f43f5e; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🎯 7.1 Definindo Tetos de Orçamento por Categoria</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(56, 189, 248, 0.08); border-left: 4px solid #38bdf8; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Arquitetura Resiliente para Sincronização Desktop e Web:</strong>
+        <div style="background: rgba(244,63,94,0.08); border-left: 4px solid #f43f5e; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>Disciplina e Previsibilidade Financeira Familiar:</strong>
         </div>
-        <p style="margin-bottom: 10px;">Para permitir que membros da família usem o app no notebook (Desktop) e no celular (Web) simultaneamente sem conflitos:</p>
+        <p style="margin-bottom: 10px;">Na aba <strong>📋 Orçamento</strong>, você estabelece o teto máximo de gastos da família para cada categoria do mês:</p>
+        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Clique no campo de valor ao lado de cada categoria (ex: <em>Alimentação: R$ 2.500,00, Moradia: R$ 3.000,00, Lazer: R$ 800,00</em>).</li>
+          <li>Conforme as despesas do mês são lançadas, o sistema calcula a porcentagem consumida em tempo real.</li>
+        </ol>
+        <div style="background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2); padding: 12px 16px; border-radius: 8px;">
+          💡 <strong>Dica de Ouro:</strong> Acompanhe o consumo visual nas barras de progresso descritas em <a href="javascript:void(0)" onclick="openManualTopic('orc-barras')" style="color: #f43f5e; font-weight: 700; text-decoration: underline;">7.2 Barras de Limite Coloridas</a>.
+        </div>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 7.2: ORÇAMENTOS > BARRAS COLORIDAS -->
+    <div class="manual-topic-content" id="topic-orc-barras" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f43f5e; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📊 7.2 Acompanhamento Visual das Barras de Limite</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">As barras de progresso mudam de cor dinamicamente para alertar a saúde do orçamento:</p>
         <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🌐 <strong>UUID Global (128 bits):</strong> Todo lançamento ganha um identificador único universal (<code>sync_id</code>). Isso impede colisões de ID numérico (ex: Desktop e Web criando o ID #1506).</li>
-          <li>⏱️ <strong>Last-Write-Wins:</strong> Atualizações em um mesmo lançamento são resolvidas automaticamente com base no carimbo de data/hora mais recente (<code>updated_at</code>).</li>
-          <li>🗑️ <strong>Soft-Delete:</strong> Exclusões são sincronizadas de forma limpa sem deixar registros fantasmas em outros aparelhos.</li>
+          <li>🟢 <strong>Verde Esmeralda (0% a 70%):</strong> Gastos confortáveis dentro da margem de segurança.</li>
+          <li>🟡 <strong>Amarelo Atenção (71% a 90%):</strong> Categoria próxima do limite planejado para o mês.</li>
+          <li>🔴 <strong>Vermelho Perigo (> 90% ou Estourado):</strong> Orçamento esgotado ou ultrapassado, sinalizando que a família deve segurar compras não essenciais.</li>
         </ul>
       </div>
     </div>
 
-    <!-- TÓPICO 6.2: SYNC > REGRA DE RECEITAS (NOVO) -->
-    <div class="manual-topic-content" id="topic-sync-receitas" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #34d399; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>💰 Regra de Ouro para Receitas & Mesma Titularidade</span>
-        <span class="badge badge-green">Recurso Novo</span>
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Como o sistema analisa o recebimento de receitas e salários:</strong>
-        </div>
-        <p style="margin-bottom: 10px;">Nas <strong>Receitas</strong> (salários, pró-labore, aluguéis recebidos, PIX recebidos), aplicam-se filtros completos de valor, data e título, respeitando as contas:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🟢 <strong>Contas Diferentes de Membros Distintos = 100% Ignoradas:</strong> Se William recebe R$ 4.000 no Itaú e Jennifer recebe R$ 4.000 no Nubank, o motor <strong>ignora totalmente</strong> e não gera alerta, pois são rendas legítimas e independentes de cada familiar.</li>
-          <li>🚨 <strong>Mesma Conta Bancária:</strong> Se uma receita de mesmo valor e data for cadastrada duas vezes na <strong>mesma conta</strong>, o motor acusa duplicidade com Altíssima Certeza (95-100%).</li>
-          <li>⚠️ <strong>Contas Diferentes do MESMO Titular:</strong> Se o próprio usuário lançar a mesma receita no Itaú e depois no Nubank por engano, o sistema identifica que ambas as contas pertencem ao mesmo usuário e acusa duplicidade com banco trocado (85-90%).</li>
-          <li>⚡ <strong>Aviso em Tempo Real no Formulário:</strong> Ao preencher uma receita no modal, surge um alerta instantâneo: <em>"Atenção: Já existe uma receita similar de William em 20/08 na conta Itaú no valor de R$ 4.000,00..."</em>.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- TÓPICO 6.3: SYNC > MOTOR HEURÍSTICO & HIERARQUIA DE DÍVIDAS -->
-    <div class="manual-topic-content" id="topic-sync-dedup" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #38bdf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>🧠 Motor Heurístico Anti-Duplicidade & Hierarquia de Dívidas</span>
-        <span class="badge badge-purple">Inteligência Familiar</span>
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(139, 92, 246, 0.08); border-left: 4px solid #8b5cf6; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Hierarquia de Análise para Dívidas e Despesas:</strong>
-        </div>
-        <p style="margin-bottom: 10px;">Para despesas e pagamentos da casa, o motor segue uma rigorosa escala de critérios:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li><strong>Nível 1 (Valor Exato + Datas Próximas):</strong> Compara valores idênticos com tolerância de até ±2 dias e compensações bancárias de fim de semana (sexta/sábado/domingo compensados na segunda/terça).</li>
-          <li><strong>Nível 2 (Data Exata + Valores Aproximados):</strong> Detecta despesas no mesmo dia com pequenas variações de centavos, taxas ou gorjetas (até 2% a 5%).</li>
-          <li><strong>Nível 3 (Títulos e NLP Bancário):</strong> Limpa ruídos e stopwords bancárias (<code>PIX</code>, <code>TED</code>, <code>PAGTO</code>, <code>COMPRA</code>, <code>DÉBITO</code>, <code>CRÉDITO</code>) e compara os estabelecimentos com busca inteligente por prefixos (ex: <em>"Zaffari Ipiranga"</em> vs <em>"Cia Zaffari"</em>).</li>
-          <li><strong>Contas Diferentes com Lojas Diferentes = 0% Duplicata:</strong> Se o valor for R$ 50 no Itaú (Farmácia) e R$ 50 no Nubank (Padaria), é <strong>100% ignorado</strong>.</li>
-          <li>🔢 <strong>Parcelamento Inteligente:</strong> Se o Lançamento A diz <em>"Sofá (2/10)"</em> e o B diz <em>"Sofá (3/10)"</em>, o motor sabe que <strong>NÃO é duplicata</strong>. Se ambos disserem <em>"2/10"</em> e <em>"2 de 10"</em>, acusa duplicata de 100%!</li>
-          <li>🏷️ <strong>Mesma Conta Fixa Recorrente:</strong> Lançamentos que apontam para o mesmo item fixo do mês (ex: <em>Aluguel, Luz, Internet</em>) são detectados automaticamente com 100% de confiança.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- TÓPICO 6.4: SYNC > CONCILIAÇÃO VISUAL E AÇÕES EM LOTE -->
-    <div class="manual-topic-content" id="topic-sync-conciliacao" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #38bdf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>⚖️ Central Avançada de Conciliação, Filtros e Ações em Lote</span>
-        <span class="badge badge-cyan">Painel Completo</span>
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(56, 189, 248, 0.08); border-left: 4px solid #38bdf8; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Painel Dedicado de Auditoria & Conciliação Familiar:</strong>
-        </div>
-        <p style="margin-bottom: 10px;">Ao clicar no botão <code>🛡️</code> na barra lateral ou no banner de alerta do Dashboard, você acessa a central:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🎯 <strong>Classificação por Nível de Certeza:</strong> Badges cromáticos informam o grau de confiança: <span class="badge badge-success">🟢 Altíssima Certeza (95-100%)</span>, <span class="badge badge-danger">🟡 Provável (80-94%)</span> e <span class="badge badge-warning">🔵 Suspeito (65-79%)</span>.</li>
-          <li>🎛️ <strong>Filtros Interativos:</strong> Filtre a lista por membro da família, nível de certeza ou conta bancária pagadora.</li>
-          <li>⚡ <strong>Ações em Lote:</strong> Botão <code>[ ⚡ Mesclar Certezas (100%) ]</code> e <code>[ 🔗 Mesclar Selecionados ]</code> para resolver dezenas de duplicidades com 1 único clique.</li>
-          <li>📜 <strong>Aba de Histórico:</strong> Registra todas as conciliações e desfechos anteriores para prestação de contas e auditoria.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- TÓPICO 7.1: ORÇAMENTOS > BUDGETS -->
-    <div class="manual-topic-content" id="topic-orc-budgets" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f43f5e; font-weight: 700;">
-        🎯 Tetos de Gastos por Categoria (Orçamento)
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin: 0;">Estabeleça um limite mensal máximo para categorias como Alimentação, Lazer e Transporte. A barra de progresso avisa com cores quando o teto estiver próximo de ser atingido.</p>
-      </div>
-    </div>
-
-    <!-- TÓPICO 7.2: ORÇAMENTOS > METAS -->
+    <!-- CAPÍTULO 7.3: ORÇAMENTOS > METAS -->
     <div class="manual-topic-content" id="topic-orc-metas" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f43f5e; font-weight: 700;">
-        🏆 Metas Financeiras & Cofrinhos de Economia
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f43f5e; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🎯 7.3 Criando Metas de Economia & Aportes Financeiros</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin: 0;">Crie objetivos como Viagem de Férias, Reserva de Emergência ou Troca de Carro, registrando aportes mensais com cálculo automático da data estimada de conclusão.</p>
+        <p style="margin-bottom: 10px;">Na tela <strong>🎯 Metas</strong>, acompanhe cofrinhos e objetivos de poupança (ex: <em>Reserva de Emergência, Férias em Família, Troca de Carro</em>):</p>
+        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Clique em <code>+ Nova Meta</code>, informe o nome do objetivo, valor alvo (R$) e data desejada.</li>
+          <li>Para adicionar dinheiro economizado, clique em <code>+ Fazer Aporte</code> escolhendo a conta bancária de onde o recurso saiu.</li>
+          <li>O sistema atualiza a barra de porcentagem e projeta quantos meses faltam para atingir o objetivo familiar.</li>
+        </ol>
       </div>
     </div>
 
-    <!-- TÓPICO 8.1: METODOLOGIA 50-30-20 -->
-    <div class="manual-topic-content" id="topic-met-regra" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #c084fc; font-weight: 700;">
-        💡 A Metodologia 50-30-20 Aplicada à Família
+    <!-- CAPÍTULO 8.1: DASHBOARD > 3 MODOS -->
+    <div class="manual-topic-content" id="topic-dash-modos" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🎛️ 8.1 Os 3 Modos de Visualização do Dashboard</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px;">
-          <div style="flex: 1; min-width: 150px; background: rgba(59,130,246,0.1); border-left: 4px solid var(--blue); padding: 12px; border-radius: 6px;">
-            <div style="font-weight: 700; color: #60a5fa;">50% — Necessidades</div>
-            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Aluguel, condomínio, luz, água, alimentação básica e saúde.</div>
-          </div>
-          <div style="flex: 1; min-width: 150px; background: rgba(16,185,129,0.1); border-left: 4px solid var(--green); padding: 12px; border-radius: 6px;">
-            <div style="font-weight: 700; color: #34d399;">30% — Desejos / Lazer</div>
-            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Restaurantes, assinaturas, passeios, compras e hobbies.</div>
-          </div>
-          <div style="flex: 1; min-width: 150px; background: rgba(139,92,246,0.1); border-left: 4px solid var(--purple); padding: 12px; border-radius: 6px;">
-            <div style="font-weight: 700; color: #c084fc;">20% — Futuro & Metas</div>
-            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Reserva de emergência, investimentos e quitação antecipada.</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- TÓPICO 9.1: ARQUITETURA MODULAR & BUILD -->
-    <div class="manual-topic-content" id="topic-arq-modular" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #eab308; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>🏗️ Nova Arquitetura Modular & Manutenção Ágil</span>
-        <span class="badge badge-yellow">Engenharia v2</span>
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(234, 179, 8, 0.08); border-left: 4px solid #eab308; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Código 100% Desacoplado (Arquivos com no máximo 900 linhas):</strong>
-        </div>
-        <p style="margin-bottom: 10px;">Para garantir alta velocidade de carregamento, facilidade de manutenção e eliminar arquivos monolíticos:</p>
+        <p style="margin-bottom: 10px;">Alterne a disposição do Dashboard no seletor de modos no canto superior direito:</p>
         <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🧩 <strong>Frontend Modularizado (21 Módulos em <code>src/renderer/js/modules/</code>):</strong> Dashboard, Planejamento, Contas, Configurações, Modais, Autenticação e Deduplicação separados em submódulos concisos.</li>
-          <li>💾 <strong>Banco SQLite Modular (8 Módulos em <code>src/database/</code>):</strong> Camadas de Transações, Contas, Usuários/LGPD, Faturas, Relatórios e Anti-Duplicidade desacopladas em mixins limpos.</li>
-          <li>🎨 <strong>Folhas de Estilo (4 Folhas em <code>src/renderer/css/</code>):</strong> <code>base.css</code>, <code>components.css</code>, <code>views.css</code> e <code>responsive-features.css</code> agregadas via <code>@import</code>.</li>
-          <li>⚡ <strong>Scripts de Build:</strong> Execute <code>npm run build:renderer</code> para compilar alterações ou <code>npm run watch:renderer</code> para compilação instantânea em segundo plano.</li>
+          <li>🏛️ <strong>Modo Executivo:</strong> Visão consolidada por blocos com widgets de saldos em conta, faturas de cartão e patrimônio líquido.</li>
+          <li>📑 <strong>Modo Sub-Abas:</strong> Navegação setorizada por abas operacionais (*Resumo, Faturas, Contas e Gráficos*).</li>
+          <li>🚀 <strong>Modo Cockpit Integrado:</strong> Painel de alta densidade reunindo todas as métricas financeiras em uma única tela panorâmica.</li>
         </ul>
       </div>
     </div>
 
-    <!-- TÓPICO 10.1: FAQ INTERATIVO -->
-    <div class="manual-topic-content" id="topic-faq-interativo" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f87171; font-weight: 700;">
-        ❓ Perguntas Frequentes (FAQ Interativo — Clique para abrir a resposta)
+    <!-- CAPÍTULO 8.2: DASHBOARD > FILTROS -->
+    <div class="manual-topic-content" id="topic-dash-filtros" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>👥 8.2 Filtros Rápidos por Membro da Família e Tipo de Conta</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">No topo do Dashboard, você pode filtrar instantaneamente os dados exibidos:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>👤 <strong>Filtro por Membro:</strong> Clique no nome de um familiar para enxergar apenas os gastos, receitas e cartões daquela pessoa.</li>
+          <li>🏦 <strong>Filtro por Tipo de Conta:</strong> Isole contas correntes, carteiras de dinheiro ou cartões benefício com 1 clique.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 8.3: DASHBOARD > KANBAN EM 3 COLUNAS -->
+    <div class="manual-topic-content" id="topic-dash-kanban" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📋 8.3 Kanban Operacional em 3 Colunas (*Prioritários, A Pagar e Pagas*)</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">No centro do Dashboard, três colunas organizam as tarefas do mês:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>⭐ <strong>Prioritários:</strong> Reúne todas as contas marcadas com estrela de prioridade indispensável no mês.</li>
+          <li>⏳ <strong>Contas a Pagar:</strong> Despesas pendentes ordenadas cronologicamente por proximidade da data de vencimento.</li>
+          <li>✓ <strong>Contas Pagas:</strong> Histórico de despesas já quitadas no mês com indicação da conta de pagamento.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 8.4: DASHBOARD > PENDÊNCIAS ANTERIORES -->
+    <div class="manual-topic-content" id="topic-dash-pendencias" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🚨 8.4 Alerta de Pendências de Meses Anteriores</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Se você tiver deixado contas em aberto nos meses passados, surge um <strong>banner vermelho de alerta no topo do Dashboard</strong> informando a quantidade e o valor total acumulado, com link direto para regularização instantânea.</p>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 9.1: RELATÓRIOS > FLUXO DE CAIXA -->
+    <div class="manual-topic-content" id="topic-rep-fluxo" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #818cf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📈 9.1 Relatório de Fluxo de Caixa</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Na tela <strong>📈 Relatórios</strong>, visualize a saúde financeira consolidada do grupo familiar:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>🟢 <strong>Total de Receitas do Mês:</strong> Entradas salariais e rendimentos.</li>
+          <li>🔴 <strong>Total de Despesas do Mês:</strong> Somatório de gastos fixos, variáveis e faturas.</li>
+          <li>💰 <strong>Saldo Líquido Operacional:</strong> Diferença real entre entradas e saídas.</li>
+          <li>📊 <strong>Taxa de Poupança Familiar (%):</strong> Percentual da renda que a família conseguiu guardar no período.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 9.2: RELATÓRIOS > GRÁFICOS INTERATIVOS -->
+    <div class="manual-topic-content" id="topic-rep-graficos" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #818cf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🍩 9.2 Gráficos Interativos por Categoria (*Pizza, Barras, Radar, Polar*)</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Analise para onde seu dinheiro está indo em diferentes perspectivas visuais interativas:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>🍩 <strong>Gráfico em Rosca (Donut):</strong> Mostra a fatia percentual de cada categoria no orçamento da família.</li>
+          <li>📊 <strong>Gráfico de Barras:</strong> Compara a evolução de gastos mês a mês.</li>
+          <li>🕸️ <strong>Gráfico Radar / Polar:</strong> Identifica anomalias e picos de gastos sazonais.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 9.3: RELATÓRIOS > PATRIMÔNIO -->
+    <div class="manual-topic-content" id="topic-rep-patrimonio" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #818cf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🏛️ 9.3 Evolução Patrimonial Anual</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Acompanhe o crescimento do <strong>Patrimônio Líquido Familiar</strong> ao longo dos 12 meses do ano:</p>
+        <p style="margin: 0;">O cálculo soma todos os saldos em contas bancárias, poupanças e investimentos, deduzindo dívidas pendentes em cartões de crédito e faturas abertas.</p>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 9.4: RELATÓRIOS > AUDITORIA DE JUROS -->
+    <div class="manual-topic-content" id="topic-rep-auditoria-juros" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #818cf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>⚖️ 9.4 Relatório de Auditoria de Juros e Descontos</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Descubra exatamente quanto a família pagou de encargos por atraso de boletos e quanto economizou aproveitando descontos antecipados via PIX.</p>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 9.5: RELATÓRIOS > IMPRESSÃO / PDF -->
+    <div class="manual-topic-content" id="topic-rep-impressao-pdf" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #818cf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🖨️ 9.5 Impressão & Exportação em PDF (*🖨️ Imprimir / PDF*)</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Clique no botão <code>🖨️ Imprimir / PDF</code> no topo da página de relatórios para gerar um arquivo PDF formatado com cabeçalho da família, tabelas detalhadas e gráficos em alta resolução.</p>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 10.1: SEGURANÇA > TRILHA DE AUDITORIA -->
+    <div class="manual-topic-content" id="topic-seg-trilha-auditoria" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #14b8a6; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🛡️ 10.1 Histórico Visual de Modificações (*Trilha de Auditoria*)</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Em <strong>⚙️ Configurações › Segurança</strong>, consulte a auditoria operacional completa:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Registro com data, hora, nome do familiar e ação realizada (criação, edição, exclusão ou quitação de contas).</li>
+          <li>Exibição detalhada dos valores anteriores e dos novos valores alterados para total transparência entre os membros da casa.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 10.2: SEGURANÇA > LGPD -->
+    <div class="manual-topic-content" id="topic-seg-lgpd" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #14b8a6; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🔒 10.2 Direitos LGPD (*Exportação dos Meus Dados e Exclusão Segura*)</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Em total conformidade com a Lei Geral de Proteção de Dados:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>📦 <strong>Exportar Meus Dados:</strong> Baixe todo o histórico financeiro da família em arquivo aberto JSON.</li>
+          <li>🗑️ <strong>Exclusão Definitiva:</strong> Permite ao Administrador expurgar com segurança os registros locais quando desejar.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 11.1: BACKUP > EXPORTAÇÃO -->
+    <div class="manual-topic-content" id="topic-bak-exportacao" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #eab308; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>💾 11.1 Exportando Backups em Excel, CSV, JSON e Banco <code>.db</code></span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Em <strong>⚙️ Configurações › Backup & Restauração</strong>, gere cópias de segurança:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>📊 <strong>Planilha Excel / CSV:</strong> Para conferência e manipulação externa de dados.</li>
+          <li>🗄️ <strong>Backup Completo SQLite (.db):</strong> Cópia integral e criptografada de todo o banco de dados.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 11.2: BACKUP > TESTAR .DB -->
+    <div class="manual-topic-content" id="topic-bak-teste-integridade" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #eab308; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🔍 11.2 Testando a Integridade do Arquivo de Backup (*🔍 Testar .db*)</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Antes de restaurar um arquivo de backup no seu computador, clique em <code>🔍 Testar .db</code>. O motor analisa a consistência estrutural, chaves estrangeiras e integridade de tabelas para garantir que o arquivo não está corrompido.</p>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 11.3: BACKUP > RESTAURAÇÃO -->
+    <div class="manual-topic-content" id="topic-bak-restauracao" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #eab308; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>♻️ 11.3 Restaurando um Backup com Segurança</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Selecione o arquivo de backup <code>.db</code> ou <code>.json</code> prévio.</li>
+          <li>Confirme a restauração com sua senha de administrador.</li>
+          <li>O sistema restaura todas as tabelas e atualiza a interface imediatamente.</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 11.4: BACKUP > SAÚDE & MÉTRICAS -->
+    <div class="manual-topic-content" id="topic-bak-saude-metricas" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #eab308; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📊 11.4 Painel de Saúde e Métricas do Sistema</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Acompanhe o tamanho físico do arquivo do banco de dados no disco, quantidade total de transações registradas, status do modo WAL e integridade dos índices.</p>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 12.1: MOBILE > CONEXÃO LOCAL / WI-FI -->
+    <div class="manual-topic-content" id="topic-mob-conexao-wifi" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #38bdf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📱 12.1 Conexão Local / Wi-Fi via QR Code</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <div style="background: rgba(56, 189, 248, 0.08); border-left: 4px solid #38bdf8; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>Acesso Direto pelo Celular Sem Precisar Baixar Nada da Loja de Aplicativos:</strong>
+        </div>
+        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Certifique-se de que o seu celular e o seu computador estão conectados na <strong>mesma rede Wi-Fi</strong>.</li>
+          <li>No computador, clique no botão <code>📱 Conectar Aparelho</code> no menu lateral.</li>
+          <li>Aponte a câmera do celular para o QR Code na tela. O app abrirá no navegador do celular conectado diretamente ao seu computador!</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 12.2: MOBILE > LAYOUT TOUCH & HEADER -->
+    <div class="manual-topic-content" id="topic-mob-layout-touch" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #38bdf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📱 12.2 Layout Mobile, Header Centralizado & Grids Touch-Friendly</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">A interface foi calibrada para navegação confortável com o polegar em smartphones:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>🔝 <strong>Header em 3 Colunas:</strong> Menu hamburguer à esquerda, logo centralizado e alternador de tema à direita.</li>
+          <li>📊 <strong>Lançamentos em 2 Linhas:</strong> Descrição, categoria, valor e status sem sobreposição.</li>
+          <li>💳 <strong>Faturas Verticais:</strong> Cards de fatura com botões largos de 42px para toque fácil.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 13.1: FAQ INTERATIVO -->
+    <div class="manual-topic-content" id="topic-faq-duvidas" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f87171; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>❓ 13.1 Perguntas Frequentes (FAQ Interativo — Clique para ver a resposta)</span>
       </h4>
       <div style="display: flex; flex-direction: column; gap: 10px;">
         
@@ -162,57 +292,27 @@ function getManualTopicsPart2Html() {
             <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
           </div>
           <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
-            Pela <strong>Regra de Ouro de Receitas</strong>, salários e recebíveis lançados em contas de familiares diferentes (ex: marido no Itaú e esposa no Nubank) são <strong>100% ignorados pelo motor de duplicidades</strong>, pois são rendas reais independentes. O sistema só alerta se a receita for na mesma conta bancária ou se o mesmo titular cadastrar em bancos diferentes por engano.
+            Salários e rendas de membros diferentes da família (ex: marido no Itaú e esposa no Nubank) são reconhecidos como rendas legítimas independentes e <strong>nunca são bloqueados pelo motor de duplicidade</strong>.
           </div>
         </div>
 
         <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
           <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
-            <span>🛡️ O que acontece se dois membros da família lançarem a mesma despesa (Web e Desktop)?</span>
+            <span>💳 O que acontece quando clico em 'Pagar Fatura' de um cartão?</span>
             <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
           </div>
           <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
-            O <strong>Motor Anti-Duplicidade</strong> cruza valor, data (com compensação de fins de semana) e o nome do estabelecimento (NLP). Se o mesmo local for detectado, o sistema alerta e você pode abrir a <strong>Central de Conciliação</strong> para mesclar em 1 único lançamento com 1 clique.
+            O valor total da fatura é debitado da conta bancária pagadora escolhida e todas as despesas e parcelas atreladas àquela fatura são marcadas como pagas simultaneamente em uma única operação segura.
           </div>
         </div>
 
         <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
           <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
-            <span>🔢 O motor de duplicidade confunde compras parceladas (ex: 2/10 com 3/10)?</span>
+            <span>🔒 Meus dados e informações financeiras ficam salvos na nuvem?</span>
             <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
           </div>
           <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
-            Não! O motor extrai o número da parcela automaticamente. Se os números forem diferentes (ex: <em>2/10</em> vs <em>3/10</em>), a duplicidade é <strong>zerada (0%)</strong> porque são parcelas de meses distintos. Já parcelas idênticas (ex: <em>2/10</em> vs <em>2 de 10</em>) recebem pontuação máxima de duplicidade (100%).
-          </div>
-        </div>
-
-        <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
-          <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
-            <span>💳 Como funciona o destaque de parcelas ao clicar na fatura?</span>
-            <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
-          </div>
-          <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
-            Ao clicar no card de qualquer fatura na tela de Planejamento (ex: <code>FATURA CARTÃO CARREFOUR</code>), todas as compras e parcelas correspondentes na lista de Despesas são imediatamente destacadas com a cor oficial do cartão/banco. Os itens de outros cartões são atenuados, facilitando a conferência.
-          </div>
-        </div>
-
-        <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
-          <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
-            <span>🤝 O que acontece quando clico em 'Renegociar / Acordo' em uma fatura?</span>
-            <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
-          </div>
-          <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
-            A fatura é marcada como <span class="badge badge-purple">Renegociada</span>, a entrada é debitada da conta bancária e o sistema gera automaticamente as parcelas do acordo como despesas nos meses subsequentes. Caso tenha feito por engano, você pode clicar em "Desfazer Acordo / Reabrir" para restaurar a fatura original.
-          </div>
-        </div>
-
-        <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
-          <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
-            <span>🔒 Meus dados financeiros ficam salvos na nuvem ou são compartilhados?</span>
-            <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
-          </div>
-          <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
-            Não! Todos os dados são gravados exclusivamente no banco de dados local SQLite no seu computador com criptografia AES-256 e conformidade integral com a LGPD. Nenhuma informação financeira sai da sua rede local.
+            Não! Todos os dados são salvos exclusivamente no banco de dados local SQLite no seu computador com criptografia AES-256 e conformidade integral com a LGPD. Nenhuma informação financeira sai da sua máquina.
           </div>
         </div>
 
@@ -220,6 +320,28 @@ function getManualTopicsPart2Html() {
     </div>
   `;
 }
+
+/**
+ * Função global para navegação por hiperlinks internos no manual
+ */
+window.openManualTopic = function(topicId) {
+  const container = document.getElementById('page-manual');
+  if (!container) return;
+
+  const targetItem = container.querySelector(`.wiki-tree-item[data-topic="${topicId}"]`);
+  if (!targetItem) return;
+
+  // Abrir o acordeão do grupo pai caso esteja fechado
+  const subs = targetItem.closest('.wiki-tree-subs');
+  const header = subs?.previousElementSibling;
+  const arrow = header?.querySelector('.wiki-tree-arrow');
+  if (subs && subs.style.display === 'none') {
+    subs.style.display = 'flex';
+    if (arrow) arrow.textContent = '▾';
+  }
+
+  targetItem.click();
+};
 
 /**
  * Renderiza a página do Manual do Usuário
@@ -235,7 +357,7 @@ async function renderManual() {
           <span>📖</span> Manual do Usuário & Central de Conhecimento
         </h2>
         <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
-          Guia completo de operações, cartões de crédito, fluxo de caixa e metodologia financeira
+          Guia completo de operações, cartões de crédito, fluxo de caixa e metodologia financeira (13 Capítulos)
         </div>
       </div>
       <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
@@ -247,16 +369,16 @@ async function renderManual() {
 
     <!-- BREADCRUMB / TRILHA DE NAVEGAÇÃO -->
     <div id="manual-breadcrumb" style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px; background: var(--bg-surface); padding: 10px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); flex-wrap: wrap;">
-      <span style="font-weight: 700; color: var(--text-muted); cursor: pointer;" id="manual-crumb-root">📚 MANUAL</span>
+      <span style="font-weight: 700; color: var(--text-muted); cursor: pointer;" id="manual-crumb-root" onclick="openManualTopic('primeiros-familia')">📚 MANUAL</span>
       <span style="opacity: 0.4;">›</span>
-      <span id="manual-crumb-cat" style="color: #60a5fa; font-weight: 600;">💳 Cartões de Crédito</span>
+      <span id="manual-crumb-cat" style="color: #60a5fa; font-weight: 600;">🌟 1. Primeiros Passos & Acesso</span>
       <span style="opacity: 0.4;">›</span>
-      <span id="manual-crumb-sub" style="color: var(--accent-light); font-weight: 700;">Competência vs Vencimento</span>
+      <span id="manual-crumb-sub" style="color: var(--accent-light); font-weight: 700;">1.1 Criando Família e Usuário</span>
     </div>
 
     <!-- BUSCA GLOBAL NO MANUAL -->
     <div style="margin-bottom: 14px; position: relative;">
-      <input type="text" id="manual-search-input" placeholder="🔍 Pesquisar em todos os tópicos, operações, termos e perguntas do manual..."
+      <input type="text" id="manual-search-input" placeholder="🔍 Pesquisar em todos os 13 capítulos, termos e dúvidas do manual..."
              style="width: 100%; padding: 10px 16px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-primary); font-size: 13px; outline: none; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
     </div>
 
@@ -362,48 +484,20 @@ function setupManualEvents(container) {
           const matches = text.includes(q);
           tc.style.display = matches ? 'block' : 'none';
         });
-        container.querySelectorAll('.wiki-faq-accordion').forEach(acc => {
-          const text = acc.textContent.toLowerCase();
-          const aEl = acc.querySelector('.wiki-faq-a');
-          const chevron = acc.querySelector('.faq-chevron');
-          if (text.includes(q)) {
-            acc.style.display = 'block';
-            if (aEl) aEl.style.display = 'block';
-            if (chevron) chevron.textContent = '➖';
-          } else {
-            acc.style.display = 'none';
-          }
-        });
       } else {
         const activeItem = container.querySelector('.wiki-tree-item.active');
-        if (activeItem) activeItem.click();
-        container.querySelectorAll('.wiki-faq-accordion').forEach(acc => {
-          acc.style.display = 'block';
-          const aEl = acc.querySelector('.wiki-faq-a');
-          const chevron = acc.querySelector('.faq-chevron');
-          if (aEl) aEl.style.display = 'none';
-          if (chevron) chevron.textContent = '➕';
-        });
+        if (activeItem) {
+          activeItem.click();
+        }
       }
     };
   }
 
-  // Download PDF button
-  const downloadBtn = container.querySelector('#btn-download-manual-pdf');
-  if (downloadBtn) {
-    downloadBtn.onclick = () => {
-      try {
-        const link = document.createElement('a');
-        link.href = 'Manual_do_Usuario.pdf';
-        link.download = 'Manual_do_Usuario_FinancasFamilia.pdf';
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        toast('📥 Abrindo download do Manual do Usuário em PDF...');
-      } catch (err) {
-        window.open('Manual_do_Usuario.pdf', '_blank');
-      }
+  // Export PDF Button
+  const btnPdf = container.querySelector('#btn-download-manual-pdf');
+  if (btnPdf) {
+    btnPdf.onclick = () => {
+      window.print();
     };
   }
 }

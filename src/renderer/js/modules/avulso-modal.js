@@ -42,7 +42,43 @@ async function showDidacticFeedback(data) {
   }
 }
 
-function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense', prefillData = null) {
+async function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense', prefillData = null) {
+  if (typeof accounts === 'string') {
+    defaultType = accounts;
+    accounts = null;
+  } else if (accounts && typeof accounts === 'object' && !Array.isArray(accounts)) {
+    if (accounts.accountId) {
+      prefillData = prefillData || {};
+      prefillData.accountId = accounts.accountId;
+    }
+    accounts = null;
+  }
+
+  if (!Array.isArray(accounts) || accounts.length === 0) {
+    try {
+      const accRes = await window.api.accounts.getAll(State.user?.id || 1);
+      accounts = Array.isArray(accRes) ? accRes : [];
+    } catch (e) {
+      accounts = [];
+    }
+  }
+
+  if (!Array.isArray(categories) || categories.length === 0) {
+    if (Array.isArray(State.categories) && State.categories.length > 0) {
+      categories = State.categories;
+    } else {
+      try {
+        const catRes = await window.api.categories.getAll(State.user?.id || 1);
+        categories = Array.isArray(catRes) ? catRes : [];
+      } catch (e) {
+        categories = [];
+      }
+    }
+  }
+
+  if (!Array.isArray(accounts)) accounts = [];
+  if (!Array.isArray(categories)) categories = [];
+
   const isEdit = !!tx;
   if (isEdit) {
     const canEdit = (State.user.profile_type === 1 || State.user.profile_type === 2) || (State.permissions && State.permissions.can_edit_all === 1) || (!tx.user_id || tx.user_id === State.user.id);
@@ -55,7 +91,7 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
   const dateVal = isEdit && tx.date ? tx.date.split(' ')[0] : (prefillData && prefillData.date ? prefillData.date : today);
   const amountVal = isEdit ? tx.amount : (prefillData && prefillData.amount ? prefillData.amount : '');
   const descVal = isEdit ? tx.description : (prefillData && prefillData.description ? prefillData.description : '');
-  const accountVal = isEdit ? tx.account_id : (accounts[0]?.id || '');
+  const accountVal = isEdit ? tx.account_id : (prefillData && prefillData.accountId ? prefillData.accountId : (accounts[0]?.id || ''));
   
   let categoryVal = isEdit ? (tx.category_id || '') : '';
   if (!categoryVal && prefillData && prefillData.suggestedCategory) {
@@ -111,7 +147,7 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
         <label>Conta</label>
         <select id="avl-account">
           <option value="">Selecione...</option>
-          ${accounts.map(a => `<option value="${a.id}" ${a.id == accountVal ? 'selected' : ''}>${a.name}</option>`).join('')}
+          ${(accounts || []).map(a => `<option value="${a.id}" ${a.id == accountVal ? 'selected' : ''}>${a.name}</option>`).join('')}
         </select>
       </div>
       <div class="form-group">
@@ -134,6 +170,36 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
       <div class="form-group" id="group-due-date" style="${(tx && tx.credit_product === 'banricompras') ? '' : 'display:none'}">
         <label style="font-size:12px; font-weight:600; color:#fbbf24;">Data do Débito (Banricompras)</label>
         <input type="date" id="avl-due-date" value="${(tx && tx.due_date) ? tx.due_date : ''}">
+      </div>
+    </div>
+
+    <!-- SEÇÃO DE JUROS E PREVISIBILIDADE CONTRATUAL -->
+    <div style="background: rgba(255,255,255,0.02); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 14px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+        <span style="font-size: 12px; font-weight: 700; color: var(--text-primary);">📈 Regra de Juros / Encargos (Opcional)</span>
+        <span style="font-size: 11px; color: var(--text-muted);">Para projeção de valor atualizado</span>
+      </div>
+      <div class="form-row" style="margin-bottom: 8px;">
+        <div class="form-group" style="flex: 1.2;">
+          <label style="font-size: 11px; color: var(--text-muted);">Taxa de Juros</label>
+          <input type="number" step="0.001" min="0" id="avl-interest-rate" placeholder="Ex: 0.033 ou 2.0" value="${tx?.interest_rate || ''}">
+        </div>
+        <div class="form-group" style="flex: 1.5;">
+          <label style="font-size: 11px; color: var(--text-muted);">Periodicidade dos Juros</label>
+          <select id="avl-interest-type" style="width: 100%; padding: 8px; font-size: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-primary);">
+            <option value="daily" ${(tx?.interest_type === 'daily' || !tx?.interest_type) ? 'selected' : ''}>% ao Dia (ex: 0,033% a.d. mora)</option>
+            <option value="monthly" ${tx?.interest_type === 'monthly' ? 'selected' : ''}>% ao Mês (ex: 2,0% a.m.)</option>
+            <option value="yearly" ${tx?.interest_type === 'yearly' ? 'selected' : ''}>% ao Ano (ex: 15% a.a.)</option>
+            <option value="installment" ${tx?.interest_type === 'installment' ? 'selected' : ''}>Fixo por Parcela</option>
+            <option value="contract" ${tx?.interest_type === 'contract' ? 'selected' : ''}>Fixo por Contrato</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom: 0;">
+        <div class="form-group" style="flex: 1;">
+          <label style="font-size: 11px; color: var(--text-muted);">Multa Fixa por Atraso (%)</label>
+          <input type="number" step="0.01" min="0" id="avl-penalty-fixed-rate" placeholder="Ex: 2.0" value="${tx?.penalty_fixed_rate || ''}">
+        </div>
       </div>
     </div>
 
@@ -261,7 +327,10 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
         notes: isEdit ? tx.notes : null,
         credit_product,
         due_date,
-        competence_date
+        competence_date,
+        interest_rate: parseFloat(document.getElementById('avl-interest-rate')?.value) || 0,
+        interest_type: document.getElementById('avl-interest-type')?.value || 'daily',
+        penalty_fixed_rate: parseFloat(document.getElementById('avl-penalty-fixed-rate')?.value) || 0
       };
 
       if (isEdit) {

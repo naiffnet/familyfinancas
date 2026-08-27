@@ -1,229 +1,289 @@
 /* manual-a.js - parte 1/2 */
 
 /**
- * Retorna o HTML do menu em árvore (Sidebar) do Manual do Usuário
+ * Retorna o HTML do menu em árvore (Sidebar) do Manual do Usuário com os 13 Capítulos
  */
 function getManualSidebarHtml() {
   return `
-    <!-- MENU EM ÁRVORE DE ASSUNTOS E SUBMENUS -->
-    <div id="manual-tree-sidebar" style="width: 270px; min-width: 270px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; scrollbar-width: thin;">
+    <!-- MENU EM ÁRVORE DE ASSUNTOS E SUBMENUS (13 CAPÍTULOS) -->
+    <div id="manual-tree-sidebar" style="width: 285px; min-width: 285px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 6px; scrollbar-width: thin;">
       
-      <!-- GRUPO 1: CARTÕES DE CRÉDITO -->
+      <!-- CAPÍTULO 1: PRIMEIROS PASSOS & ACESSO -->
       <div class="wiki-tree-group">
-        <div class="wiki-tree-header" data-cat="cartoes" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #60a5fa; background: rgba(59,130,246,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-          <span>💳 Cartões de Crédito</span>
+        <div class="wiki-tree-header" data-cat="primeiros" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #60a5fa; background: rgba(59,130,246,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>🌟 1. Primeiros Passos & Acesso</span>
           <span class="wiki-tree-arrow">▾</span>
         </div>
         <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
-          <div class="wiki-tree-item active" data-cat="cartoes" data-topic="cartao-competencia" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-primary); cursor: pointer; border-left: 2px solid var(--accent); background: var(--bg-raised);">
-            • Competência vs Vencimento
+          <div class="wiki-tree-item active" data-cat="primeiros" data-topic="primeiros-familia" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-primary); cursor: pointer; border-left: 2px solid var(--accent); background: var(--bg-raised);">
+            • 1.1 Criando Família e Usuário
           </div>
+          <div class="wiki-tree-item" data-cat="primeiros" data-topic="primeiros-perfis" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 1.2 Perfis & Permissões Granulares
+          </div>
+          <div class="wiki-tree-item" data-cat="primeiros" data-topic="primeiros-recuperacao" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 1.3 Recuperação de Senha Segura
+          </div>
+          <div class="wiki-tree-item" data-cat="primeiros" data-topic="primeiros-temas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 1.4 Temas & Personalização Visual
+          </div>
+        </div>
+      </div>
+
+      <!-- CAPÍTULO 2: CONTAS, CARTEIRAS & BENEFÍCIOS -->
+      <div class="wiki-tree-group">
+        <div class="wiki-tree-header" data-cat="contas" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #06b6d4; background: rgba(6,182,212,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>🏦 2. Contas & Benefícios</span>
+          <span class="wiki-tree-arrow">▾</span>
+        </div>
+        <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+          <div class="wiki-tree-item" data-cat="contas" data-topic="contas-cadastro" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 2.1 Contas, Poupanças & Dinheiro
+          </div>
+          <div class="wiki-tree-item" data-cat="contas" data-topic="contas-beneficios" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 2.2 Cartões Benefício (*Flash, Caju*)
+          </div>
+          <div class="wiki-tree-item" data-cat="contas" data-topic="contas-transferencias" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 2.3 Transferências Sem Duplicação
+          </div>
+          <div class="wiki-tree-item" data-cat="contas" data-topic="contas-limites" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 2.4 Cheque Especial & LIS
+          </div>
+        </div>
+      </div>
+
+      <!-- CAPÍTULO 3: CARTÕES DE CRÉDITO & FATURAS -->
+      <div class="wiki-tree-group">
+        <div class="wiki-tree-header" data-cat="cartoes" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #a855f7; background: rgba(168,85,247,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>💳 3. Cartões de Crédito</span>
+          <span class="wiki-tree-arrow">▾</span>
+        </div>
+        <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
           <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-ciclo" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Ciclo & Melhor Dia de Compra
+            • 3.1 Ciclo & Melhor Dia de Compra
           </div>
           <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-limite" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Limite Total vs Comprometido
+            • 3.2 Limite Total vs Comprometido
           </div>
           <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-pagamento" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Pagamento & Baixa Atômica
+            • 3.3 Pagamento Integral da Fatura
           </div>
-          <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-destaque" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #38bdf8; font-weight: 600; cursor: pointer; border-left: 2px solid transparent;">
-            • ✨ Destaque Cromático de Parcelas (Novo)
+          <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-rotativo" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 3.4 Pagamento Parcial & Rotativo
+          </div>
+          <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-antecipacao" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 3.5 Antecipação com Desconto
           </div>
           <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-acordo" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Renegociação & Acordo de Faturas
+            • 3.6 Renegociação & Acordos
           </div>
-          <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-reabertura" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Reabertura & Desfazer Quitação
-          </div>
-        </div>
-      </div>
-
-      <!-- GRUPO 2: DASHBOARD & PAINEL DE CONTROLE -->
-      <div class="wiki-tree-group">
-        <div class="wiki-tree-header" data-cat="dashboard" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #fb923c; background: rgba(249,115,22,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-          <span>📊 Dashboard & Painel</span>
-          <span class="wiki-tree-arrow">▾</span>
-        </div>
-        <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
-          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-modos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #fb923c; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
-            • 🎛️ 3 Modos de Dashboard (Novo)
-          </div>
-          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-filtros-membros" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #60a5fa; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
-            • 👥 Filtros de Membros & Titularidade
-          </div>
-          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-kpis" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 📊 Indicadores Principais (KPIs & Sincronia)
-          </div>
-          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-pendencias-anteriores" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #fbbf24; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
-            • ⚠️ Pendências de Meses Anteriores (Novo)
-          </div>
-          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-alertas-coloridos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #34d399; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
-            • 🚦 Alertas Diferenciados (Receitas vs Despesas)
-          </div>
-          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-cards-limites" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #fb923c; font-weight: 600; cursor: pointer; border-left: 2px solid transparent;">
-            • 💳 Cartões, Faturas & Limites Reais
-          </div>
-          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-contas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 🏦 Contas Bancárias & Cheque Especial
-          </div>
-          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-links" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 🚨 Faixa de Avisos & Links Diretos
-          </div>
-          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-prioridades" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • ⭐ Prioritários, A Pagar & Pagas
-          </div>
-          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-graficos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 📈 Gráficos de Fluxo & Categorias
-          </div>
-          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-consolidado" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 🌐 Visão Geral, Metas & Patrimônio
-          </div>
-          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-contraste" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 🎨 Modos de Contraste & Usabilidade
+          <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-estorno" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 3.7 Estorno em 1 Clique
           </div>
         </div>
       </div>
 
-      <!-- GRUPO 3: DESPESAS & RECEITAS -->
+      <!-- CAPÍTULO 4: LANÇAMENTOS & NOTAS FISCAIS -->
       <div class="wiki-tree-group">
-        <div class="wiki-tree-header" data-cat="lancamentos" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #34d399; background: rgba(16,185,129,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-          <span>📌 Despesas & Receitas</span>
+        <div class="wiki-tree-header" data-cat="lancamentos" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #10b981; background: rgba(16,185,129,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>📝 4. Lançamentos & NF-e</span>
           <span class="wiki-tree-arrow">▾</span>
         </div>
         <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+          <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-despesas-receitas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 4.1 Despesas e Receitas
+          </div>
           <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-competencia" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Competência (Ref: MM/AAAA)
+            • 4.2 Mês de Competência
           </div>
-          <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-fixas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Despesas Fixas & Prioridade ⭐
+          <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-nfce-qr" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 4.3 Leitor de Nota Fiscal (QR Code)
           </div>
-          <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-avulsos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Despesas Variáveis (Avulsas)
+          <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-duplicados" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 4.4 Alerta de Duplicidades
           </div>
-          <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-nfce-qr" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #10b981; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
-            • 📷 Leitor de Nota Fiscal (QR Code) (Novo)
-          </div>
-          <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-similares" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #fbbf24; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
-            • 🔔 Alerta de Similar em Tempo Real (Novo)
-          </div>
-          <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-juros" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Juros, Multas e Descontos
+          <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-popup-detalhes" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #38bdf8; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+            • 4.5 Pop-up de Detalhes & 3 Ações
           </div>
         </div>
       </div>
 
-      <!-- GRUPO 4: CONTAS & CARTEIRAS -->
+      <!-- CAPÍTULO 5: JUROS, MULTAS & FERIADOS -->
       <div class="wiki-tree-group">
-        <div class="wiki-tree-header" data-cat="contas" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #06b6d4; background: rgba(6,182,212,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-          <span>🏦 Contas, Vouchers & Bancos</span>
+        <div class="wiki-tree-header" data-cat="juros" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #f59e0b; background: rgba(245,158,11,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>⚖️ 5. Juros, Multas & Feriados</span>
           <span class="wiki-tree-arrow">▾</span>
         </div>
         <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
-          <div class="wiki-tree-item" data-cat="contas" data-topic="contas-tipos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Tipos de Contas Bancárias
+          <div class="wiki-tree-item" data-cat="juros" data-topic="juros-prorrogacao" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 5.1 Prorrogação em Feriados
           </div>
-          <div class="wiki-tree-item" data-cat="contas" data-topic="contas-beneficio" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #06b6d4; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
-            • 🎟️ Cartões Benefício & Vouchers (Novo)
+          <div class="wiki-tree-item" data-cat="juros" data-topic="juros-calculo" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 5.2 Cálculo de Juros & Multas
           </div>
-          <div class="wiki-tree-item" data-cat="contas" data-topic="contas-transf" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Transferências sem Duplicação
+          <div class="wiki-tree-item" data-cat="juros" data-topic="juros-projecao" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 5.3 Projeção para Pagamento Hoje
           </div>
-          <div class="wiki-tree-item" data-cat="contas" data-topic="contas-produtos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Produtos da Conta & Limites
+          <div class="wiki-tree-item" data-cat="juros" data-topic="juros-pagamento" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 5.4 Pagamento com Acréscimo/Desconto
           </div>
         </div>
       </div>
 
-      <!-- GRUPO 5: FAMÍLIA & PERMISSÕES -->
+      <!-- CAPÍTULO 6: PLANEJAMENTO & RECORRÊNCIAS -->
       <div class="wiki-tree-group">
-        <div class="wiki-tree-header" data-cat="familia" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #a78bfa; background: rgba(167,139,250,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-          <span>👨‍👩‍👧 Família & Permissões</span>
+        <div class="wiki-tree-header" data-cat="planejamento" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #ec4899; background: rgba(236,72,153,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>🔄 6. Planejamento Mensal</span>
           <span class="wiki-tree-arrow">▾</span>
         </div>
         <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
-          <div class="wiki-tree-item" data-cat="familia" data-topic="fam-perfis" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Papéis de Usuário (ADM, etc)
+          <div class="wiki-tree-item" data-cat="planejamento" data-topic="plan-fixas-parceladas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 6.1 Despesas Fixas & Parceladas
           </div>
-          <div class="wiki-tree-item" data-cat="familia" data-topic="fam-permissoes" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Permissões Granulares por Menu
+          <div class="wiki-tree-item" data-cat="planejamento" data-topic="plan-prioritarias" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 6.2 Despesas Prioritárias ⭐
+          </div>
+          <div class="wiki-tree-item" data-cat="planejamento" data-topic="plan-adiar" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 6.3 Adiar Parcela para o Mês
+          </div>
+          <div class="wiki-tree-item" data-cat="planejamento" data-topic="plan-kanban" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 6.4 Kanban com Drag & Drop
+          </div>
+          <div class="wiki-tree-item" data-cat="planejamento" data-topic="plan-decisao-cards" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #a78bfa; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+            • 6.5 Cards de Decisão de Recorrência
           </div>
         </div>
       </div>
 
-      <!-- GRUPO 6: SINCRONIZAÇÃO & ANTI-DUPLICIDADE -->
+      <!-- CAPÍTULO 7: ORÇAMENTOS & METAS -->
       <div class="wiki-tree-group">
-        <div class="wiki-tree-header" data-cat="sync" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #38bdf8; background: rgba(56,189,248,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-          <span>🛡️ Sincronização & Anti-Duplicidade</span>
+        <div class="wiki-tree-header" data-cat="orcamento" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #f43f5e; background: rgba(244,63,94,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>🎯 7. Orçamentos & Metas</span>
           <span class="wiki-tree-arrow">▾</span>
         </div>
         <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
-          <div class="wiki-tree-item" data-cat="sync" data-topic="sync-uuid" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #38bdf8; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
-            • 🔑 UUIDs & Multi-Aparelho
+          <div class="wiki-tree-item" data-cat="orcamento" data-topic="orc-tetos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 7.1 Tetos de Orçamento
           </div>
-          <div class="wiki-tree-item" data-cat="sync" data-topic="sync-receitas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #34d399; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
-            • 💰 Regra de Receitas & Mesma Conta (Novo)
+          <div class="wiki-tree-item" data-cat="orcamento" data-topic="orc-barras" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 7.2 Barras de Limite Coloridas
           </div>
-          <div class="wiki-tree-item" data-cat="sync" data-topic="sync-dedup" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 🧠 Motor Heurístico & Dívidas
-          </div>
-          <div class="wiki-tree-item" data-cat="sync" data-topic="sync-conciliacao" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • ⚖️ Central de Conciliação & Ações em Lote
+          <div class="wiki-tree-item" data-cat="orcamento" data-topic="orc-metas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 7.3 Metas de Economia & Aportes
           </div>
         </div>
       </div>
 
-      <!-- GRUPO 7: ORÇAMENTOS & METAS -->
+      <!-- CAPÍTULO 8: DASHBOARD & KANBAN -->
       <div class="wiki-tree-group">
-        <div class="wiki-tree-header" data-cat="orcamentos" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #f43f5e; background: rgba(244,63,94,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-          <span>🎯 Orçamentos & Metas</span>
+        <div class="wiki-tree-header" data-cat="dashboard" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #fb923c; background: rgba(249,115,22,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>📊 8. Dashboard & Painel</span>
           <span class="wiki-tree-arrow">▾</span>
         </div>
         <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
-          <div class="wiki-tree-item" data-cat="orcamentos" data-topic="orc-budgets" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Tetos de Gastos por Categoria
+          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-modos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 8.1 Os 3 Modos de Visualização
           </div>
-          <div class="wiki-tree-item" data-cat="orcamentos" data-topic="orc-metas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Metas Financeiras & Aportes
+          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-filtros" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 8.2 Filtros por Membro e Conta
           </div>
-        </div>
-      </div>
-
-      <!-- GRUPO 8: METODOLOGIA 50-30-20 -->
-      <div class="wiki-tree-group">
-        <div class="wiki-tree-header" data-cat="metodologia" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #c084fc; background: rgba(192,132,252,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-          <span>💡 Metodologia 50-30-20</span>
-          <span class="wiki-tree-arrow">▾</span>
-        </div>
-        <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
-          <div class="wiki-tree-item" data-cat="metodologia" data-topic="met-regra" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Como Dividir o Orçamento Familiar
+          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-kanban" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 8.3 Kanban em 3 Colunas
+          </div>
+          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-pendencias" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 8.4 Pendências de Meses Anteriores
           </div>
         </div>
       </div>
 
-      <!-- GRUPO 9: ARQUITETURA MODULAR & DESENVOLVIMENTO -->
+      <!-- CAPÍTULO 9: RELATÓRIOS, AUDITORIA & PDF -->
       <div class="wiki-tree-group">
-        <div class="wiki-tree-header" data-cat="arquitetura" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #eab308; background: rgba(234,179,8,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-          <span>🏗️ Arquitetura & Manutenção</span>
+        <div class="wiki-tree-header" data-cat="relatorios" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #818cf8; background: rgba(129,140,248,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>📈 9. Relatórios & Auditoria</span>
           <span class="wiki-tree-arrow">▾</span>
         </div>
         <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
-          <div class="wiki-tree-item" data-cat="arquitetura" data-topic="arq-modular" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #eab308; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
-            • ⚡ Modularização (< 1000 Linhas) & Build
+          <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-fluxo" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 9.1 Relatório de Fluxo de Caixa
+          </div>
+          <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-graficos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 9.2 Gráficos Interativos
+          </div>
+          <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-patrimonio" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 9.3 Evolução Patrimonial Anual
+          </div>
+          <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-auditoria-juros" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 9.4 Auditoria de Juros & Encargos
+          </div>
+          <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-impressao-pdf" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 9.5 Impressão & Exportação PDF
           </div>
         </div>
       </div>
 
-      <!-- GRUPO 10: FAQ INTERATIVO -->
+      <!-- CAPÍTULO 10: AUDITORIA, SEGURANÇA & LGPD -->
       <div class="wiki-tree-group">
-        <div class="wiki-tree-header" data-cat="faq" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #f87171; background: rgba(248,113,113,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-          <span>❓ FAQ (Perguntas)</span>
+        <div class="wiki-tree-header" data-cat="seguranca" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #14b8a6; background: rgba(20,184,166,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>🛡️ 10. Auditoria & LGPD</span>
           <span class="wiki-tree-arrow">▾</span>
         </div>
         <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
-          <div class="wiki-tree-item" data-cat="faq" data-topic="faq-interativo" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Dúvidas Frequentes (Clique e Veja)
+          <div class="wiki-tree-item" data-cat="seguranca" data-topic="seg-trilha-auditoria" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 10.1 Histórico de Modificações
+          </div>
+          <div class="wiki-tree-item" data-cat="seguranca" data-topic="seg-lgpd" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 10.2 Direitos LGPD & Privacidade
+          </div>
+        </div>
+      </div>
+
+      <!-- CAPÍTULO 11: BACKUPS & INTEGRIDADE -->
+      <div class="wiki-tree-group">
+        <div class="wiki-tree-header" data-cat="backup" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #eab308; background: rgba(234,179,8,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>💾 11. Backups & Restauração</span>
+          <span class="wiki-tree-arrow">▾</span>
+        </div>
+        <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+          <div class="wiki-tree-item" data-cat="backup" data-topic="bak-exportacao" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 11.1 Exportação Excel, CSV, DB
+          </div>
+          <div class="wiki-tree-item" data-cat="backup" data-topic="bak-teste-integridade" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 11.2 Testar Integridade (.db)
+          </div>
+          <div class="wiki-tree-item" data-cat="backup" data-topic="bak-restauracao" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 11.3 Restaurando um Backup
+          </div>
+          <div class="wiki-tree-item" data-cat="backup" data-topic="bak-saude-metricas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 11.4 Saúde & Métricas SQLite
+          </div>
+        </div>
+      </div>
+
+      <!-- CAPÍTULO 12: CELULAR & RESPONSIVIDADE -->
+      <div class="wiki-tree-group">
+        <div class="wiki-tree-header" data-cat="mobile" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #38bdf8; background: rgba(56,189,248,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>📱 12. Acesso Celular & Mobile</span>
+          <span class="wiki-tree-arrow">▾</span>
+        </div>
+        <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+          <div class="wiki-tree-item" data-cat="mobile" data-topic="mob-conexao-wifi" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 12.1 Conexão Wi-Fi / QR Code
+          </div>
+          <div class="wiki-tree-item" data-cat="mobile" data-topic="mob-layout-touch" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 12.2 Layout Touch & Header
+          </div>
+        </div>
+      </div>
+
+      <!-- CAPÍTULO 13: FAQ INTERATIVO -->
+      <div class="wiki-tree-group">
+        <div class="wiki-tree-header" data-cat="faq" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #f87171; background: rgba(248,113,113,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>❓ 13. FAQ & Dúvidas Frequentes</span>
+          <span class="wiki-tree-arrow">▾</span>
+        </div>
+        <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+          <div class="wiki-tree-item" data-cat="faq" data-topic="faq-duvidas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 13.1 Dúvidas Mais Frequentes
           </div>
         </div>
       </div>
@@ -233,500 +293,479 @@ function getManualSidebarHtml() {
 }
 
 /**
- * Retorna o HTML dos tópicos 1 a 5 do painel de conteúdo
+ * Retorna o HTML dos tópicos dos Capítulos 1 a 6 do painel de leitura
  */
 function getManualTopicsPart1Html() {
   return `
-    <!-- TÓPICO 1.1: CARTÕES > COMPETÊNCIA VS VENCIMENTO -->
-    <div class="manual-topic-content" id="topic-cartao-competencia" style="display: block;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #60a5fa; font-weight: 700;">
-        📅 Competência da Fatura vs Data de Vencimento
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(59,130,246,0.08); border-left: 4px solid var(--blue); padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Conceito Fundamental:</strong> A <em>competência</em> é o mês em que a despesa ou o ciclo da fatura ocorreu (ex: compras feitas até 25/02 pertencem à competência <code>Ref: 02/2026</code>). O <em>vencimento</em> é o dia limite para pagar o boleto do banco (ex: <code>05/03/2026</code>).
-        </div>
-        <p style="margin-bottom: 10px;">No FinançasFamília, as faturas e compras são organizadas por <strong>Mês de Referência</strong> para que você saiba exatamente o quanto consumiu no período, mantendo o controle do fluxo de caixa e o cumprimento do orçamento.</p>
-      </div>
-    </div>
-
-    <!-- TÓPICO 1.2: CARTÕES > CICLO & MELHOR DIA -->
-    <div class="manual-topic-content" id="topic-cartao-ciclo" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #60a5fa; font-weight: 700;">
-        🛒 Ciclo de Fechamento & Melhor Dia de Compra
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(59,130,246,0.08); border-left: 4px solid var(--blue); padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Como Funciona o Fechamento:</strong> Todo cartão possui um <em>Dia de Fechamento (Corte)</em> e um <em>Dia de Vencimento</em>.
-        </div>
-        <p style="margin-bottom: 8px;">• <strong>Antes do Fechamento:</strong> Compras feitas até o dia de corte entram na fatura do mês atual.</p>
-        <p style="margin-bottom: 8px;">• <strong>Melhor Dia de Compra (Após o Fechamento):</strong> Compras realizadas a partir do dia seguinte ao corte caem automaticamente na fatura do mês subsequente, dando até 40 dias para pagar!</p>
-        <p style="margin: 0;">• <strong>Cálculo Automático:</strong> O aplicativo calcula e projeta cada parcela no mês exato da fatura de acordo com o dia da compra.</p>
-      </div>
-    </div>
-
-    <!-- TÓPICO 1.3: CARTÕES > LIMITE TOTAL VS COMPROMETIDO -->
-    <div class="manual-topic-content" id="topic-cartao-limite" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #60a5fa; font-weight: 700;">
-        📊 Limite Total vs Limite Comprometido
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">O limite do cartão é gerenciado de forma contínua:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
-          <li><strong>Limite Total:</strong> Valor máximo liberado pelo banco (ex: R$ 5.000,00).</li>
-          <li><strong>Limite Comprometido:</strong> Soma de todas as compras parceladas futuras e faturas abertas que ainda não foram pagas.</li>
-          <li><strong>Limite Disponível:</strong> <code>Limite Total - Limite Comprometido</code>. Conforme as faturas são pagas, o limite é liberado proporcionalmente.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- TÓPICO 1.4: CARTÕES > PAGAMENTO DA FATURA -->
-    <div class="manual-topic-content" id="topic-cartao-pagamento" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #60a5fa; font-weight: 700;">
-        💳 Pagamento & Baixa Atômica da Fatura
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">Ao quitar uma fatura de cartão de crédito:</p>
-        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
-          <li>Clique no botão verde <strong>"Pagar Fatura"</strong> no card do cartão.</li>
-          <li>Selecione a <strong>Conta Bancária Pagadora</strong> de onde o dinheiro sairá.</li>
-          <li>Confirme a data de pagamento e o valor (total ou parcial).</li>
-        </ol>
-        <p style="margin: 0;">O sistema baixa a fatura, debita da sua conta bancária e <strong>marca atomicamente todas as compras e parcelas atreladas àquela fatura como pagas</strong>!</p>
-      </div>
-    </div>
-
-    <!-- TÓPICO 1.5: CARTÕES > DESTAQUE CROMÁTICO DE PARCELAS (NOVO) -->
-    <div class="manual-topic-content" id="topic-cartao-destaque" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #38bdf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>✨ Destaque Cromático Inteligente de Parcelas</span>
-        <span class="badge badge-blue">Novo</span>
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(56,189,248,0.08); border-left: 4px solid var(--accent); padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Auditoria Visual Instantânea:</strong> Chega de perder tempo procurando quais compras pertencem a qual fatura!
-        </div>
-        <p style="margin-bottom: 10px;">Ao clicar sobre qualquer card de fatura na tela de Planejamento:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
-          <li>🎨 <strong>Realce de Cor Oficial:</strong> Todas as despesas e compras parceladas vinculadas àquela fatura são imediatamente iluminadas com a <strong>cor tema e borda personalizada do cartão/banco</strong>.</li>
-          <li>🔍 <strong>Foco Automático:</strong> Os lançamentos que não pertencem ao cartão são atenuados suavemente, e a tela rola automaticamente até a primeira parcela da fatura.</li>
-          <li>🏷️ <strong>Badge Explicativa:</strong> Um selo visual exibe <code>📍 Parcela desta Fatura</code> ao lado de cada item destacado.</li>
-          <li>↩️ <strong>Desativar:</strong> Basta clicar novamente no card da fatura para retornar à visualização normal.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- TÓPICO 1.6: CARTÕES > RENEGOCIAÇÃO E ACORDO -->
-    <div class="manual-topic-content" id="topic-cartao-acordo" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a78bfa; font-weight: 700;">
-        🤝 Renegociação & Acordo de Faturas
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">Se você precisou parcelar a fatura com o banco ou fazer um acordo:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
-          <li>Clique no botão roxo <strong>"Renegociar / Acordo"</strong> no card da fatura.</li>
-          <li>Informe o valor de entrada (se houver) e o número de parcelas acordadas com os juros.</li>
-          <li>A fatura atual é liquidada como <span class="badge badge-purple">Acordo / Renegociada</span> e o sistema <strong>injeta automaticamente as parcelas do acordo nos meses futuros</strong> como despesas recorrentes transparentes.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- TÓPICO 1.7: CARTÕES > REABERTURA DE FATURA -->
-    <div class="manual-topic-content" id="topic-cartao-reabertura" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #60a5fa; font-weight: 700;">
-        🔓 Reabertura de Fatura & Estorno Seguro
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">Se você deu baixa ou renegociou uma fatura por engano:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
-          <li>Clique em <strong>"Reabrir Fatura"</strong>.</li>
-          <li>O valor pago é <strong>estornado de volta para o saldo da sua conta bancária</strong>.</li>
-          <li>Se houve renegociação, as parcelas futuras geradas pelo acordo são canceladas e removidas.</li>
-          <li>A fatura volta para o estado <span class="badge badge-yellow">⏳ Aberta</span> e recalcula seu valor total automaticamente.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- TÓPICO 2.0A: DASHBOARD > 3 MODOS DE LAYOUT (NOVO) -->
-    <div class="manual-topic-content" id="topic-dash-modos" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>🎛️ 3 Modos de Visualização do Dashboard</span>
-        <span class="badge badge-yellow">Novo Recurso</span>
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(249,115,22,0.08); border-left: 4px solid #fb923c; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Personalize a Experiência Visual Conforme sua Preferência:</strong>
-        </div>
-        <p style="margin-bottom: 10px;">Você pode alternar o layout do Dashboard a qualquer momento pelo menu <strong>Configurações ⚙️ &gt; Geral</strong> ou pelo seletor rápido no topo da tela:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🌟 <strong>1. Executivo por Zonas (Padrão):</strong> Visão 360° com KPIs consolidados, pílulas de ação rápida, previsão de cartões e contas com filtro de membros e o Painel Kanban 3 colunas.</li>
-          <li>📑 <strong>2. Sub-Abas Operacionais:</strong> Reduz a rolagem vertical agrupando os dados em 3 abas temáticas focadas (<em>📋 Operação</em>, <em>💳 Cartões & Bancos</em> e <em>📈 Gráficos</em>).</li>
-          <li>🎛️ <strong>3. Cockpit Integrado:</strong> Layout otimizado com barra de filtros no topo em linha, quadro de Cartões e Contas logo abaixo em largura total, KPIs sincronizados, Painel Kanban 3 colunas em 100% de largura e Gráficos no rodapé.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- TÓPICO 2.0B: DASHBOARD > FILTROS DE MEMBROS E TITULARIDADE (NOVO) -->
-    <div class="manual-topic-content" id="topic-dash-filtros-membros" style="display: none;">
+    <!-- CAPÍTULO 1.1: PRIMEIROS PASSOS > FAMÍLIA & USUÁRIO -->
+    <div class="manual-topic-content" id="topic-primeiros-familia" style="display: block;">
       <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #60a5fa; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>👥 Barra Superior de Filtros por Membro & Titularidade Efetiva</span>
-        <span class="badge badge-blue">Recurso Novo</span>
+        <span>🌟 1.1 Criando sua Família e Primeiro Usuário Master</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(59, 130, 246, 0.08); border-left: 4px solid #3b82f6; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Visão Familiar e Individual com 1 Clique:</strong>
+        <div style="background: rgba(59,130,246,0.08); border-left: 4px solid #3b82f6; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>Passo a Passo de Inicialização do Ambiente Familiar:</strong>
         </div>
-        <p style="margin-bottom: 10px;">A barra superior em linha (<code>dash-top-filter-bar</code>) permite filtrar instantaneamente todos os índices, cartões, alertas e contas do mês:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>👨‍👩‍👧 <strong>Toda a Família:</strong> Consolida a soma global de todos os familiares do grupo.</li>
-          <li>👤 <strong>Filtro por Membro Individual:</strong> Ao clicar no chip de um membro (ex: <em>William, Jennifer, etc.</em>), todos os KPIs, gráficos, alertas de vencimento e colunas do Kanban se ajustam para exibir apenas os lançamentos daquele titular.</li>
-          <li>🛡️ <strong>Titularidade Inteligente de Contas & Extratos:</strong> Mesmo que um extrato bancário (OFX/CSV) seja importado pelo Administrador da família, o sistema atribui as transações ao proprietário efetivo da conta bancária/cartão, garantindo que os filtros mostrem os dados perfeitamente.</li>
-          <li>💳 <strong>Filtro por Tipo de Produto:</strong> Alterne rapidamente entre <em>Tudo</em>, <em>Cartões de Crédito</em> ou <em>Contas Correntes/Poupanças</em>.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- TÓPICO 2.1: DASHBOARD > KPIS PRINCIPAIS -->
-    <div class="manual-topic-content" id="topic-dash-kpis" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>📊 Indicadores Principais de Fluxo de Caixa (KPIs & Sincronia)</span>
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(249,115,22,0.08); border-left: 4px solid #fb923c; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Sincronização Matemática 100% Precisa com o Painel Kanban:</strong>
+        <p style="margin-bottom: 10px;">Ao abrir o FinançasFamília pela primeira vez, o assistente inicial solicita:</p>
+        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li><strong>Nome do Grupo Familiar:</strong> Digite o nome da sua casa (ex: <em>Família Silva</em> ou <em>Família Oliveira</em>).</li>
+          <li><strong>Perfil do Administrador Master (ADM):</strong> Crie o login principal (usuário <code>adm</code>) com senha forte.</li>
+          <li><strong>Personalização Cromática:</strong> Escolha a cor oficial do titular (ex: <em>Verde Esmeralda</em>) e um avatar.</li>
+        </ol>
+        <div style="background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2); padding: 12px 16px; border-radius: 8px; margin-bottom: 14px;">
+          💡 <strong>Exemplo Prático:</strong> O casal Carlos e Mariana cria a "Família Silva". Carlos cadastra o usuário master e em seguida convida Mariana criando o perfil secundário em <a href="javascript:void(0)" onclick="openManualTopic('primeiros-perfis')" style="color: #60a5fa; text-decoration: underline; font-weight: 700;">1.2 Perfis & Permissões Granulares</a>.
         </div>
-        <p style="margin-bottom: 10px;">Os 4 cards de topo do Dashboard resumem com exatidão a competência financeira selecionada, sincronizados com as colunas operacionais:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🟢 <strong>Receitas (Pagas):</strong> Soma de todas as entradas e rendimentos recebidos no mês.</li>
-          <li>🔴 <strong>Despesas (Pagas):</strong> Soma das contas já quitadas no mês, correspondendo exatamente ao total da coluna <em>✅ Contas Pagas</em> do Kanban.</li>
-          <li>⏳ <strong>À Pagar (Pendentes):</strong> Montante total das contas em aberto do mês, correspondendo exatamente à coluna <em>⏳ A Pagar</em> do Kanban.</li>
-          <li>⚖️ <strong>Saldo do Mês:</strong> Diferença matemática direta <code>Receitas Pagas - Despesas Pagas</code>.</li>
-        </ul>
-        <p style="margin: 0;">📊 <strong>Barra de Progresso de Contas:</strong> Indica a proporção exata de despesas quitadas em relação ao total de despesas do mês (ex: <em>8 de 20 pagas • 40%</em>).</p>
       </div>
     </div>
 
-    <!-- TÓPICO 2.2: DASHBOARD > PENDÊNCIAS DE MESES ANTERIORES (NOVO) -->
-    <div class="manual-topic-content" id="topic-dash-pendencias-anteriores" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fbbf24; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>⚠️ Container de Pendências de Meses Anteriores Não Pagas</span>
-        <span class="badge badge-yellow">Novo Recurso</span>
+    <!-- CAPÍTULO 1.2: PERFIS & PERMISSÕES -->
+    <div class="manual-topic-content" id="topic-primeiros-perfis" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #60a5fa; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>👥 1.2 Perfis de Membros da Família & Permissões Granulares</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(245, 158, 11, 0.08); border-left: 4px solid #f59e0b; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Rastreamento Ativo de Dívidas e Contas Esquecidas do Passado:</strong>
+        <p style="margin-bottom: 10px;">Em <strong>⚙️ Configurações › Membros da Família</strong>, você pode cadastrar e gerenciar o acesso de cada integrante:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>👑 <strong>Administrador (ADM):</strong> Acesso total às configurações, contas bancárias, cartões, backups e gerenciamento de membros.</li>
+          <li>👔 <strong>Membro Operacional:</strong> Pode lançar despesas, receitas, dar baixa em contas e visualizar o planejamento do mês.</li>
+          <li>👀 <strong>Visualizador:</strong> Acesso somente-leitura aos relatórios e gráficos, ideal para acompanhamento sem permissão de alteração.</li>
+          <li>🧸 <strong>Perfil Caçula:</strong> Interface simplificada e amigável para educação financeira de filhos e dependentes.</li>
+        </ul>
+        <div style="background: rgba(59,130,246,0.08); border-left: 4px solid #3b82f6; padding: 12px 16px; border-radius: 0 8px 8px 0;">
+          🔗 <strong>Tópico Relacionado:</strong> Veja como configurar as contas bancárias de cada familiar em <a href="javascript:void(0)" onclick="openManualTopic('contas-cadastro')" style="color: #60a5fa; font-weight: 700; text-decoration: underline;">2.1 Cadastrando Contas Correntes e Poupanças</a>.
         </div>
-        <p style="margin-bottom: 10px;">Sempre que você estiver visualizando o Dashboard de um mês (ex: <em>Agosto/2026</em>) e existirem lançamentos de meses anteriores (ex: <em>Julho, Junho ou Janeiro</em>) que ainda não foram pagos (<code>is_paid = 0</code>), o sistema exibe automaticamente um container temático de alerta:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🔢 <strong>Contador de Pendências & Total Acumulado:</strong> Informa a quantidade exata de itens em atraso e a soma monetária total das dívidas passadas em aberto.</li>
-          <li>📅 <strong>Identificação de Origem:</strong> Cada item exibe uma badge colorida com o mês/ano de competência original (ex: <code>📅 Julho/2026</code>), a descrição, o titular e o banco.</li>
-          <li>🎯 <strong>Navegação Direta com 1 Clique:</strong> Ao clicar em qualquer pendência, o aplicativo altera o seletor do mês para a data de origem, abre o Planejamento na aba correta e aplica um <strong>pulso de luz (*glow flash*)</strong> sobre o lançamento para você localizá-lo e dar baixa imediatamente!</li>
-        </ul>
       </div>
     </div>
 
-    <!-- TÓPICO 2.3: DASHBOARD > ALERTAS CROMÁTICOS (NOVO) -->
-    <div class="manual-topic-content" id="topic-dash-alertas-coloridos" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #34d399; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>🚦 Diferenciação Cromática Inteligente na Faixa de Avisos</span>
-        <span class="badge badge-green">Novo Recurso</span>
+    <!-- CAPÍTULO 1.3: RECUPERAÇÃO DE SENHA -->
+    <div class="manual-topic-content" id="topic-primeiros-recuperacao" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #60a5fa; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🔑 1.3 Recuperação de Senha Segura com Pergunta Secreta</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Separação Visual Clara entre o que Entra e o que Sai:</strong>
+        <div style="background: rgba(16,185,129,0.08); border-left: 4px solid #10b981; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>Privacidade Total Sem Depender de Servidores Externos:</strong>
         </div>
-        <p style="margin-bottom: 10px;">Para evitar confusão visual entre contas a pagar e receitas a receber:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🟢 <strong style="color: var(--accent-light);">💰 Faixa Verde (Recebimentos Próximos):</strong> Destaca exclusivamente salários, aluguéis, pro-labores e rendimentos previstos para os próximos dias, com chips verdes clicáveis.</li>
-          <li>🔴 <strong style="color: #f87171;">🚨 Faixa Vermelha (Vencimentos Próximos):</strong> Alerta sobre contas fixas, faturas e parcelas prestes a vencer para evitar atrasos e juros.</li>
-        </ul>
+        <p style="margin-bottom: 10px;">Como o FinançasFamília opera 100% local no seu computador, a recuperação de senha é realizada com pergunta e resposta secreta:</p>
+        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Acesse <strong>⚙️ Configurações › Minha Conta</strong> e defina sua pergunta de segurança (ex: <em>"Qual o modelo do meu primeiro carro?"</em>).</li>
+          <li>Digite a resposta que apenas você conhece.</li>
+          <li>Se esquecer a senha, na tela de login clique em <code>Esqueci minha senha</code>, responda corretamente e crie a nova chave na hora.</li>
+        </ol>
       </div>
     </div>
 
-    <!-- TÓPICO 2.4: DASHBOARD > CARTÕES, FATURAS E LIMITES (NOVO) -->
-    <div class="manual-topic-content" id="topic-dash-cards-limites" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>💳 Previsibilidade de Cartões, Faturas & Limites Reais</span>
-        <span class="badge badge-blue">Recurso Aprimorado</span>
+    <!-- CAPÍTULO 1.4: TEMAS & PERSONALIZAÇÃO -->
+    <div class="manual-topic-content" id="topic-primeiros-temas" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #60a5fa; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🎨 1.4 Personalização Visual, Temas & Layouts do Dashboard</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(249,115,22,0.08); border-left: 4px solid #fb923c; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Auditoria e Previsibilidade de Limites Bancários:</strong>
+        <p style="margin-bottom: 10px;">Personalize a estética e o modo de visualização do aplicativo em <strong>⚙️ Configurações › Aparência</strong>:</p>
+        
+        <div style="background: rgba(59,130,246,0.06); border: 1px solid rgba(59,130,246,0.15); border-radius: 8px; padding: 14px; margin-bottom: 14px;">
+          <strong style="color: var(--text-primary); font-size: 14px;">🎨 Modos de Aparência Disponíveis:</strong>
+          <ul style="padding-left: 20px; line-height: 1.8; margin-top: 8px; margin-bottom: 0;">
+            <li>🌙 <strong>Tema Escuro (Dark Emerald):</strong> Visual escuro moderno e sofisticado, com acentos em verde esmeralda relaxantes para os olhos, ideal para uso diário e noturno.</li>
+            <li>☀️ <strong>Tema Claro (Light Clean):</strong> Visual branco limpo, descansado e profissional com alto contraste, excelente para ambientes bem iluminados.</li>
+            <li>🌓 <strong>Botão Rápido de Alternância:</strong> Clique no ícone de lua/sol no topo superior direito da tela (ou no cabeçalho mobile) para alternar instantaneamente entre Claro e Escuro com apenas 1 clique.</li>
+          </ul>
         </div>
-        <p style="margin-bottom: 10px;">Cada cartão de crédito exibido no quadro <strong>"🏦 Previsibilidade de Contas e Cartões"</strong> traz informações vitais e transparentes:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>💳 <strong>Limite Total:</strong> O limite de crédito contratado e cadastrado no banco (ex: <code>R$ 5.000,00</code>).</li>
-          <li>🔴 <strong>Fatura do Mês:</strong> O valor exato das compras e parcelas que vencem na fatura do mês selecionado (ex: <code>R$ 1.004,05</code>).</li>
-          <li>🟠 <strong>Comprometido Total:</strong> A soma global de <strong>todas as compras e parcelas futuras em aberto</strong> que já consom o limite do seu cartão (ex: <code>R$ 5.824,30</code>).</li>
-          <li>🟢/🔴 <strong>Disponível / Excedido:</strong> Saldo livre real calculado como <code>Limite Total - Comprometido Total</code>. Se você realizou compras parceladas superiores ao limite, o saldo é exibido em <strong>vermelho com valor negativo</strong> (ex: <code>-R$ 824,30</code>) e badge <span class="badge badge-danger">⚠️ LIMITE EXCEDIDO</span>.</li>
-          <li>🍩 <strong>Spinner / Donut SVG Interativo:</strong> O gráfico de rosca exibe o percentual real de utilização do cartão (inclusive valores como <code>116% ULTRAPASSADO</code> ou <code>126% ULTRAPASSADO</code> envolto por anel tracejado de perigo).</li>
-          <li>🔒 <strong>Fechamento & Vencimento:</strong> Exibe os dias exatos de corte da fatura e data de débito.</li>
-          <li>✨ <strong>Clique no Card:</strong> Ao clicar sobre qualquer card de cartão no Dashboard, o aplicativo abre o Planejamento e <strong>destaca todas as parcelas da fatura com a cor oficial do banco</strong>!</li>
-        </ul>
-      </div>
-    </div>
 
-    <!-- TÓPICO 2.3: DASHBOARD > CONTAS BANCÁRIAS E CHEQUE ESPECIAL -->
-    <div class="manual-topic-content" id="topic-dash-contas" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700;">
-        <span>🏦 Previsibilidade de Contas Correntes, Poupanças & Cheque Especial</span>
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">Os widgets de contas correntes, contas de pagamento e carteiras exibem:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>💰 <strong>Saldo Atual em Conta:</strong> O saldo líquido real conciliado no banco.</li>
-          <li>🛡️ <strong>Limite de Cheque Especial (LIS):</strong> Limite de crédito rotativo configurado para a conta.</li>
-          <li>⚡ <strong>Saldo Disponível Operacional:</strong> Total utilizável imediatamente <code>(Saldo em Conta + Cheque Especial)</code>.</li>
-          <li>👤 <strong>Identificação de Titularidade:</strong> Cada conta traz o badge cromático do membro da família responsável (ex: <em>William, Jennifer, Isabel</em>).</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- TÓPICO 2.4: DASHBOARD > AVISOS & LINKS DIRETOS (NOVO) -->
-    <div class="manual-topic-content" id="topic-dash-links" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>🚨 Faixa de Avisos & Links Diretos para Lançamentos</span>
-        <span class="badge badge-blue">Recurso Novo</span>
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(249,115,22,0.08); border-left: 4px solid #fb923c; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Diferenciação Cromática de Alertas & Navegação Instantânea:</strong>
+        <div style="background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.15); border-radius: 8px; padding: 14px;">
+          <strong style="color: var(--text-primary); font-size: 14px;">🎛️ Modos de Layout do Dashboard (Configurações › Aparência):</strong>
+          <ul style="padding-left: 20px; line-height: 1.8; margin-top: 8px; margin-bottom: 0;">
+            <li>🌟 <strong>Executivo por Zonas (Padrão):</strong> Visão consolidada 360° com KPIs, cartões de contas e painel Kanban em 3 colunas.</li>
+            <li>📑 <strong>Sub-Abas Operacionais:</strong> Navegação setorizada por abas (*Resumo, Faturas, Contas e Gráficos*).</li>
+            <li>🚀 <strong>Cockpit Integrado:</strong> Painel panorâmico de alta densidade reunindo todas as métricas em uma tela.</li>
+          </ul>
         </div>
-        <p style="margin-bottom: 10px;">Os avisos de proximidade (próximos 3 dias) são separados visualmente por tipo de fluxo financeiro:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🟢 <strong>Recebimentos Próximos (Faixa Verde 💰):</strong> Salários, pró-labore, pensões e receitas a receber nos próximos dias aparecem em <strong>chips verdes esmeralda</strong>, transmitindo tranquilidade e previsão de caixa positivo.</li>
-          <li>🔴 <strong>Vencimentos Próximos (Faixa Vermelha 🚨):</strong> Boletos, contas fixas, faturas e despesas a pagar nos próximos dias aparecem em <strong>chips vermelhos de alerta</strong> para evitar atrasos e juros.</li>
-          <li>⚡ <strong>Navegação Instantânea:</strong> Cada chip é um link direto clicável. Ao clicar, o aplicativo abre o <strong>Planejamento</strong>, faz rolagem suave e aplica um <strong>efeito pulsante (*glow flash*)</strong> sobre a conta!</li>
-        </ul>
       </div>
     </div>
 
-    <!-- TÓPICO 2.5: DASHBOARD > PRIORIDADES, A PAGAR E PAGAS -->
-    <div class="manual-topic-content" id="topic-dash-prioridades" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700;">
-        <span>⭐ Quadros de Prioridades, Contas a Pagar e Contas Pagas</span>
+    <!-- CAPÍTULO 2.1: CONTAS & CADASTRO -->
+    <div class="manual-topic-content" id="topic-contas-cadastro" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #06b6d4; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🏦 2.1 Cadastrando Contas Correntes, Poupanças e Carteiras de Dinheiro</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">No centro do Dashboard, três colunas organizam a rotina operacional do mês:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>⭐ <strong>Prioritários:</strong> Reúne todas as contas marcadas com estrela de prioridade indispensável no mês, facilitando que você não deixe passar compromissos críticos.</li>
-          <li>⏳ <strong>Contas a Pagar:</strong> Todas as despesas pendentes do mês ordenadas cronologicamente por proximidade da data de vencimento.</li>
-          <li>✓ <strong>Contas Pagas:</strong> Histórico de despesas já quitadas com indicação da conta bancária de onde o recurso saiu.</li>
-        </ul>
+        <p style="margin-bottom: 10px;">Na aba <strong>🏦 Contas</strong>, clique em <code>+ Nova Conta</code> para registrar onde o dinheiro da casa está guardado:</p>
+        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li><strong>Instituição / Banco:</strong> Selecione o banco (ex: <em>Itaú, Bradesco, Nubank, Banrisul, Inter, Caixa, Banco do Brasil</em>).</li>
+          <li><strong>Tipo da Conta:</strong> Escolha entre <em>Conta Corrente</em>, <em>Conta Pagamento/Digital</em>, <em>Poupança/Investimento</em> ou <em>Dinheiro em Espécie (Carteira)</em>.</li>
+          <li><strong>Titular Responsável:</strong> Vincule ao membro da família proprietário da conta.</li>
+          <li><strong>Saldo Inicial Conciliado:</strong> Digite o saldo real exato que consta no extrato bancário hoje.</li>
+        </ol>
       </div>
     </div>
 
-    <!-- TÓPICO 2.6: DASHBOARD > GRÁFICOS INTERATIVOS -->
-    <div class="manual-topic-content" id="topic-dash-graficos" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700;">
-        <span>📈 Gráficos de Fluxo de Caixa & Distribuição por Categoria</span>
+    <!-- CAPÍTULO 2.2: CARTÕES BENEFÍCIO -->
+    <div class="manual-topic-content" id="topic-contas-beneficios" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #06b6d4; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🎟️ 2.2 Cartões Benefício (*Flash, Caju, Alelo, Sodexo, Swile, Banricard*)</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">O Dashboard conta com gráficos interativos que facilitam a tomada de decisão:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>📊 <strong>Evolução Mensal (Barras):</strong> Compara visualmente as Receitas vs. Despesas ao longo dos últimos meses, permitindo enxergar tendências de economia ou aperto financeiro.</li>
-          <li>🍩 <strong>Despesas por Categoria (Rosca):</strong> Aponta visualmente em que áreas o dinheiro da família está sendo alocado (ex: <em>Moradia, Alimentação, Educação, Transporte, Saúde, Lazer</em>), com valores e percentuais.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- TÓPICO 2.7: DASHBOARD > VISÃO GERAL, METAS E PATRIMÔNIO -->
-    <div class="manual-topic-content" id="topic-dash-consolidado" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700;">
-        <span>🌐 Aba Visão Geral, Metas & Patrimônio Líquido</span>
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(249,115,22,0.08); border-left: 4px solid #fb923c; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Consolidação Patrimonial e Objetivos de Poupança:</strong>
+        <div style="background: rgba(6,182,212,0.08); border-left: 4px solid #06b6d4; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>Gestão Inteligente de Vouchers de Alimentação e Refeição:</strong>
         </div>
-        <p style="margin-bottom: 10px;">Na aba <strong>"🌐 Visão Geral"</strong> no topo do Dashboard:</p>
+        <p style="margin-bottom: 10px;">Cartões como <strong>Flash, Caju, Alelo, Sodexo, Swile e Banricard</strong> funcionam como contas pré-pagas corporativas:</p>
         <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🏛️ <strong>Patrimônio Líquido Consolidado:</strong> Soma o saldo real de todas as contas correntes, poupanças e investimentos, deduzindo os compromissos em aberto nos cartões de crédito e cheques especiais.</li>
-          <li>🎯 <strong>Objetivos & Cofrinhos:</strong> Acompanhamento do progresso percentual e financeiro de cada meta de poupança (ex: <em>Reserva de Emergência, Viagem em Família, Reforma</em>).</li>
-          <li>🏦 <strong>Saldos e Faturas Reais Atuais:</strong> Exibição do estado patrimonial de cada conta do grupo familiar.</li>
+          <li>Cadastre o cartão na tela de <strong>🏦 Contas</strong> escolhendo o tipo <em>Cartão Benefício / Voucher</em>.</li>
+          <li>Ao lançar uma compra de supermercado ou restaurante, selecione o cartão benefício como pagador. O saldo é debitado exclusivamente do benefício, sem mexer no saldo da conta corrente!</li>
         </ul>
       </div>
     </div>
 
-    <!-- TÓPICO 2.8: DASHBOARD > CONTRASTE & ACESSIBILIDADE -->
-    <div class="manual-topic-content" id="topic-dash-contraste" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>🎨 Modos de Visualização & Alto Contraste</span>
-        <span class="badge badge-blue">Recurso Novo</span>
+    <!-- CAPÍTULO 2.3: TRANSFERÊNCIAS -->
+    <div class="manual-topic-content" id="topic-contas-transferencias" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #06b6d4; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🔄 2.3 Transferências Entre Contas Sem Duplicar Gastos</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">O Dashboard e todos os controles foram projetados para alta legibilidade:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
-          <li><strong>Modo Claro:</strong> Contornos nítidos (<code>border: 1.5px solid #94a3b8</code>), fundo sólido branco e tipografia em alto contraste sem desbotamento.</li>
-          <li><strong>Modo Escuro:</strong> Elementos em tons escuros refinados com brilho esmeralda e contrastes calibrados para não cansar a vista.</li>
-          <li><strong>Controles de Busca e Filtro:</strong> Bordas com feedback luminoso (*focus ring*) ao clicar para digitação ou ordenação.</li>
+        <p style="margin-bottom: 10px;">Ao mover recursos financeiros entre familiares ou contas (ex: PIX da Conta Itaú para a Carteira de Dinheiro):</p>
+        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Clique no botão <code>🔄 Transferência</code> na tela de Contas ou Planejamento.</li>
+          <li>Selecione a <strong>Conta de Origem</strong>, a <strong>Conta de Destino</strong>, a data e o valor (R$).</li>
+          <li>O sistema realiza o débito e o crédito atomicamente.</li>
+        </ol>
+        <div style="background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2); padding: 12px 16px; border-radius: 8px;">
+          🛡️ <strong>Regra Contábil:</strong> Transferências internas não são computadas como despesa nem como receita, mantendo seus gráficos e relatórios de fluxo de caixa 100% corretos!
+        </div>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 2.4: LIMITES ESPECIAIS -->
+    <div class="manual-topic-content" id="topic-contas-limites" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #06b6d4; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🛡️ 2.4 Limites Especiais (*Cheque Especial, Banricompras, Crédito Minuto*)</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Configure o limite de crédito rotativo contratado no seu banco para cada conta:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>💰 <strong>Saldo Atual:</strong> O dinheiro real disponível em conta (ex: <code>R$ 350,00</code>).</li>
+          <li>🛡️ <strong>Limite LIS / Cheque Especial:</strong> O limite concedido pelo banco (ex: <code>R$ 1.500,00</code>).</li>
+          <li>⚡ <strong>Saldo Operacional Total:</strong> Exibido como <code>R$ 1.850,00</code> (Saldo + Cheque Especial). Se o saldo ficar negativo, o card alerta o uso do rotativo para evitar encargos bancários.</li>
         </ul>
       </div>
     </div>
 
-    <!-- TÓPICO 3.1: LANÇAMENTOS > COMPETÊNCIA -->
+    <!-- CAPÍTULO 3.1: CARTÕES > CICLO -->
+    <div class="manual-topic-content" id="topic-cartao-ciclo" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a855f7; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>💳 3.1 Ciclo do Cartão: Fechamento vs Vencimento & Melhor Dia</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <div style="background: rgba(168,85,247,0.08); border-left: 4px solid #a855f7; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>Conceito Fundamental do Cartão de Crédito:</strong>
+        </div>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>🔒 <strong>Dia de Fechamento (Corte):</strong> Data em que a operadora encerra a fatura do mês. Compras realizadas até esse dia entram no boleto atual.</li>
+          <li>🛒 <strong>Melhor Dia de Compra:</strong> Compras feitas no dia seguinte ao fechamento entram automaticamente na fatura do mês posterior, proporcionando até 40 dias de prazo!</li>
+          <li>📅 <strong>Dia de Vencimento:</strong> Data limite para pagamento da fatura sem juros.</li>
+        </ul>
+        <div style="background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2); padding: 12px 16px; border-radius: 8px;">
+          💡 <strong>Exemplo:</strong> Cartão com Fechamento dia 25 e Vencimento dia 05. Uma compra feita em 24/08 vence em 05/09. Uma compra feita em 26/08 vencerá apenas em 05/10!
+        </div>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 3.2: CARTÕES > LIMITE TOTAL VS COMPROMETIDO -->
+    <div class="manual-topic-content" id="topic-cartao-limite" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a855f7; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📊 3.2 Limite Total vs Limite Comprometido em Tempo Real</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">No quadro <strong>"🏦 Previsibilidade de Contas e Cartões"</strong> do Dashboard:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>💳 <strong>Limite Total:</strong> Limite concedido pelo banco (ex: <code>R$ 5.000,00</code>).</li>
+          <li>🔴 <strong>Fatura do Mês:</strong> Gastos que vencem na competência selecionada (ex: <code>R$ 1.200,00</code>).</li>
+          <li>🟠 <strong>Comprometido Global:</strong> Soma de todas as faturas abertas e parcelas futuras a vencer (ex: <code>R$ 4.200,00</code>).</li>
+          <li>🟢/🔴 <strong>Disponível / Excedido:</strong> Saldo livre em tempo real <code>(Limite - Comprometido)</code>. Se as parcelas ultrapassarem o limite, surge o alerta <span class="badge badge-danger">⚠️ LIMITE EXCEDIDO</span>.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 3.3: CARTÕES > PAGAMENTO INTEGRAL -->
+    <div class="manual-topic-content" id="topic-cartao-pagamento" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a855f7; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>💳 3.3 Pagamento Integral da Fatura (Baixa Atômica)</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Para liquidar a fatura de cartão de crédito no final do ciclo:</p>
+        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>No card da fatura em <strong>🔄 Planejamento</strong>, clique no botão verde <code>💳 Pagar Fatura</code>.</li>
+          <li>Selecione a <strong>Conta Bancária Pagadora</strong> (ex: <em>Conta Itaú</em>) e a data de pagamento.</li>
+          <li>Confirme o valor total.</li>
+        </ol>
+        <p style="margin: 0;">O aplicativo debita o valor da conta bancária e <strong>marca todas as compras e parcelas atreladas àquela fatura como pagas em uma única transação segura</strong>.</p>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 3.4: CARTÕES > PAGAMENTO PARCIAL & ROTATIVO -->
+    <div class="manual-topic-content" id="topic-cartao-rotativo" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a855f7; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🔄 3.4 Pagamento Parcial & Saldo Rotativo Automático</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Se a família não puder quitar o valor integral do boleto do cartão:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Ao clicar em <code>💳 Pagar Fatura</code>, informe o valor parcial que foi pago.</li>
+          <li>O sistema dá baixa no montante pago e <strong>lança o saldo devedor restante na fatura do mês seguinte como Saldo Rotativo</strong>, aplicando automaticamente a taxa de juros cadastrada no cartão.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 3.5: CARTÕES > ANTECIPAÇÃO DE PARCELAS -->
+    <div class="manual-topic-content" id="topic-cartao-antecipacao" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a855f7; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>⚡ 3.5 Antecipação de Parcelas Futuras com Desconto</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Aproveite descontos antecipando parcelas de compras longas (ex: compras parceladas no Nubank/Inter):</p>
+        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Na fatura ou na lista de despesas, selecione as parcelas futuras que deseja adiantar.</li>
+          <li>Informe o desconto em reais (R$) ou percentual concedido pelo banco.</li>
+          <li>O sistema puxa as parcelas para a fatura atual com o valor abatido e libera o limite futuro imediatamente.</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 3.6: CARTÕES > RENEGOCIAÇÃO & ACORDO -->
+    <div class="manual-topic-content" id="topic-cartao-acordo" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a855f7; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🤝 3.6 Renegociação e Acordos de Fatura Parcelada</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Se você precisou negociar a fatura com o banco gerando um parcelamento de acordo:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Clique em <code>🤝 Parcelar / Acordo</code> no card da fatura.</li>
+          <li>Informe a entrada e o número de parcelas acordadas. A fatura original é marcada como <span class="badge badge-purple">Renegociada</span> e as novas parcelas são projetadas nos meses seguintes.</li>
+          <li>Caso tenha realizado a operação por engano, utilize o botão <code>↩️ Desfazer Acordo / Reabrir</code> para restaurar o estado original da fatura.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 3.7: CARTÕES > ESTORNO EM 1 CLIQUE -->
+    <div class="manual-topic-content" id="topic-cartao-estorno" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a855f7; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>↩️ 3.7 Estorno de Compras em 1 Clique</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Se uma compra foi devolvida ou cancelada pelo estabelecimento comercial:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Abra o pop-up de detalhes do lançamento clicando sobre a linha da compra.</li>
+          <li>Clique no botão de estorno. O valor é creditado de volta no limite do cartão e marcado com selo auditado de estorno.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 4.1: LANÇAMENTOS > DESPESAS & RECEITAS -->
+    <div class="manual-topic-content" id="topic-lanc-despesas-receitas" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #10b981; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📝 4.1 Lançamento de Despesas e Receitas</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Para lançar receitas e despesas no dia a dia:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>🟢 <strong>+ Nova Receita:</strong> Salários, comissões, pró-labore, aluguéis recebidos, dividendos e transferências recebidas.</li>
+          <li>🟣 <strong>+ Nova Variável:</strong> Gastos esporádicos do cotidiano (Supermercado, Farmácia, Combustível, Restaurante).</li>
+          <li>⭐ <strong>Despesa Fixa Recorrente:</strong> Contas mensais que se repetem todo mês (Aluguel, Luz, Condomínio, Internet).</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 4.2: LANÇAMENTOS > COMPETÊNCIA -->
     <div class="manual-topic-content" id="topic-lanc-competencia" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #34d399; font-weight: 700;">
-        📋 Mês de Referência (Competência: Ref: MM/AAAA)
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #10b981; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📋 4.2 Mês de Competência vs Data de Vencimento</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">O app permite controlar tanto a data de pagamento quanto o mês de competência:</p>
-        <div style="background: rgba(16,185,129,0.08); border-left: 4px solid #10b981; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 12px;">
-          <strong>Exemplo de Conta de Energia:</strong><br>
-          • Consumo do mês de <strong>Fevereiro</strong> (Competência: <code>Ref: 02/2026</code>).<br>
-          • Vencimento do boleto em <strong>10 de Março</strong> (Data de Pagamento: <code>10/03/2026</code>).
+        <div style="background: rgba(16,185,129,0.08); border-left: 4px solid #10b981; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>O que é o Mês de Referência (Competência)?</strong>
         </div>
-        <p style="margin: 0;">Isso garante que ao emitir relatórios de gastos mensais, o custo seja computado no mês em que o consumo realmente ocorreu.</p>
-      </div>
-    </div>
-
-    <!-- TÓPICO 3.2: LANÇAMENTOS > FIXAS -->
-    <div class="manual-topic-content" id="topic-lanc-fixas" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #34d399; font-weight: 700;">
-        ⭐ Despesas Fixas (Recorrentes) & Prioridades
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">Despesas fixas são aquelas que se repetem todo mês (Aluguel, Internet, Mensalidade Escolar, Financiamento):</p>
-        <p style="margin-bottom: 8px;">• <strong>Estrela de Prioridade ⭐:</strong> Marque despesas essenciais com estrela para que fiquem no topo da lista.</p>
-        <p style="margin: 0;">• <strong>Adiar Vencimento:</strong> Permite empurrar o vencimento de uma conta para frente se o orçamento do mês estiver apertado.</p>
-      </div>
-    </div>
-
-    <!-- TÓPICO 3.3: LANÇAMENTOS > AVULSOS -->
-    <div class="manual-topic-content" id="topic-lanc-avulsos" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #34d399; font-weight: 700;">
-        🛍️ Despesas Variáveis do Mês (Avulsas)
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">Gastos esporádicos do dia a dia (Supermercado, Farmácia, Restaurante, Combustível):</p>
-        <p style="margin: 0;">Clique no botão roxo <code>+ Nova Variável</code> em qualquer momento para registrar uma compra rápida, escolhendo a categoria, conta/cartão e quem realizou o gasto.</p>
-      </div>
-    </div>
-
-    <!-- TÓPICO 3.3B: LANÇAMENTOS > ALERTA DE SIMILARES EM TEMPO REAL -->
-    <div class="manual-topic-content" id="topic-lanc-similares" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fbbf24; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>🔔 Alerta Inteligente de Lançamento Similar em Tempo Real</span>
-        <span class="badge badge-yellow">Novo Recurso</span>
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(245, 158, 11, 0.08); border-left: 4px solid #f59e0b; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Prevenção Ativa Contra Cadastros Duplicados Acidentais:</strong>
-        </div>
-        <p style="margin-bottom: 10px;">Ao preencher os formulários de <strong>Novo Lançamento Avulso</strong> ou <strong>Despesa Fixa Recorrente</strong>, o sistema analisa instantaneamente os dados digitados:</p>
+        <p style="margin-bottom: 10px;">A competência é o mês em que o consumo realmente aconteceu, enquanto a data de vencimento é quando o boleto deve ser pago:</p>
         <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>⚡ <strong>Verificação Automática:</strong> Conforme você digita o valor, a data, a conta e a descrição, o motor busca se já existe um lançamento com características idênticas ou muito próximas.</li>
-          <li>⚠️ <strong>Aviso Visual em Destaque:</strong> Se houver similaridade, surge um banner amarelo no formulário informando: <em>"Atenção: Já existe um lançamento similar [Descrição] no valor de R$ X,XX na conta [Banco]..."</em>.</li>
-          <li>🔒 <strong>Segurança e Liberdade:</strong> O aviso não impede você de salvar caso seja uma compra legítima repetida, mas evita que você lance duas vezes a mesma conta por engano.</li>
+          <li>💡 <strong>Exemplo:</strong> Sua conta de energia de <strong>Fevereiro</strong> (Competência: <code>Ref: 02/2026</code>) que vence no dia <strong>10 de Março</strong> (Vencimento: <code>10/03/2026</code>).</li>
+          <li>📊 O app permite computar o gasto no orçamento de Fevereiro, garantindo relatórios de consumo 100% fieis à realidade.</li>
         </ul>
       </div>
     </div>
 
-    <!-- TÓPICO 3.3C: LANÇAMENTOS > LEITOR DE NOTA FISCAL (QR CODE) -->
+    <!-- CAPÍTULO 4.3: LANÇAMENTOS > LEITOR DE NOTA FISCAL (QR CODE) -->
     <div class="manual-topic-content" id="topic-lanc-nfce-qr" style="display: none;">
       <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #10b981; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>📷 Leitura de Notas Fiscais (NFC-e / SAT / Pix) via Câmera</span>
-        <span class="badge badge-green">Recurso Inovador</span>
+        <span>📷 4.3 Leitor de Nota Fiscal por Câmera & QR Code (NFC-e)</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Cadastro Instantâneo de Despesas Apontando a Câmera para o Cupom Fiscal:</strong>
+        <div style="background: rgba(16,185,129,0.08); border-left: 4px solid #10b981; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>Cadastro Instantâneo de Compras Sem Digitação Manual:</strong>
         </div>
-        <p style="margin-bottom: 10px;">Para lançar gastos de supermercado, farmácia, restaurantes e postos de combustível sem precisar digitar nada manualmente:</p>
+        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Clique no botão <code>📷 Ler Nota Fiscal</code> no Dashboard, Planejamento ou formulário.</li>
+          <li>Aponte a câmera do seu celular ou webcam para o QR Code quadrado impresso no final do seu cupom fiscal (NFC-e ou SAT).</li>
+          <li>O aplicativo consulta a SEFAZ e preenche automaticamente o <strong>Valor Total (R$)</strong>, a <strong>Data</strong>, o <strong>Nome do Mercado/Farmácia</strong> e sugere a <strong>Categoria</strong>!</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 4.4: LANÇAMENTOS > ALERTA DE DUPLICADOS -->
+    <div class="manual-topic-content" id="topic-lanc-duplicados" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #10b981; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🔔 4.4 Identificação & Alerta Automático de Gastos Duplicados</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Enquanto você digita o valor, data e descrição de um lançamento, o motor inteligente verifica se já existe uma transação similar cadastrada:</p>
         <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🎯 <strong>Como Usar:</strong> Clique no botão <code>📷 Ler Nota Fiscal</code> no Dashboard, no Planejamento ou dentro do formulário de Novo Lançamento.</li>
-          <li>📱 <strong>Câmera ao Vivo:</strong> Aponte o celular ou webcam para o QR Code quadrado impresso no final da sua Nota Fiscal de Consumidor (NFC-e) ou cupom SAT.</li>
-          <li>⚡ <strong>Preenchimento Automático:</strong> O app decodifica a nota junto à SEFAZ e preenche instantaneamente o <strong>Valor Total (R$)</strong>, a <strong>Data de Emissão</strong>, o <strong>Nome do Estabelecimento</strong>, a <strong>Categoria Sugerida</strong> e o <strong>Número da Nota Fiscal</strong>.</li>
-          <li>📁 <strong>Foto da Nota ou Chave de 44 Dígitos:</strong> Se preferir, você também pode carregar uma foto da galeria/arquivo ou colar o link/chave da nota.</li>
-          <li>🛡️ <strong>Anti-Duplicidade Ativa:</strong> O sistema confere em tempo real se aquele cupom fiscal já foi lido antes para proteger contra lançamentos repetidos.</li>
+          <li>⚠️ Se houver similaridade, surge um banner amarelo no formulário informando a existência de lançamento parecido, prevenindo lançamentos repetidos por engano.</li>
+          <li>Na barra lateral, o botão <code>🛡️</code> abre a <strong>Central de Conciliação</strong> para mesclar duplicidades com 1 clique.</li>
         </ul>
       </div>
     </div>
 
-    <!-- TÓPICO 3.4: LANÇAMENTOS > JUROS & DESCONTOS -->
-    <div class="manual-topic-content" id="topic-lanc-juros" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #34d399; font-weight: 700;">
-        🏷️ Juros, Multas e Descontos Antecipados
+    <!-- CAPÍTULO 4.5: POP-UP DE DETALHES & 3 AÇÕES RÁPIDAS -->
+    <div class="manual-topic-content" id="topic-lanc-popup-detalhes" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #38bdf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🔍 4.5 Pop-up de Detalhes Completo & 3 Ações Rápidas</span>
+        <span class="badge badge-blue">Recurso Novo</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 8px;">• <strong>Desconto:</strong> Ao pagar antecipado com desconto, o sistema debita do saldo da conta apenas o valor líquido real.</p>
-        <p style="margin: 0;">• <strong>Juros / Multa:</strong> Ao pagar em atraso, registre o acréscimo para que o valor real debitado corresponda exatamente ao extrato do banco.</p>
-      </div>
-    </div>
-
-    <!-- TÓPICO 4.1: CONTAS > TIPOS -->
-    <div class="manual-topic-content" id="topic-contas-tipos" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #06b6d4; font-weight: 700;">
-        🏦 Tipos de Contas Bancárias & Carteiras
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 8px;">• <span class="badge badge-blue">Conta Corrente</span>: Banco do Brasil, Itaú, Nubank, etc.</p>
-        <p style="margin-bottom: 8px;">• <span class="badge badge-green">Poupança / Investimentos</span>: Reserva de emergência e aplicações.</p>
-        <p style="margin-bottom: 8px;">• <span class="badge badge-yellow">Carteira Física</span>: Dinheiro em espécie na mão.</p>
-        <p style="margin: 0;">• <span class="badge badge-cyan">Voucher</span>: Vale Refeição / Alimentação (Alelo, Ticket, Sodexo).</p>
-      </div>
-    </div>
-
-    <!-- TÓPICO 4.2: CONTAS > CARTÕES BENEFÍCIO & VOUCHERS (NOVO) -->
-    <div class="manual-topic-content" id="topic-contas-beneficio" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #06b6d4; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>🎟️ Cartões Benefício, Vouchers e Alimentação</span>
-        <span class="badge badge-cyan">Novo Recurso</span>
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(6, 182, 212, 0.08); border-left: 4px solid #06b6d4; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Controle Completo de Saldos e Recargas Mensais de Benefícios:</strong>
+        <div style="background: rgba(56, 189, 248, 0.08); border-left: 4px solid #38bdf8; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>Visão Executiva do Lançamento com 1 Toque:</strong>
         </div>
-        <p style="margin-bottom: 10px;">O FinançasFamília possui suporte nativo para operadoras de benefícios corporativos e flexíveis:</p>
+        <p style="margin-bottom: 10px;">Ao clicar ou tocar em qualquer linha de transação na tela de <strong>Planejamento</strong>, abre-se uma janela com todas as informações e 3 botões ergonômicos:</p>
         <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🏷️ <strong>Operadoras Suportadas:</strong> Flash, Caju, Alelo, Banricard, Swile, Ticket, Sodexo, VR, Ben Visa Vale, etc.</li>
-          <li>🍴 <strong>Modalidades Específicas:</strong> Alimentação (VA), Refeição (VR), Transporte (VT), Flexível / Multibenefícios, Combustível, Saúde/Farmácia e Educação.</li>
-          <li>💵 <strong>Recarga Mensal Automática:</strong> Defina o valor previsto da recarga (ex: <code>R$ 800,00</code>) e o dia do crédito (ex: <code>Dia 10</code>) para previsibilidade orçamentária.</li>
-          <li>💳 <strong>Final do Cartão:</strong> Identificação rápida pelos 4 últimos dígitos (ex: <code>Final 4920</code>).</li>
+          <li>📑 <strong>Ficha Completa:</strong> Descrição, categoria com ícone, titular responsável, conta/cartão pagador, vencimento e status.</li>
+          <li>💰 <strong>Memória de Cálculo:</strong> Valor original, juros/multas acumulados, descontos obtidos e valor líquido final.</li>
+          <li>🔴 <strong>[ 🗑️ Excluir Lançamento ]:</strong> Remove o lançamento com restauração automática do saldo bancário.</li>
+          <li>🟡 <strong>[ ✏️ Editar Lançamento ]:</strong> Abre o formulário de edição para ajustar datas, valores ou categoria.</li>
+          <li>🟢 <strong>[ 💳 Pagar / Baixar ]:</strong> Permite quitar a conta na hora escolhendo a data e conta pagadora (ou <code>↩️ Desfazer Pagamento</code> para reverter).</li>
         </ul>
       </div>
     </div>
 
-    <!-- TÓPICO 4.3: CONTAS > TRANSFERÊNCIAS -->
-    <div class="manual-topic-content" id="topic-contas-transf" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #06b6d4; font-weight: 700;">
-        🔁 Transferências entre Contas sem Duplicação
+    <!-- CAPÍTULO 5.1: JUROS & FERIADOS -->
+    <div class="manual-topic-content" id="topic-juros-prorrogacao" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f59e0b; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📅 5.1 Prorrogação Automática para Dias Úteis & Feriados Nacionais</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin: 0;">Ao usar o botão <strong>"Nova Transferência"</strong> na tela de Contas, o saldo é transferido da conta de origem para a de destino sem gerar receitas ou despesas artificiais no balanço familiar.</p>
+        <div style="background: rgba(245,158,11,0.08); border-left: 4px solid #f59e0b; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>Conformidade com a Legislação Bancária Nacional (Febraban):</strong>
+        </div>
+        <p style="margin-bottom: 10px;">Contas cujo vencimento cai em sábados, domingos ou feriados nacionais (incluindo feriados móveis como Páscoa, Carnaval e Corpus Christi) são automaticamente prorrogadas para o <strong>próximo dia útil</strong>:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>🏷️ O card da conta exibe o selo <code>📅 Prorroga: DD/MM</code> informando a data limite sem juros.</li>
+          <li>Os juros por atraso só começam a ser calculados se o pagamento ocorrer após o dia útil prorrogado.</li>
+        </ul>
       </div>
     </div>
 
-    <!-- TÓPICO 4.4: CONTAS > PRODUTOS -->
-    <div class="manual-topic-content" id="topic-contas-produtos" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #06b6d4; font-weight: 700;">
-        💳 Produtos da Conta (Banricompras, Cheque Especial)
+    <!-- CAPÍTULO 5.2: JUROS > CÁLCULO -->
+    <div class="manual-topic-content" id="topic-juros-calculo" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f59e0b; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>⚖️ 5.2 Cálculo de Juros Diários (% a.d.), Mensais (% a.m.) e Multas Fixas</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin: 0;">O aplicativo suporta produtos acoplados à conta corrente, permitindo parcelar despesas em débito pré-datado ou controlar o uso do cheque especial com visibilidade total.</p>
+        <p style="margin-bottom: 10px;">Você pode configurar parâmetros financeiros específicos para cada despesa fixa:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>🔢 <strong>Multa Moratória (%):</strong> Percentual fixo cobrado pelo atraso (ex: <code>2,00%</code>).</li>
+          <li>📈 <strong>Juros de Mora (% a.m. ou % a.d.):</strong> Taxa de juros mensal ou diária calculada proporcionalmente aos dias de atraso (pro-rata die).</li>
+        </ul>
       </div>
     </div>
 
-    <!-- TÓPICO 5.1: FAMÍLIA > PERFIS -->
-    <div class="manual-topic-content" id="topic-fam-perfis" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a78bfa; font-weight: 700;">
-        👑 Papéis de Usuário (ADM, Responsável, Colaborador, Caçula)
+    <!-- CAPÍTULO 5.3: JUROS > PROJEÇÃO -->
+    <div class="manual-topic-content" id="topic-juros-projecao" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f59e0b; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📈 5.3 Projeção do Valor Atualizado para Pagamento Hoje</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 8px;">• 👑 <strong>ADM Geral:</strong> Gestão técnica, auditoria e backups globais.</p>
-        <p style="margin-bottom: 8px;">• ⭐ <strong>Responsável:</strong> Gestão financeira da casa, membros e permissões.</p>
-        <p style="margin-bottom: 8px;">• 👤 <strong>Colaborador:</strong> Membro adulto com acesso às suas finanças e menus autorizados.</p>
-        <p style="margin: 0;">• 🧸 <strong>Caçula:</strong> Interface especial para crianças e controle de mesada.</p>
+        <p style="margin-bottom: 10px;">Ao consultar contas vencidas no Dashboard ou Planejamento, o sistema calcula e exibe em tempo real o <strong>Valor Atualizado para Pagamento Hoje</strong>, somando o valor original aos juros e multas acumulados até a data de hoje.</p>
       </div>
     </div>
 
-    <!-- TÓPICO 5.2: FAMÍLIA > PERMISSÕES -->
-    <div class="manual-topic-content" id="topic-fam-permissoes" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a78bfa; font-weight: 700;">
-        🛡️ Permissões Granulares por Módulo
+    <!-- CAPÍTULO 5.4: JUROS > PAGAMENTO COM ACRÉSCIMO/DESCONTO -->
+    <div class="manual-topic-content" id="topic-juros-pagamento" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f59e0b; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🏷️ 5.4 Pagamento com Acréscimo ou Desconto</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin: 0;">Defina exatamente quem pode visualizar ou editar lançamentos fixos, avulsos, contas bancárias, cartões de crédito e relatórios gerais.</p>
+        <p style="margin-bottom: 10px;">No modal de liquidação, você pode ajustar com total flexibilidade:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>🟢 <strong>Desconto Obtido:</strong> Se você pagou antecipadamente ou via PIX com desconto, informe o abatimento para registrar o valor líquido real debitado da conta.</li>
+          <li>🔴 <strong>Acréscimo Pago:</strong> Registre eventuais tarifas bancárias ou juros cobrados na quitação do boleto.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 6.1: PLANEJAMENTO > FIXAS & PARCELADAS -->
+    <div class="manual-topic-content" id="topic-plan-fixas-parceladas" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #ec4899; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🔄 6.1 Criando Despesas Fixas e Parcelamentos</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Na tela <strong>🔄 Planejamento</strong>, organize as contas recorrentes e compras em parcelas:</p>
+        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Clique em <code>⭐ + Nova Despesa Fixa</code>.</li>
+          <li>Defina se a conta é <strong>Recorrente Contínua</strong> (sem fim previsto, ex: <em>Aluguel, Internet</em>) ou <strong>Parcelada</strong> (ex: <em>10x de R$ 150</em>).</li>
+          <li>O sistema projeta cada parcela no mês correspondente com contagem automática (1/10, 2/10, etc.).</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 6.2: PLANEJAMENTO > PRIORITÁRIAS -->
+    <div class="manual-topic-content" id="topic-plan-prioritarias" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #ec4899; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>⭐ 6.2 Despesas Prioritárias ⭐</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Marque contas indispensáveis (Aluguel, Luz, Mensalidade Escolar) com a <strong>Estrela de Prioridade ⭐</strong>:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>As contas prioritárias ganham moldura dourada e aparecem no topo do quadro operacional do mês no Dashboard.</li>
+          <li>Facilita para que você saiba exatamente o montante mínimo necessário para honrar compromissos vitais.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 6.3: PLANEJAMENTO > ADIAR PARCELA -->
+    <div class="manual-topic-content" id="topic-plan-adiar" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #ec4899; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>⏩ 6.3 Adiar Parcela para o Mês Seguinte</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Se o orçamento do mês atual estiver apertado e você combinou de postergar um pagamento:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>No card da despesa, clique na opção de adiar.</li>
+          <li>A parcela é transferida para o mês seguinte sem afetar as demais parcelas futuras do parcelamento.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 6.4: PLANEJAMENTO > KANBAN DRAG & DROP -->
+    <div class="manual-topic-content" id="topic-plan-kanban" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #ec4899; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📋 6.4 Kanban de Planejamento com Arrastar e Soltar</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Você pode reordenar a sequência de pagamento das contas no Planejamento simplesmente <strong>arrastando os cards</strong> para cima ou para baixo, organizando sua esteira financeira na ordem de pagamento desejada.</p>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 6.5: CARDS DE DECISÃO DE RECORRÊNCIA -->
+    <div class="manual-topic-content" id="topic-plan-decisao-cards" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a78bfa; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🎛️ 6.5 Cards de Decisão de Recorrência (*Apenas este mês vs Todos*)</span>
+        <span class="badge badge-purple">Segurança Operacional</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <div style="background: rgba(167,139,250,0.08); border-left: 4px solid #a78bfa; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>Decisões Claras ao Editar ou Excluir Lançamentos Fixos:</strong>
+        </div>
+        <p style="margin-bottom: 10px;">Ao alterar o valor de uma despesa fixa ou cancelá-la, o sistema exibe dois cards visuais:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>🗓️ <strong>Opção 1 — Apenas este Mês:</strong> Ajusta unicamente a fatura/parcela da competência atual (ex: conta de água ou luz que varia todo mês). Na tela de edição, você pode clicar no botão <strong><code>📷 Escanear Fatura / QR Code / Pix</code></strong> para capturar com a câmera ou importar o PDF da fatura, preenchendo valor exato, vencimento e chave PIX em 1 segundo.</li>
+          <li>♾️ <strong>Opção 2 — Este e Todos os Futuros:</strong> Propaga o novo valor para todos os meses seguintes (ex: aumento definitivo da mensalidade do plano de internet).</li>
+        </ul>
       </div>
     </div>
   `;

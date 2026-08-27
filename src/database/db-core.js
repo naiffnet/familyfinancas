@@ -142,6 +142,24 @@ class DbCore {
       this.db.exec("ALTER TABLE transactions ADD COLUMN competence_date TEXT DEFAULT NULL");
     } catch (e) {}
     try {
+      this.db.exec("ALTER TABLE recurring_items ADD COLUMN interest_rate REAL DEFAULT 0");
+    } catch (e) {}
+    try {
+      this.db.exec("ALTER TABLE recurring_items ADD COLUMN interest_type TEXT DEFAULT 'daily'");
+    } catch (e) {}
+    try {
+      this.db.exec("ALTER TABLE recurring_items ADD COLUMN penalty_fixed_rate REAL DEFAULT 0");
+    } catch (e) {}
+    try {
+      this.db.exec("ALTER TABLE transactions ADD COLUMN interest_rate REAL DEFAULT 0");
+    } catch (e) {}
+    try {
+      this.db.exec("ALTER TABLE transactions ADD COLUMN interest_type TEXT DEFAULT 'daily'");
+    } catch (e) {}
+    try {
+      this.db.exec("ALTER TABLE transactions ADD COLUMN penalty_fixed_rate REAL DEFAULT 0");
+    } catch (e) {}
+    try {
       this.db.exec(`
         CREATE TABLE IF NOT EXISTS invoices (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -205,9 +223,29 @@ class DbCore {
     try { this.db.exec("ALTER TABLE invoices ADD COLUMN is_renegotiated INTEGER DEFAULT 0"); } catch (e) {}
     try { this.db.exec("ALTER TABLE invoices ADD COLUMN renegotiation_details TEXT"); } catch (e) {}
 
-    // 4.9. Strategic Performance Indexes
+    // 4.9. Strategic Performance Indexes and Audit Logs Table
     try {
       this.db.exec(`
+        CREATE TABLE IF NOT EXISTS audit_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER,
+          family_id INTEGER,
+          user_name TEXT,
+          action TEXT NOT NULL,
+          entity_type TEXT NOT NULL,
+          entity_id INTEGER,
+          description TEXT,
+          old_values TEXT,
+          new_values TEXT,
+          ip_address TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL,
+          FOREIGN KEY(family_id) REFERENCES families(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_audit_logs_family ON audit_logs(family_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
+
         CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, date);
         CREATE INDEX IF NOT EXISTS idx_transactions_account_date ON transactions(account_id, date);
         CREATE INDEX IF NOT EXISTS idx_transactions_recurring ON transactions(recurring_item_id);
@@ -217,7 +255,7 @@ class DbCore {
         CREATE INDEX IF NOT EXISTS idx_accounts_user_active ON accounts(user_id, is_active);
       `);
     } catch (e) {
-      console.warn("Aviso ao criar índices SQLite:", e);
+      console.warn("Aviso ao criar índices e tabela de auditoria SQLite:", e);
     }
 
     // 5. Migrate accounts CHECK constraint to include 'voucher'
@@ -543,20 +581,15 @@ class DbCore {
 
   repairLegacyShiftedPayments() {
     try {
-      const shiftedTxs = this.db.prepare(`
-        SELECT t.*, ri.due_day, ri.created_at as rec_created_at, ri.start_installment, ri.repeat_months, ri.name as rec_name
-        FROM transactions t
-        JOIN recurring_items ri ON t.recurring_item_id = ri.id
-        WHERE t.is_paid = 1 AND t.is_avulso = 0
-      `).all();
-
       const repair = this.db.transaction(() => {
-        for (const tx of shiftedTxs) {
-          if (!tx.date) continue;
-          
+        const recurringItems = this.db.prepare("SELECT * FROM recurring_items").all();
+
+        for (const ri of recurringItems) {
+          if (!ri.repeat_months || ri.repeat_months <= 1) continue;
+
           let createdYear, createdMonth;
-          if (tx.rec_created_at) {
-            const partsC = tx.rec_created_at.split('-');
+          if (ri.created_at) {
+            const partsC = ri.created_at.split('-');
             createdYear = parseInt(partsC[0], 10);
             createdMonth = parseInt(partsC[1], 10);
           } else {
@@ -565,45 +598,53 @@ class DbCore {
             createdMonth = now.getMonth() + 1;
           }
 
-          const match = tx.description ? tx.description.match(/(\d+)\/(\d+)/) : null;
-          if (match) {
-            const instNum = parseInt(match[1], 10);
-            const startInst = tx.start_installment || 1;
-            const monthOffset = instNum - startInst;
+          const startInst = ri.start_installment || 1;
 
+          // Get all transactions for this recurring item
+          const txs = this.db.prepare("SELECT * FROM transactions WHERE recurring_item_id = ? ORDER BY is_paid DESC, id ASC").all(ri.id);
+          
+          // Group by installment number
+          const byInst = {};
+          for (const tx of txs) {
+            const match = tx.description ? tx.description.match(/(\d+)\/(\d+)/) : null;
+            if (!match) continue;
+            const instNum = parseInt(match[1], 10);
+            if (!byInst[instNum]) byInst[instNum] = [];
+            byInst[instNum].push(tx);
+          }
+
+          for (const [instStr, group] of Object.entries(byInst)) {
+            const instNum = parseInt(instStr, 10);
+            
+            // Calculate correct competence date
+            const monthOffset = instNum - startInst;
             let expectedMonth = createdMonth + monthOffset;
             let expectedYear = createdYear + Math.floor((expectedMonth - 1) / 12);
             expectedMonth = ((expectedMonth - 1) % 12) + 1;
+            const maxDays = new Date(expectedYear, expectedMonth, 0).getDate();
+            const day = Math.min(ri.due_day || 1, maxDays);
+            const correctDate = `${expectedYear}-${String(expectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
-            const partsDate = tx.date.split('-');
-            const txYear = parseInt(partsDate[0], 10);
-            const txMonth = parseInt(partsDate[1], 10);
+            // Pick primary record (prefer paid, otherwise first)
+            const primary = group.find(t => t.is_paid === 1) || group[0];
+            const duplicates = group.filter(t => t.id !== primary.id);
 
-            if (txYear !== expectedYear || txMonth !== expectedMonth) {
-              const day = Math.min(tx.due_day || 1, new Date(expectedYear, expectedMonth, 0).getDate());
-              const originalCompetenceDate = `${expectedYear}-${String(expectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-              const actualPaymentDate = tx.payment_date || tx.date;
+            // Delete redundant duplicates
+            for (const dup of duplicates) {
+              this.db.prepare("DELETE FROM transactions WHERE id = ?").run(dup.id);
+            }
 
-              console.log(`[Self-Healing] Restaurando data de competência da transação ID ${tx.id} ("${tx.description}") de ${tx.date} para ${originalCompetenceDate} (Pago em ${actualPaymentDate})`);
-
-              this.db.prepare(`
-                UPDATE transactions 
-                SET date = ?, payment_date = ? 
-                WHERE id = ?
-              `).run(originalCompetenceDate, actualPaymentDate, tx.id);
-
-              this.db.prepare(`
-                DELETE FROM transactions 
-                WHERE recurring_item_id = ? AND is_paid = 0 AND id != ?
-                AND strftime('%m', date) = ? AND strftime('%Y', date) = ?
-              `).run(tx.recurring_item_id, tx.id, String(expectedMonth).padStart(2, '0'), String(expectedYear));
+            // Align date and preserve payment date if paid
+            const payDate = primary.payment_date || (primary.is_paid ? primary.date : null);
+            if (primary.date !== correctDate || (primary.is_paid && !primary.payment_date)) {
+              this.db.prepare("UPDATE transactions SET date = ?, payment_date = ? WHERE id = ?").run(correctDate, payDate, primary.id);
             }
           }
         }
       });
       repair();
     } catch (err) {
-      console.error('Error repairing legacy shifted payments:', err);
+      console.error('Error repairing legacy shifted payments and deduplication:', err);
     }
   }
 
@@ -696,6 +737,9 @@ class DbCore {
         repeat_months INTEGER DEFAULT 0,
         start_installment INTEGER DEFAULT 1,
         competence_offset INTEGER DEFAULT 0,
+        interest_rate REAL DEFAULT 0,
+        interest_type TEXT DEFAULT 'daily',
+        penalty_fixed_rate REAL DEFAULT 0,
         position INTEGER DEFAULT 0,
         created_at TEXT DEFAULT (datetime('now')),
         FOREIGN KEY(user_id) REFERENCES users(id),
@@ -716,6 +760,9 @@ class DbCore {
         payment_date TEXT,
         penalty_amount REAL DEFAULT 0,
         discount_amount REAL DEFAULT 0,
+        interest_rate REAL DEFAULT 0,
+        interest_type TEXT DEFAULT 'daily',
+        penalty_fixed_rate REAL DEFAULT 0,
         is_paid INTEGER DEFAULT 1,
         is_avulso INTEGER DEFAULT 0,
         notes TEXT,
@@ -972,23 +1019,205 @@ class DbCore {
           const finalDescription = item.name + installmentSuffix;
 
           this.db.prepare(`
-            INSERT INTO transactions (user_id, account_id, category_id, recurring_item_id, type, amount, description, date, competence_date, is_paid, is_avulso)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
-          `).run(item.user_id, item.account_id, item.category_id, item.id, item.type, item.amount, finalDescription, dateStr, compDateStr);
+            INSERT INTO transactions (user_id, account_id, category_id, recurring_item_id, type, amount, description, date, competence_date, interest_rate, interest_type, penalty_fixed_rate, is_paid, is_avulso)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)
+          `).run(item.user_id, item.account_id, item.category_id, item.id, item.type, item.amount, finalDescription, dateStr, compDateStr, item.interest_rate || 0, item.interest_type || 'daily', item.penalty_fixed_rate || 0);
         } else if (exists.is_paid === 0 && exists.is_avulso !== 2) {
-          // Self-Healing: If transaction exists but is unpaid and active, ensure description and competence_date are corrected
-          const installmentSuffix = item.repeat_months && item.repeat_months > 0
-            ? ` ${currentInstallment}/${item.repeat_months}`
-            : '';
-          const finalDescription = item.name + installmentSuffix;
-
+          // Self-Healing: Se o lançamento já existe e está pendente, assegura a data de competência e taxas sem sobrescrever descrições customizadas
           this.db.prepare(`
-            UPDATE transactions SET description = ?, competence_date = COALESCE(competence_date, ?) WHERE id = ?
-          `).run(finalDescription, compDateStr, exists.id);
+            UPDATE transactions 
+            SET competence_date = COALESCE(competence_date, ?),
+                interest_rate = CASE WHEN interest_rate IS NULL OR interest_rate = 0 THEN ? ELSE interest_rate END,
+                interest_type = COALESCE(interest_type, ?),
+                penalty_fixed_rate = CASE WHEN penalty_fixed_rate IS NULL OR penalty_fixed_rate = 0 THEN ? ELSE penalty_fixed_rate END
+            WHERE id = ?
+          `).run(compDateStr, item.interest_rate || 0, item.interest_type || 'daily', item.penalty_fixed_rate || 0, exists.id);
         }
       }
     });
     generate();
+  }
+
+  logAudit({ userId, familyId = null, userName = null, action, entityType, entityId = null, description = '', oldValues = null, newValues = null, ipAddress = null }) {
+    try {
+      if (!this.db) return;
+      if (!userName && userId) {
+        try {
+          const u = this.db.prepare('SELECT name, family_id FROM users WHERE id = ?').get(userId);
+          if (u) {
+            userName = u.name;
+            if (!familyId) familyId = u.family_id;
+          }
+        } catch (e) {}
+      }
+
+      const oldValStr = typeof oldValues === 'object' && oldValues !== null ? JSON.stringify(oldValues) : (oldValues || null);
+      const newValStr = typeof newValues === 'object' && newValues !== null ? JSON.stringify(newValues) : (newValues || null);
+
+      this.db.prepare(`
+        INSERT INTO audit_logs (user_id, family_id, user_name, action, entity_type, entity_id, description, old_values, new_values, ip_address, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      `).run(
+        userId || null,
+        familyId || null,
+        userName || 'Sistema',
+        action,
+        entityType,
+        entityId || null,
+        description || '',
+        oldValStr,
+        newValStr,
+        ipAddress || null
+      );
+    } catch (err) {
+      console.warn('[Audit Log] Falha ao registrar log de auditoria:', err.message);
+    }
+  }
+
+  getAuditLogs({ familyId = null, userId = null, entityType = null, limit = 100, offset = 0 } = {}) {
+    try {
+      let query = 'SELECT * FROM audit_logs WHERE 1=1';
+      const params = [];
+
+      if (familyId) {
+        query += ' AND (family_id = ? OR family_id IS NULL)';
+        params.push(familyId);
+      }
+      if (userId) {
+        query += ' AND user_id = ?';
+        params.push(userId);
+      }
+      if (entityType) {
+        query += ' AND entity_type = ?';
+        params.push(entityType);
+      }
+
+      query += ' ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?';
+      params.push(parseInt(limit) || 100, parseInt(offset) || 0);
+
+      return this.db.prepare(query).all(...params).map(row => ({
+        ...row,
+        old_values: row.old_values ? (function() { try { return JSON.parse(row.old_values); } catch(e) { return row.old_values; } })() : null,
+        new_values: row.new_values ? (function() { try { return JSON.parse(row.new_values); } catch(e) { return row.new_values; } })() : null
+      }));
+    } catch (err) {
+      console.error('[Audit Log] Erro ao buscar logs de auditoria:', err);
+      return [];
+    }
+  }
+
+  testBackupIntegrity(filePath) {
+    const fs = require('fs');
+    if (!filePath || !fs.existsSync(filePath)) {
+      return { success: false, error: 'Arquivo de backup não encontrado para teste.' };
+    }
+
+    let tempDb = null;
+    try {
+      const stats = fs.statSync(filePath);
+      const Database = require('better-sqlite3');
+      tempDb = new Database(filePath, { readonly: true, fileMustExist: true });
+
+      const integrityCheck = tempDb.pragma('integrity_check');
+      const isIntegrityOk = Array.isArray(integrityCheck) && integrityCheck.length === 1 && integrityCheck[0].integrity_check === 'ok';
+
+      const expectedTables = ['users', 'accounts', 'transactions', 'recurring_items', 'categories', 'invoices', 'families'];
+      const tableCounts = {};
+      const missingTables = [];
+
+      for (const table of expectedTables) {
+        try {
+          const countRow = tempDb.prepare(`SELECT COUNT(*) as count FROM ${table}`).get();
+          tableCounts[table] = countRow ? countRow.count : 0;
+        } catch (e) {
+          missingTables.push(table);
+        }
+      }
+
+      tempDb.close();
+      tempDb = null;
+
+      const isClean = isIntegrityOk && missingTables.length === 0;
+
+      return {
+        success: true,
+        isClean,
+        integrityResult: isIntegrityOk ? 'OK' : 'CORRUPTED',
+        sizeBytes: stats.size,
+        sizeFormatted: `${(stats.size / 1024).toFixed(1)} KB`,
+        tableCounts,
+        missingTables,
+        testedAt: new Date().toISOString()
+      };
+    } catch (err) {
+      if (tempDb) {
+        try { tempDb.close(); } catch (e) {}
+      }
+      return {
+        success: false,
+        error: `Falha no teste de integridade: ${err.message}`
+      };
+    }
+  }
+
+  getSystemMetrics() {
+    const fs = require('fs');
+    try {
+      let dbSizeBytes = 0;
+      let walSizeBytes = 0;
+      let shmSizeBytes = 0;
+
+      if (this.dbPath && fs.existsSync(this.dbPath)) {
+        dbSizeBytes = fs.statSync(this.dbPath).size;
+      }
+      if (this.dbPath && fs.existsSync(this.dbPath + '-wal')) {
+        walSizeBytes = fs.statSync(this.dbPath + '-wal').size;
+      }
+      if (this.dbPath && fs.existsSync(this.dbPath + '-shm')) {
+        shmSizeBytes = fs.statSync(this.dbPath + '-shm').size;
+      }
+
+      const totalSizeBytes = dbSizeBytes + walSizeBytes + shmSizeBytes;
+      const mem = process.memoryUsage();
+
+      const tableCounts = {};
+      const tables = ['users', 'accounts', 'transactions', 'recurring_items', 'categories', 'invoices', 'audit_logs', 'families'];
+      for (const table of tables) {
+        try {
+          const row = this.db.prepare(`SELECT COUNT(*) as c FROM ${table}`).get();
+          tableCounts[table] = row ? row.c : 0;
+        } catch (e) {
+          tableCounts[table] = 0;
+        }
+      }
+
+      const journalMode = this.db.pragma('journal_mode', { simple: true });
+      const foreignKeys = this.db.pragma('foreign_keys', { simple: true });
+
+      return {
+        success: true,
+        sqlite: {
+          dbPath: this.dbPath,
+          dbSizeBytes,
+          walSizeBytes,
+          shmSizeBytes,
+          totalSizeBytes,
+          totalFormatted: `${(totalSizeBytes / 1024 / 1024).toFixed(2)} MB`,
+          journalMode,
+          foreignKeys: foreignKeys === 1
+        },
+        tableCounts,
+        process: {
+          uptimeSeconds: Math.floor(process.uptime()),
+          memoryRssMb: `${(mem.rss / 1024 / 1024).toFixed(1)} MB`,
+          memoryHeapUsedMb: `${(mem.heapUsed / 1024 / 1024).toFixed(1)} MB`,
+          nodeVersion: process.version
+        },
+        timestamp: new Date().toISOString()
+      };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
   }
 
 }

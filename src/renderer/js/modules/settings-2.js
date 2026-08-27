@@ -205,6 +205,43 @@ function bindBackupTabEvents(capitalizedMonth) {
     };
   }
 
+  if (document.getElementById('btn-test-backup')) {
+    document.getElementById('btn-test-backup').onclick = () => {
+      document.getElementById('input-test-backup').click();
+    };
+
+    document.getElementById('input-test-backup').onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      toast('Analisando integridade do arquivo SQLite...');
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64 = event.target.result.split(',')[1];
+        try {
+          // Salva temporariamente no backend para validar via PRAGMA
+          const res = await window.api.backup.testIntegrity({ fileData: base64, filename: file.name });
+          if (res && res.success) {
+            const counts = res.tableCounts || {};
+            const summaryStr = Object.entries(counts).map(([k, v]) => `• ${k}: ${v} registros`).join('\n');
+            alert(`🔍 DIAGNÓSTICO DE INTEGRIDADE SQLITE:\n\n` +
+                  `✅ Status: Arquivo 100% íntegro!\n` +
+                  `📦 Tamanho: ${res.sizeFormatted}\n` +
+                  `🛡️ PRAGMA integrity_check: ${res.integrityResult}\n\n` +
+                  `📊 Contagem de Registros:\n${summaryStr}\n\n` +
+                  `Este arquivo é seguro e válido para restauração.`);
+          } else {
+            alert('❌ Falha no teste de integridade: ' + (res?.error || 'Arquivo corrompido ou formato SQLite inválido.'));
+          }
+        } catch (err) {
+          alert('Erro ao testar integridade: ' + err.message);
+        }
+        e.target.value = '';
+      };
+      reader.readAsDataURL(file);
+    };
+  }
+
   if (document.getElementById('btn-restore-backup')) {
     document.getElementById('btn-restore-backup').onclick = () => {
       document.getElementById('input-restore-backup').click();
@@ -235,6 +272,57 @@ function bindBackupTabEvents(capitalizedMonth) {
       reader.readAsDataURL(file);
     };
   }
+
+  const loadSqliteMetrics = async () => {
+    const container = document.getElementById('sqlite-metrics-content');
+    if (!container) return;
+    try {
+      const res = await window.api.server.getMetrics();
+      if (!res || !res.success) {
+        container.innerHTML = `<span style="color:#f87171">Não foi possível obter métricas: ${res?.error || 'Erro'}</span>`;
+        return;
+      }
+      const { sqlite, tableCounts, process: proc } = res;
+      container.innerHTML = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 12px;">
+          <div style="padding: 10px; border-radius: var(--radius-sm); background: var(--bg-raised); border: 1px solid var(--border);">
+            <div style="font-size: 11px; color: var(--text-muted);">Tamanho Total (.db + WAL)</div>
+            <div style="font-size: 16px; font-weight: 700; color: #34d399; margin-top: 2px;">${sqlite.totalFormatted}</div>
+          </div>
+          <div style="padding: 10px; border-radius: var(--radius-sm); background: var(--bg-raised); border: 1px solid var(--border);">
+            <div style="font-size: 11px; color: var(--text-muted);">Modo de Journal & FK</div>
+            <div style="font-size: 14px; font-weight: 700; color: #60a5fa; margin-top: 2px;">${(sqlite.journalMode || 'wal').toUpperCase()} • FKs ${sqlite.foreignKeys ? 'Ativas' : 'Desat.'}</div>
+          </div>
+          <div style="padding: 10px; border-radius: var(--radius-sm); background: var(--bg-raised); border: 1px solid var(--border);">
+            <div style="font-size: 11px; color: var(--text-muted);">Memória do Processo</div>
+            <div style="font-size: 14px; font-weight: 700; color: #c084fc; margin-top: 2px;">${proc.memoryRssMb} (Heap: ${proc.memoryHeapUsedMb})</div>
+          </div>
+          <div style="padding: 10px; border-radius: var(--radius-sm); background: var(--bg-raised); border: 1px solid var(--border);">
+            <div style="font-size: 11px; color: var(--text-muted);">Uptime do Sistema</div>
+            <div style="font-size: 14px; font-weight: 700; color: var(--text-primary); margin-top: 2px;">${Math.floor(proc.uptimeSeconds / 60)} min (${proc.uptimeSeconds}s)</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; font-size: 11px; color: var(--text-muted); background: var(--bg-base); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+          <span>📊 <strong>Lançamentos:</strong> ${tableCounts.transactions || 0}</span>
+          <span>•</span>
+          <span>💳 <strong>Faturas:</strong> ${tableCounts.invoices || 0}</span>
+          <span>•</span>
+          <span>🏦 <strong>Contas:</strong> ${tableCounts.accounts || 0}</span>
+          <span>•</span>
+          <span>🔄 <strong>Recorrências:</strong> ${tableCounts.recurring_items || 0}</span>
+          <span>•</span>
+          <span>🛡️ <strong>Logs Auditoria:</strong> ${tableCounts.audit_logs || 0}</span>
+          <span>•</span>
+          <span>👥 <strong>Usuários:</strong> ${tableCounts.users || 0}</span>
+        </div>
+      `;
+    } catch (err) {
+      container.innerHTML = `<span style="color:#f87171">Erro ao carregar métricas: ${err.message}</span>`;
+    }
+  };
+
+  document.getElementById('btn-refresh-metrics')?.addEventListener('click', loadSqliteMetrics);
+  loadSqliteMetrics();
 
   if (document.getElementById('btn-export-month')) {
     document.getElementById('btn-export-month').onclick = async () => {

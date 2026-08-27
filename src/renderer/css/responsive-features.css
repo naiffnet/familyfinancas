@@ -134,15 +134,104 @@
 }
 
 @media (max-width: 768px) {
-  /* Titlebar */
+  /* Titlebar Mobile Header */
   .titlebar {
-    padding-left: 0 !important;
+    padding: 0 6px !important;
+    height: 48px !important;
+    display: grid !important;
+    grid-template-columns: 44px 1fr 44px !important;
+    align-items: center !important;
+    justify-content: stretch !important;
+    background: var(--bg-surface) !important;
+    border-bottom: 1px solid var(--border) !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    position: relative !important;
+    z-index: 100 !important;
   }
-  .titlebar-controls {
-    display: none !important;
-  }
+
   .titlebar-menu-btn {
     display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: var(--radius-sm, 8px) !important;
+    font-size: 20px !important;
+    color: var(--text-primary) !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    cursor: pointer !important;
+  }
+
+  .titlebar-menu-btn:hover {
+    background: var(--bg-hover) !important;
+  }
+
+  .titlebar-drag {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    min-width: 0 !important;
+    text-align: center !important;
+    width: 100% !important;
+  }
+
+  .titlebar-icon {
+    font-size: 18px !important;
+  }
+
+  .titlebar-title {
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    color: var(--text-primary) !important;
+    letter-spacing: -0.01em !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .titlebar-controls {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .titlebar-controls #btn-minimize,
+  .titlebar-controls #btn-maximize,
+  .titlebar-controls #btn-close {
+    display: none !important;
+  }
+
+  .titlebar-controls #app-theme-toggle {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: var(--radius-sm, 8px) !important;
+    font-size: 15px !important;
+    color: var(--text-muted) !important;
+    background: transparent !important;
+    border: none !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .titlebar-controls #app-theme-toggle:hover {
+    background: var(--bg-hover) !important;
+    color: var(--text-primary) !important;
+  }
+
+  .app > .main-content {
+    top: 48px !important;
   }
 
   /* Sidebar Drawer slide-out */
@@ -483,6 +572,355 @@
     overflow-x: auto;
     width: 100%;
     padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     RESPONSIVE TRANSACTION & RECURRING ITEMS (MOBILE CLEAN CARDS)
+     ══════════════════════════════════════════════════════════════ */
+  .transactions-list,
+  .recurring-list {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .transaction-item {
+    display: grid !important;
+    grid-template-columns: auto auto 1fr auto !important;
+    grid-template-rows: auto auto !important;
+    column-gap: 10px !important;
+    row-gap: 3px !important;
+    padding: 11px 13px !important;
+    align-items: center !important;
+    border-radius: var(--radius-sm, 10px) !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* 1. Checkbox: Row 1-2, Col 1 */
+  .transaction-item > .transaction-check-btn,
+  .transaction-item .rec-toggle-paid,
+  .transaction-item .avl-toggle {
+    grid-column: 1 !important;
+    grid-row: 1 / span 2 !important;
+    align-self: center !important;
+    width: 24px !important;
+    height: 24px !important;
+    flex-shrink: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* 2. Category Icon: Row 1-2, Col 2 */
+  .transaction-item > .transaction-category-icon {
+    grid-column: 2 !important;
+    grid-row: 1 / span 2 !important;
+    align-self: center !important;
+    width: 34px !important;
+    height: 34px !important;
+    font-size: 17px !important;
+    flex-shrink: 0 !important;
+    margin: 0 !important;
+    border-radius: 8px !important;
+  }
+
+  /* 3. Info Column: Row 1-2, Col 3 */
+  .transaction-item > .transaction-info {
+    grid-column: 3 !important;
+    grid-row: 1 / span 2 !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    gap: 2px !important;
+  }
+
+  .transaction-item .transaction-desc {
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    color: var(--text-primary) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    line-height: 1.25 !important;
+    max-width: 100% !important;
+  }
+
+  .transaction-item .transaction-meta {
+    font-size: 10.5px !important;
+    color: var(--text-muted) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    line-height: 1.2 !important;
+    margin-top: 1px !important;
+    max-width: 100% !important;
+  }
+
+  /* 4. Amount & Status Column: Row 1-2, Col 4 */
+  .transaction-item > div:nth-last-child(2) {
+    grid-column: 4 !important;
+    grid-row: 1 / span 2 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-end !important;
+    justify-content: center !important;
+    text-align: right !important;
+    gap: 2px !important;
+    flex-shrink: 0 !important;
+    min-width: 80px !important;
+  }
+
+  .transaction-item .transaction-amount {
+    font-size: 13.5px !important;
+    font-weight: 800 !important;
+    white-space: nowrap !important;
+    line-height: 1.2 !important;
+  }
+
+  .transaction-item .transaction-status,
+  .transaction-item .badge {
+    font-size: 9px !important;
+    padding: 2px 6px !important;
+    white-space: nowrap !important;
+    border-radius: 12px !important;
+    display: inline-block !important;
+    line-height: 1.2 !important;
+  }
+
+  /* 5. Hide inline desktop hover actions on mobile since clicking the card opens the rich pop-up with Excluir, Editar, Pagar */
+  .transaction-item > .transaction-actions {
+    display: none !important;
+  }
+
+  /* Planning controls wrap on mobile */
+  #rec-controls-wrap {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  #rec-controls-wrap > div {
+    width: 100% !important;
+    min-width: 100% !important;
+  }
+
+  #rec-period-wrap-main {
+    margin-left: 0 !important;
+    display: flex !important;
+    justify-content: center !important;
+  }
+
+  #rec-period-wrap-main .period-selector {
+    width: 100% !important;
+    justify-content: space-between !important;
+  }
+
+  /* Quick action buttons in page header on mobile */
+  .page-header > div:last-child {
+    width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  .page-header > div:last-child .btn {
+    flex: 1 1 calc(50% - 8px) !important;
+    justify-content: center !important;
+    text-align: center !important;
+    font-size: 12px !important;
+    padding: 8px 10px !important;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     RESPONSIVE INVOICE CARDS (FATURAS DE CARTÃO NO MOBILE)
+     ══════════════════════════════════════════════════════════════ */
+  .invoices-section-title {
+    font-size: 14.5px !important;
+    flex-wrap: wrap !important;
+    word-break: break-word !important;
+    line-height: 1.3 !important;
+  }
+
+  .invoices-list {
+    gap: 12px !important;
+    width: 100% !important;
+  }
+
+  .invoice-card-item {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+    padding: 12px 14px !important;
+    border-radius: var(--radius-md) !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .invoice-card-header {
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+    width: 100% !important;
+  }
+
+  .invoice-bank-logo-wrap {
+    flex-shrink: 0 !important;
+    margin-top: 2px !important;
+  }
+
+  .invoice-card-info {
+    flex: 1 !important;
+    min-width: 0 !important;
+  }
+
+  .invoice-card-title {
+    font-size: 13.5px !important;
+    font-weight: 700 !important;
+    display: flex !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+    gap: 4px 6px !important;
+    line-height: 1.3 !important;
+  }
+
+  .invoice-ref-tag {
+    font-size: 12px !important;
+  }
+
+  .invoice-card-meta {
+    font-size: 11px !important;
+    color: var(--text-muted) !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 6px !important;
+    margin-top: 3px !important;
+  }
+
+  .invoice-card-middle {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 6px !important;
+    padding: 10px 12px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    background: rgba(0, 0, 0, 0.14) !important;
+    border-radius: var(--radius-sm) !important;
+  }
+
+  .invoice-card-amount-col {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    width: 100% !important;
+    gap: 2px !important;
+  }
+
+  .invoice-amount-label {
+    font-size: 10px !important;
+  }
+
+  .invoice-card-amount {
+    font-size: 18px !important;
+    font-weight: 900 !important;
+    color: #f87171 !important;
+  }
+
+  .invoice-card-status-wrap {
+    text-align: left !important;
+    width: 100% !important;
+  }
+
+  .invoice-card-status-wrap .transaction-status {
+    font-size: 10px !important;
+    padding: 3px 8px !important;
+    line-height: 1.3 !important;
+    display: inline-block !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+  }
+
+  .invoice-card-footer {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .invoice-highlight-btn {
+    width: 100% !important;
+    text-align: center !important;
+    justify-content: center !important;
+    padding: 8px 10px !important;
+    font-size: 12px !important;
+  }
+
+  .invoice-card-actions {
+    display: flex !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  .invoice-card-actions .btn {
+    flex: 1 1 0 !important;
+    justify-content: center !important;
+    text-align: center !important;
+    padding: 10px !important;
+    font-size: 12.5px !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     RESPONSIVE MANUAL DO USUÁRIO (MOBILE)
+     ══════════════════════════════════════════════════════════════ */
+  #page-manual > div:nth-child(4) {
+    flex-direction: column !important;
+    height: auto !important;
+    min-height: 0 !important;
+    gap: 12px !important;
+  }
+
+  #manual-tree-sidebar {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-height: 240px !important;
+    overflow-y: auto !important;
+    box-sizing: border-box !important;
+  }
+
+  #manual-display-panel {
+    width: 100% !important;
+    padding: 16px 14px !important;
+    box-sizing: border-box !important;
+    overflow-y: visible !important;
+    height: auto !important;
+  }
+
+  #manual-breadcrumb {
+    font-size: 11.5px !important;
+    padding: 8px 12px !important;
+    gap: 4px !important;
+  }
+
+  #btn-download-manual-pdf {
+    width: 100% !important;
+    justify-content: center !important;
   }
 }
 
@@ -504,6 +942,16 @@
   .invoice-card-item > div:last-child {
     flex-direction: column;
     align-items: flex-start;
+  }
+  .transaction-item {
+    padding: 8px 10px !important;
+    column-gap: 8px !important;
+  }
+  .transaction-item .transaction-desc {
+    font-size: 12px !important;
+  }
+  .transaction-item .transaction-amount {
+    font-size: 13px !important;
   }
 }
 

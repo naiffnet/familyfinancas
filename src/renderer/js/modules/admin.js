@@ -804,33 +804,45 @@ async function openAdmEditFamilyModal(familyId) {
 initLoginScreen();
 
 // Sidebar Responsive Toggle Controls
-document.getElementById('titlebar-menu-btn').onclick = (e) => {
-  e.stopPropagation();
-  const sidebar = document.getElementById('sidebar');
-  sidebar.classList.toggle('open');
-};
+const menuBtn = document.getElementById('titlebar-menu-btn');
+if (menuBtn) {
+  menuBtn.onclick = (e) => {
+    e.stopPropagation();
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) sidebar.classList.toggle('open');
+  };
+}
 
 // Close sidebar when clicking any navigation link
 document.querySelectorAll('.nav-item').forEach(item => {
   item.addEventListener('click', () => {
     const sidebar = document.getElementById('sidebar');
-    sidebar.classList.remove('open');
+    if (sidebar) sidebar.classList.remove('open');
   });
 });
 
 // Close sidebar when clicking anywhere on the main content area
-document.getElementById('main-content').onclick = () => {
-  const sidebar = document.getElementById('sidebar');
-  if (sidebar.classList.contains('open')) {
-    sidebar.classList.remove('open');
-  }
-};
+const mainContentEl = document.getElementById('main-content');
+if (mainContentEl) {
+  mainContentEl.onclick = () => {
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar && sidebar.classList.contains('open')) {
+      sidebar.classList.remove('open');
+    }
+  };
+}
 
-// Register PWA Service Worker for web hosting compatibility
+// Register PWA Service Worker only on HTTPS or unregister stale local workers
 if ('serviceWorker' in navigator && !window.api.isElectron) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then(reg => console.log('Service Worker registrado com sucesso no escopo:', reg.scope))
-      .catch(err => console.error('Falha ao registrar o Service Worker:', err));
-  });
+  if (window.location.protocol === 'https:' && !window.location.hostname.includes('192.168.') && !window.location.hostname.includes('127.0.0.1') && window.location.hostname !== 'localhost') {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => console.log('Service Worker registrado:', reg.scope))
+        .catch(err => console.error('Falha ao registrar Service Worker:', err));
+    });
+  } else {
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      for (const reg of regs) reg.unregister();
+    }).catch(() => {});
+  }
 }

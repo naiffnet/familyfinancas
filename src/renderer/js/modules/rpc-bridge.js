@@ -64,6 +64,7 @@ if (!window.api) {
     },
     server: {
       getInfo: () => makeRpcCall('server:getInfo'),
+      getMetrics: () => makeRpcCall('server:getMetrics'),
     },
     auth: {
       login:    (d) => makeRpcCall('auth:login', d),
@@ -95,7 +96,7 @@ if (!window.api) {
       delete: (id)     => makeRpcCall('categories:delete', id),
     },
     recurring: {
-      getAll:          (userId, type, month, year) => makeRpcCall('recurring:getAll', { userId, type, month, year }),
+      getAll:          (userId, type, month, year) => (typeof userId === 'object' && userId !== null ? makeRpcCall('recurring:getAll', userId) : makeRpcCall('recurring:getAll', { userId, type, month, year })),
       create:          (d)            => makeRpcCall('recurring:create', d),
       update:          (d)            => makeRpcCall('recurring:update', d),
       delete:          (id, fromDate) => makeRpcCall('recurring:delete', { id, fromDate }),
@@ -112,10 +113,13 @@ if (!window.api) {
       togglePaid:  (id) => makeRpcCall('transactions:togglePaid', id),
       togglePaidWithDate: (id, date, options) => makeRpcCall('transactions:togglePaidWithDate', id, date, options),
       updatePositions: (userId, positions) => makeRpcCall('transactions:updatePositions', { userId, positions }),
+      refund:      (d)  => makeRpcCall('transactions:refund', d),
     },
     invoices: {
       getMonthly:  (d) => makeRpcCall('invoices:getMonthly', d),
       pay:         (d) => makeRpcCall('invoices:pay', d),
+      payPartial:  (d) => makeRpcCall('cards:payInvoicePartial', d),
+      anticipate:  (d) => makeRpcCall('cards:anticipateInstallments', d),
       renegotiate: (d) => makeRpcCall('invoices:renegotiate', d),
       reopen:      (d) => makeRpcCall('invoices:reopen', d),
       recalculate: (d) => makeRpcCall('invoices:recalculate', d),
@@ -138,12 +142,14 @@ if (!window.api) {
       getCategoryChart:(d)=> makeRpcCall('dashboard:getCategoryChart', d),
     },
     reports: {
-      getCashflow:  (d) => makeRpcCall('reports:getCashflow', d),
-      getPatrimony: (d) => makeRpcCall('reports:getPatrimony', d),
+      getCashflow:      (d) => makeRpcCall('reports:getCashflow', d),
+      getPatrimony:     (d) => makeRpcCall('reports:getPatrimony', d),
+      getInterestAudit: (d) => makeRpcCall('reports:getInterestAudit', d),
     },
     backup: {
       export: () => makeRpcCall('backup:export'),
       restore: (d) => makeRpcCall('backup:restore', d),
+      testIntegrity: (d) => makeRpcCall('backup:testIntegrity', d),
       exportExcel: (d) => makeRpcCall('backup:exportExcel', d),
       exportJson: (d) => makeRpcCall('backup:exportJson', d),
       exportCsv: (d) => makeRpcCall('backup:exportCsv', d),
@@ -162,6 +168,9 @@ if (!window.api) {
     logs: {
       get: () => makeRpcCall('server:getLogs'),
       getByFamily: (id) => makeRpcCall('logs:getByFamily', id),
+    },
+    audit: {
+      getLogs: (d) => makeRpcCall('audit:getLogs', d),
     },
     importer: {
       parseOfx: (ofxString) => makeRpcCall('importer:parseOfx', { ofxString }),

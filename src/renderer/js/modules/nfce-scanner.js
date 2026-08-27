@@ -760,6 +760,11 @@ function openNFCeScannerModal(customCallback = null) {
   NFCeCameraManager.start(videoEl, handleSuccess, handleError);
 }
 
+function openNfceScannerModal(customCallback = null) {
+  return openNFCeScannerModal(customCallback);
+}
+
+
 function openNFCeConfirmationModal(parsedData, accounts, categories) {
   const today = new Date().toISOString().split('T')[0];
   const dateVal = parsedData.date || parsedData.dueDate || today;

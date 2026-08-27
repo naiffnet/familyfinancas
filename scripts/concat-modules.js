@@ -54,6 +54,21 @@ function build() {
   const kb = (fs.statSync(OUT).size / 1024).toFixed(1);
   
   console.log(`\napp.bundle.js: ${totalLines} linhas, ${kb} KB`);
+
+  // Bundle CSS
+  const CSS_DIR = path.join(__dirname, '..', 'src', 'renderer', 'css');
+  const STYLE_OUT = path.join(__dirname, '..', 'src', 'renderer', 'style.css');
+  const cssFiles = ['base.css', 'components.css', 'views.css', 'responsive-features.css', 'mobile-environment.css'];
+  const cssParts = [`/* === FINANÇASFAMÍLIA — BUNDLED STYLESHEET === */\n`];
+  for (const cf of cssFiles) {
+    const cp = path.join(CSS_DIR, cf);
+    if (fs.existsSync(cp)) {
+      cssParts.push(`\n/* ==== ${cf} ==== */\n` + fs.readFileSync(cp, 'utf8'));
+    }
+  }
+  fs.writeFileSync(STYLE_OUT, cssParts.join('\n'), 'utf8');
+  console.log(`style.css: Bundled ${cssFiles.length} stylesheets (${(fs.statSync(STYLE_OUT).size / 1024).toFixed(1)} KB)`);
+
   const oversized = results.filter(r => r.lines > 1000);
   if (oversized.length > 0) {
     console.warn('AVISO - Modulos acima de 1000 linhas:');

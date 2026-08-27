@@ -265,6 +265,14 @@ function renderRecurringList(container, items, monthlyTxs, type, accounts, categ
     const baseAmount = tx ? tx.amount : item.amount;
     const netAmount = baseAmount + (tx?.penalty_amount || 0) - (tx?.discount_amount || 0);
 
+    const todayStr = new Date().toISOString().split('T')[0];
+    const rule = {
+      interest_rate: (tx && tx.interest_rate !== undefined) ? tx.interest_rate : item.interest_rate,
+      interest_type: (tx && tx.interest_type) ? tx.interest_type : item.interest_type,
+      penalty_fixed_rate: (tx && tx.penalty_fixed_rate !== undefined) ? tx.penalty_fixed_rate : item.penalty_fixed_rate,
+    };
+    const proj = (!isPaid && isOverdue) ? calculateProjectedInterest(baseAmount, compDateStr, todayStr, rule) : null;
+
     let statusBadge = '';
     if (isPaid) {
       if (isEarlyPaid && hasDiscount) {
@@ -279,7 +287,7 @@ function renderRecurringList(container, items, monthlyTxs, type, accounts, categ
         statusBadge = `<span class="transaction-status status-paid">✓ Pago</span>`;
       }
     }
-    else if (isOverdue) statusBadge = `<span class="transaction-status" style="background:#7f1d1d;color:#f87171">⚠️ Atrasado</span>`;
+    else if (isOverdue) statusBadge = `<span class="transaction-status" style="background:#7f1d1d;color:#f87171" title="${Math.abs(daysLeft)}d de atraso${proj && proj.penaltyAmount > 0 ? ` • Juros estimados: +${fmt.currency(proj.penaltyAmount)}` : ''}">⚠️ Atrasado (${Math.abs(daysLeft)}d)</span>`;
     else if (isAlert) statusBadge = `<span class="transaction-status" style="background:var(--warning-dim);color:var(--warning)">🚨 Vence em ${daysLeft}d</span>`;
     else statusBadge = `<span class="transaction-status status-pending">⏳ Dia ${item.due_day}</span>`;
 
@@ -326,6 +334,11 @@ function renderRecurringList(container, items, monthlyTxs, type, accounts, categ
           <div class="transaction-amount ${type === 'income' ? 'income' : 'expense'}">
             ${type === 'income' ? '+' : '-'}${fmt.currency(isPaid ? netAmount : baseAmount)}
           </div>
+          ${!isPaid && isOverdue && proj && proj.penaltyAmount > 0 ? `
+            <div style="font-size:10px;font-weight:700;color:#f59e0b;margin-top:-2px" title="Valor aproximado atualizado para hoje com encargos (+${fmt.currency(proj.penaltyAmount)})">
+              Aprox. hoje: ${fmt.currency(proj.projectedAmount)}
+            </div>
+          ` : ''}
           ${isPaid && (hasPenalty || hasDiscount) ? `
             <div style="font-size:10px;color:var(--text-muted);margin-top:-2px">
               Base: ${fmt.currency(baseAmount)} • ${hasPenalty ? `Juros: +${fmt.currency(tx.penalty_amount)}` : `Desconto: -${fmt.currency(tx.discount_amount)}`}
@@ -380,18 +393,51 @@ function renderRecurringList(container, items, monthlyTxs, type, accounts, categ
 
       if (tx) {
         Modal.open('Editar Lançamento Fixo', `
-          <div style="padding: 16px; text-align: center;">
-            <p style="margin-bottom: 24px; font-size: 15px; color: var(--text-primary);">
-              Como deseja editar o item <strong>"${tx.description || item.name}"</strong>?
-            </p>
-            <div style="display: flex; flex-direction: column; gap: 12px;">
-              <button class="btn btn-primary" id="btn-edit-month" style="background: var(--accent); border-color: var(--accent); font-weight: 600;">
-                ✏️ Editar APENAS o valor/dados deste mês (${MONTHS[State.currentMonth - 1]} / ${State.currentYear})
-              </button>
-              <button class="btn btn-outline" id="btn-edit-all" style="background: var(--bg-raised); font-weight: 600;">
-                ⚙️ Editar o Cadastro Fixo Geral (Regra de todos os meses)
-              </button>
-              <button class="btn btn-secondary" id="btn-edit-cancel" style="margin-top: 8px;">
+          <div style="padding: 4px 2px;">
+            <div style="text-align: center; margin-bottom: 18px;">
+              <div style="display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; background: rgba(16, 185, 129, 0.12); color: #10b981; font-size: 20px; margin-bottom: 10px; border: 1px solid rgba(16, 185, 129, 0.25);">
+                ✏️
+              </div>
+              <h3 style="font-size: 15.5px; font-weight: 700; color: var(--text-primary); margin: 0 0 6px 0;">Como deseja editar este lançamento?</h3>
+              <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 20px; font-size: 12px; color: var(--text-secondary); max-width: 90%;">
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600;">📌 ${tx.description || item.name}</span>
+              </div>
+            </div>
+
+            <div class="choice-options-container">
+              <div class="choice-option-card card-accent-emerald" id="btn-edit-month">
+                <div class="choice-icon-wrap" style="background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25);">
+                  📅
+                </div>
+                <div class="choice-body">
+                  <div class="choice-title">
+                    <span>Apenas este mês (${MONTHS[State.currentMonth - 1]} / ${State.currentYear})</span>
+                  </div>
+                  <div class="choice-desc">
+                    Altera valor, vencimento ou categoria somente desta ocorrência. As outras parcelas continuam inalteradas.
+                  </div>
+                </div>
+                <div class="choice-chevron">›</div>
+              </div>
+
+              <div class="choice-option-card card-accent-indigo" id="btn-edit-all">
+                <div class="choice-icon-wrap" style="background: rgba(139, 92, 246, 0.12); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.25);">
+                  ⚙️
+                </div>
+                <div class="choice-body">
+                  <div class="choice-title">
+                    <span>Cadastro Fixo Geral (Regra Mestre)</span>
+                  </div>
+                  <div class="choice-desc">
+                    Altera a regra principal de valor, repetições, conta ou vencimento para todas as parcelas e meses futuros.
+                  </div>
+                </div>
+                <div class="choice-chevron">›</div>
+              </div>
+            </div>
+
+            <div style="margin-top: 16px; text-align: center;">
+              <button class="btn btn-secondary" id="btn-edit-cancel" style="min-width: 120px; font-size: 12.5px; border-radius: 8px;">
                 Cancelar
               </button>
             </div>
@@ -422,20 +468,53 @@ function renderRecurringList(container, items, monthlyTxs, type, accounts, categ
       const tx = monthlyTxs.find(t => t.recurring_item_id === itemId);
       
       Modal.open('Excluir Lançamento Fixo', `
-        <div style="padding: 16px; text-align: center;">
-          <p style="margin-bottom: 24px; font-size: 15px; color: var(--text-primary);">
-            Como deseja excluir o item <strong>"${item.name}"</strong>?
-          </p>
-          <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div style="padding: 4px 2px;">
+          <div style="text-align: center; margin-bottom: 18px;">
+            <div style="display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; background: rgba(239, 68, 68, 0.12); color: #f87171; font-size: 20px; margin-bottom: 10px; border: 1px solid rgba(239, 68, 68, 0.25);">
+              🗑️
+            </div>
+            <h3 style="font-size: 15.5px; font-weight: 700; color: var(--text-primary); margin: 0 0 6px 0;">Como deseja excluir este lançamento?</h3>
+            <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 20px; font-size: 12px; color: var(--text-secondary); max-width: 90%;">
+              <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600;">📌 ${item.name}</span>
+            </div>
+          </div>
+
+          <div class="choice-options-container">
             ${tx ? `
-              <button class="btn btn-primary" id="btn-del-month" style="background: var(--warning); border-color: var(--warning); color: #000; font-weight: 600;">
-                ❌ Excluir APENAS o lançamento deste mês
-              </button>
+            <div class="choice-option-card card-accent-amber" id="btn-del-month">
+              <div class="choice-icon-wrap" style="background: rgba(245, 158, 11, 0.12); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.25);">
+                🗓️
+              </div>
+              <div class="choice-body">
+                <div class="choice-title">
+                  <span>Excluir apenas neste mês (${MONTHS[State.currentMonth - 1]} / ${State.currentYear})</span>
+                </div>
+                <div class="choice-desc">
+                  Remove somente o lançamento desta competência. O cadastro fixo e os meses futuros continuam ativos.
+                </div>
+              </div>
+              <div class="choice-chevron">›</div>
+            </div>
             ` : ''}
-            <button class="btn btn-danger" id="btn-del-all" style="font-weight: 600;">
-              🗑️ Excluir TODAS as ocorrências futuras (Desativar item)
-            </button>
-            <button class="btn btn-secondary" id="btn-del-cancel" style="margin-top: 8px;">
+
+            <div class="choice-option-card card-accent-danger" id="btn-del-all">
+              <div class="choice-icon-wrap" style="background: rgba(239, 68, 68, 0.12); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25);">
+                🚫
+              </div>
+              <div class="choice-body">
+                <div class="choice-title">
+                  <span style="color: #f87171;">Desativar Cadastro Fixo (Todos os Meses)</span>
+                </div>
+                <div class="choice-desc">
+                  Desativa a regra mestre e remove todas as ocorrências futuras de forma definitiva.
+                </div>
+              </div>
+              <div class="choice-chevron">›</div>
+            </div>
+          </div>
+
+          <div style="margin-top: 16px; text-align: center;">
+            <button class="btn btn-secondary" id="btn-del-cancel" style="min-width: 120px; font-size: 12.5px; border-radius: 8px;">
               Cancelar
             </button>
           </div>
@@ -447,18 +526,51 @@ function renderRecurringList(container, items, monthlyTxs, type, accounts, categ
           if (item.repeat_months > 0) {
             // Limited installment expense - Ask if Postpone or Skip
             Modal.open('Opções do Parcelamento', `
-              <div style="padding: 16px; text-align: center;">
-                <p style="margin-bottom: 20px; font-size: 14px; color: var(--text-primary); line-height: 1.5;">
-                  Esta despesa é parcelada (<strong>${tx.description}</strong>).<br>Como deseja tratar a exclusão deste mês?
-                </p>
-                <div style="display: flex; flex-direction: column; gap: 12px;">
-                  <button class="btn btn-primary" id="btn-postpone" style="background: var(--accent); border-color: var(--accent); font-weight: 600;">
-                    ➡️ Postergar (Adiar para o próximo mês)
-                  </button>
-                  <button class="btn btn-outline" id="btn-skip" style="background: var(--bg-raised); font-weight: 600;">
-                    ❌ Pular Parcela (Cancelar a deste mês)
-                  </button>
-                  <button class="btn btn-secondary" id="btn-postpone-cancel" style="margin-top: 8px;">
+              <div style="padding: 4px 2px;">
+                <div style="text-align: center; margin-bottom: 18px;">
+                  <div style="display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; background: rgba(14, 165, 233, 0.12); color: #38bdf8; font-size: 20px; margin-bottom: 10px; border: 1px solid rgba(14, 165, 233, 0.25);">
+                    ⏳
+                  </div>
+                  <h3 style="font-size: 15.5px; font-weight: 700; color: var(--text-primary); margin: 0 0 6px 0;">Tratamento do Parcelamento</h3>
+                  <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 20px; font-size: 12px; color: var(--text-secondary); max-width: 90%;">
+                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600;">📌 ${tx.description}</span>
+                  </div>
+                </div>
+
+                <div class="choice-options-container">
+                  <div class="choice-option-card card-accent-emerald" id="btn-postpone">
+                    <div class="choice-icon-wrap" style="background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25);">
+                      ➡️
+                    </div>
+                    <div class="choice-body">
+                      <div class="choice-title">
+                        <span>Postergar Parcela (Adiar para o próximo mês)</span>
+                      </div>
+                      <div class="choice-desc">
+                        Empurra esta parcela e todas as subsequentes em 1 mês para a frente, mantendo o total de parcelas intacto.
+                      </div>
+                    </div>
+                    <div class="choice-chevron">›</div>
+                  </div>
+
+                  <div class="choice-option-card card-accent-amber" id="btn-skip">
+                    <div class="choice-icon-wrap" style="background: rgba(245, 158, 11, 0.12); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.25);">
+                      ⏭️
+                    </div>
+                    <div class="choice-body">
+                      <div class="choice-title">
+                        <span>Pular Parcela (Cancelar apenas deste mês)</span>
+                      </div>
+                      <div class="choice-desc">
+                        Cancela a cobrança deste mês sem alterar o cronograma das parcelas dos meses seguintes.
+                      </div>
+                    </div>
+                    <div class="choice-chevron">›</div>
+                  </div>
+                </div>
+
+                <div style="margin-top: 16px; text-align: center;">
+                  <button class="btn btn-secondary" id="btn-postpone-cancel" style="min-width: 120px; font-size: 12.5px; border-radius: 8px;">
                     Cancelar
                   </button>
                 </div>
@@ -499,6 +611,19 @@ function renderRecurringList(container, items, monthlyTxs, type, accounts, categ
       };
       
       document.getElementById('btn-del-cancel').onclick = Modal.close;
+    };
+  });
+
+  // Clique na linha do lançamento fixo para abrir Pop-up de Detalhes completos
+  list.querySelectorAll('.recurring-item').forEach(row => {
+    row.onclick = (e) => {
+      if (e.target.closest('.transaction-check-btn, .rec-pix, .rec-priority, .rec-edit, .rec-delete')) return;
+      const itemId = parseInt(row.dataset.id);
+      const item = items.find(i => i.id === itemId);
+      const tx = monthlyTxs.find(t => t.recurring_item_id === itemId);
+      if (typeof openTransactionDetailsModal === 'function') {
+        openTransactionDetailsModal({ tx, item, accounts, categories, type, onUpdate: () => renderRecurring() });
+      }
     };
   });
 }
@@ -560,6 +685,14 @@ function renderAvulsosList(container, txs, accounts, categories, tabType) {
     const baseAmount = t.amount;
     const netAmount = baseAmount + (t.penalty_amount || 0) - (t.discount_amount || 0);
 
+    const todayStr = new Date().toISOString().split('T')[0];
+    const rule = {
+      interest_rate: t.interest_rate,
+      interest_type: t.interest_type,
+      penalty_fixed_rate: t.penalty_fixed_rate,
+    };
+    const proj = (!isPaid && isOverdue) ? calculateProjectedInterest(baseAmount, compDateStr, todayStr, rule) : null;
+
     let statusBadge = '';
     if (isPaid) {
       if (isEarlyPaid && hasDiscount) {
@@ -574,7 +707,7 @@ function renderAvulsosList(container, txs, accounts, categories, tabType) {
         statusBadge = `<span class="transaction-status status-paid">✓ Pago${payDateStr ? ' (' + fmt.date(payDateStr) + ')' : ''}</span>`;
       }
     }
-    else if (isOverdue) statusBadge = `<span class="transaction-status" style="background:#7f1d1d;color:#f87171">⚠️ Atrasado</span>`;
+    else if (isOverdue) statusBadge = `<span class="transaction-status" style="background:#7f1d1d;color:#f87171" title="${Math.abs(daysLeft)}d de atraso${proj && proj.penaltyAmount > 0 ? ` • Juros estimados: +${fmt.currency(proj.penaltyAmount)}` : ''}">⚠️ Atrasado (${Math.abs(daysLeft)}d)</span>`;
     else if (isAlert) statusBadge = `<span class="transaction-status" style="background:var(--warning-dim);color:var(--warning)">🚨 Vence em ${daysLeft}d</span>`;
     else statusBadge = `<span class="transaction-status status-pending">⏳ Pendente</span>`;
 
@@ -590,10 +723,15 @@ function renderAvulsosList(container, txs, accounts, categories, tabType) {
           ${t.competence_date ? `<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:var(--bg-raised);color:var(--text-muted);border:1px solid var(--border);font-weight:600;margin-left:4px" title="Mês de Referência / Consumo">Ref: ${fmtCompetence(t.competence_date)}</span>` : ''}
           ${!canEdit ? '<span title="Apenas Leitura" style="font-size: 11px; opacity: 0.7;">🔒</span>' : ''}
         </div>
-        <div class="transaction-meta">${fmt.date(t.date)} • ${(t.account_type === 'credit' || accounts.find(a => a.id === t.account_id)?.type === 'credit') ? `<span style="font-size:10px;padding:1px 6px;border-radius:6px;background:rgba(236,72,153,0.15);color:#ec4899;border:1px solid rgba(236,72,153,0.3);font-weight:600">💳 ${t.account_name}</span>` : (t.account_name || '—')} ${t.category_name ? `• ${t.category_name}` : ''}</div>
+        <div class="transaction-meta">${fmt.date(t.date)}${typeof isWeekendOrHoliday === 'function' && isWeekendOrHoliday(t.date) && !isPaid ? ` <span style="font-size:10.5px;color:#60a5fa;font-weight:600" title="Vence em fim de semana ou feriado. Prorroga para o 1º dia útil: ${fmt.date(getNextBusinessDay(t.date))}">📅 Prorroga: ${fmt.date(getNextBusinessDay(t.date))}</span>` : ''} • ${(t.account_type === 'credit' || accounts.find(a => a.id === t.account_id)?.type === 'credit') ? `<span style="font-size:10px;padding:1px 6px;border-radius:6px;background:rgba(236,72,153,0.15);color:#ec4899;border:1px solid rgba(236,72,153,0.3);font-weight:600">💳 ${t.account_name}</span>` : (t.account_name || '—')} ${t.category_name ? `• ${t.category_name}` : ''}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
         <div class="transaction-amount ${t.type === 'income' ? 'income' : 'expense'}">${t.type === 'income' ? '+' : '-'}${fmt.currency(isPaid ? netAmount : baseAmount)}</div>
+        ${!isPaid && isOverdue && proj && proj.penaltyAmount > 0 ? `
+          <div style="font-size:10px;font-weight:700;color:#f59e0b;margin-top:-2px" title="Valor aproximado atualizado para hoje com encargos (+${fmt.currency(proj.penaltyAmount)})">
+            Aprox. hoje: ${fmt.currency(proj.projectedAmount)}
+          </div>
+        ` : ''}
         ${isPaid && (hasPenalty || hasDiscount) ? `
           <div style="font-size:10px;color:var(--text-muted);margin-top:-2px">
             Base: ${fmt.currency(baseAmount)} • ${hasPenalty ? `Juros: +${fmt.currency(t.penalty_amount)}` : `Desconto: -${fmt.currency(t.discount_amount)}`}
@@ -646,13 +784,27 @@ function renderAvulsosList(container, txs, accounts, categories, tabType) {
       const amountStr = tx ? fmt.currency(tx.amount) : '';
 
       Modal.open('Excluir Lançamento Variável', `
-        <div style="padding:16px;text-align:center">
-          <p style="margin-bottom:20px;font-size:15px;color:var(--text-primary);line-height:1.5">
-            Tem certeza que deseja excluir permanentemente a despesa <strong>${desc}</strong>${amountStr ? ' no valor de <strong style="color:var(--danger)">' + amountStr + '</strong>' : ''}?
-          </p>
-          <div style="display:flex;flex-direction:column;gap:10px">
-            <button class="btn btn-danger" id="btn-confirm-delete-avl" style="font-weight:600;padding:10px;background:#ef4444;border-color:#ef4444;color:#fff;border-radius:8px">🗑️ Sim, Excluir Definitivamente</button>
-            <button class="btn btn-secondary" id="btn-cancel-delete-avl" style="padding:8px">Cancelar</button>
+        <div style="padding: 4px 2px;">
+          <div style="text-align: center; margin-bottom: 18px;">
+            <div style="display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; background: rgba(239, 68, 68, 0.12); color: #f87171; font-size: 20px; margin-bottom: 10px; border: 1px solid rgba(239, 68, 68, 0.25);">
+              🗑️
+            </div>
+            <h3 style="font-size: 15.5px; font-weight: 700; color: var(--text-primary); margin: 0 0 6px 0;">Excluir Lançamento Variável</h3>
+            <p style="font-size: 13px; color: var(--text-muted); margin: 0 0 12px 0;">
+              Tem certeza que deseja excluir permanentemente este lançamento?
+            </p>
+            <div style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 20px; font-size: 12.5px; color: var(--text-secondary); max-width: 90%;">
+              <span>📌 <strong>${desc}</strong>${amountStr ? ' • <strong style="color:#f87171">' + amountStr + '</strong>' : ''}</span>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button class="btn btn-secondary" id="btn-cancel-delete-avl" style="flex: 1; padding: 10px; font-size: 13px; border-radius: 8px;">
+              Cancelar
+            </button>
+            <button class="btn btn-danger" id="btn-confirm-delete-avl" style="flex: 1.3; font-weight: 700; padding: 10px; background: #ef4444; border-color: #ef4444; color: #fff; border-radius: 8px; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <span>🗑️</span> Confirmar Exclusão
+            </button>
           </div>
         </div>
       `);
@@ -664,6 +816,18 @@ function renderAvulsosList(container, txs, accounts, categories, tabType) {
         if (res && res.error) toast(res.error, 'error');
         else { toast('Despesa variável excluída com sucesso!', 'success'); renderRecurring(); }
       };
+    };
+  });
+
+  // Clique na linha do lançamento avulso para abrir Pop-up de Detalhes completos
+  list.querySelectorAll('.transaction-item').forEach(row => {
+    row.onclick = (e) => {
+      if (e.target.closest('.transaction-check-btn, .avl-pix, .avl-edit, .avl-delete')) return;
+      const txId = parseInt(row.dataset.id);
+      const tx = txs.find(t => t.id == txId);
+      if (tx && typeof openTransactionDetailsModal === 'function') {
+        openTransactionDetailsModal({ tx, item: null, accounts, categories, type: tx.type, onUpdate: () => renderRecurring() });
+      }
     };
   });
 }
@@ -871,92 +1035,151 @@ function renderInvoicesList(container, invoices, accounts) {
   }
 
   const mName = MONTHS[State.currentMonth - 1] || '';
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const totalAmount = invoices.reduce((sum, i) => sum + (i.amount || 0) + (i.penalty_amount || 0) - (i.discount_amount || 0), 0);
+  const paidInvoices = invoices.filter(i => i.is_paid);
+  const paidAmount = paidInvoices.reduce((sum, i) => sum + (i.amount || 0) + (i.penalty_amount || 0) - (i.discount_amount || 0), 0);
+  const openInvoices = invoices.filter(i => !i.is_paid);
+  const openAmount = openInvoices.reduce((sum, i) => sum + (i.amount || 0) + (i.penalty_amount || 0) - (i.discount_amount || 0), 0);
 
   container.innerHTML = `
-    <div class="section-title" style="margin-top:16px;margin-bottom:10px;font-size:16px;font-weight:600;color:var(--text-primary);display:flex;align-items:center;gap:8px">
-      <span style="font-size:18px">💳</span> Faturas de Cartão de Crédito (${mName} / ${State.currentYear})
-    </div>
-    <div class="invoices-list" style="display:flex;flex-direction:column;gap:10px">
-      ${invoices.map(inv => {
-        const b = BANKS[inv.bank] || BANKS.outro;
-        const netAmount = inv.amount + (inv.penalty_amount || 0) - (inv.discount_amount || 0);
-        const userBadge = inv.user_name ? `<span class="profile-badge" style="background:${inv.user_avatar_color || '#10b981'}22;color:${inv.user_avatar_color || '#10b981'};border:1px solid ${inv.user_avatar_color || '#10b981'}44;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600">${inv.user_name}</span>` : '';
-        const cardAccountId = inv.card_account_id || inv.card_id || inv.account_id;
-        const isSelected = (State.highlightCardId && State.highlightCardId === cardAccountId) || (State.highlightInvoiceId && State.highlightInvoiceId === inv.id);
-        
-        return `
-          <div class="invoice-card-item ${isSelected ? 'invoice-card-selected' : ''}" 
-               data-card-id="${cardAccountId || ''}" 
-               data-invoice-id="${inv.id || ''}" 
-               data-bank-color="${b.color}" 
-               data-card-name="${inv.card_name}"
-               style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-radius:var(--radius-md);background:${isSelected ? b.color + '25' : b.color + '15'};border:1.5px solid ${isSelected ? b.color : b.color + '44'};border-left:6px solid ${b.color};gap:12px;flex-wrap:wrap;cursor:pointer;${isSelected ? 'box-shadow: 0 0 20px ' + b.color + '44, inset 0 0 10px ' + b.color + '22;' : ''}">
-            <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1">
-              ${bankLogo(inv.bank, 36)}
-              <div>
-                <div style="font-size:15px;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                  💳 FATURA ${inv.card_name.toUpperCase()} (Ref: ${String(inv.month).padStart(2,'0')}/${inv.year})
-                  ${userBadge}
+    <div class="invoices-section-wrap" style="margin-top: 20px; margin-bottom: 24px;">
+      <!-- Section Title & Executive KPI Bar -->
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
+        <div style="font-size: 15.5px; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 20px;">💳</span> Faturas de Cartão de Crédito
+          <span style="font-size: 11.5px; font-weight: 600; color: var(--text-muted); background: var(--bg-surface); padding: 3px 9px; border-radius: 12px; border: 1px solid var(--border);">
+            ${invoices.length} ${invoices.length === 1 ? 'cartão' : 'cartões'} • ${mName}/${State.currentYear}
+          </span>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 6px; background: var(--bg-surface); border: 1px solid var(--border); padding: 5px 12px; border-radius: 8px; font-size: 11.5px; box-shadow: 0 1px 4px rgba(0,0,0,0.03);">
+            <span style="color: var(--text-muted);">Total Geral:</span>
+            <strong style="color: var(--text-primary); font-weight: 800;">${fmt.currency(totalAmount)}</strong>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); padding: 5px 12px; border-radius: 8px; font-size: 11.5px;">
+            <span style="color: #10b981; font-weight: 700;">✓ Pago (${paidInvoices.length}):</span>
+            <strong style="color: #10b981; font-weight: 800;">${fmt.currency(paidAmount)}</strong>
+          </div>
+          ${openInvoices.length > 0 ? `
+          <div style="display: flex; align-items: center; gap: 6px; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); padding: 5px 12px; border-radius: 8px; font-size: 11.5px;">
+            <span style="color: #f59e0b; font-weight: 700;">⏳ Aberto (${openInvoices.length}):</span>
+            <strong style="color: #f87171; font-weight: 800;">${fmt.currency(openAmount)}</strong>
+          </div>` : ''}
+        </div>
+      </div>
+
+      <!-- Invoices Responsive Grid -->
+      <div class="invoices-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 14px;">
+        ${invoices.map(inv => {
+          const b = BANKS[inv.bank] || BANKS.outro;
+          const netAmount = inv.amount + (inv.penalty_amount || 0) - (inv.discount_amount || 0);
+          const userBadge = inv.user_name ? `<span class="profile-badge" style="background:${inv.user_avatar_color || '#10b981'}18;color:${inv.user_avatar_color || '#10b981'};border:1px solid ${inv.user_avatar_color || '#10b981'}33;padding:2px 7px;border-radius:10px;font-size:10.5px;font-weight:700">${inv.user_name}</span>` : '';
+          const cardAccountId = inv.card_account_id || inv.card_id || inv.account_id;
+          const isSelected = (State.highlightCardId && State.highlightCardId === cardAccountId) || (State.highlightInvoiceId && State.highlightInvoiceId === inv.id);
+          const isOverdue = !inv.is_paid && inv.due_date && inv.due_date < todayStr;
+          
+          return `
+            <div class="invoice-card-item ${isSelected ? 'invoice-card-selected' : ''}" 
+                 data-card-id="${cardAccountId || ''}" 
+                 data-invoice-id="${inv.id || ''}" 
+                 data-bank-color="${b.color}" 
+                 data-card-name="${inv.card_name}"
+                 style="--card-bank-color: ${b.color};">
+              
+              <!-- Colored Top Indicator Line -->
+              <div class="invoice-card-top-bar" style="background: linear-gradient(90deg, ${b.color}, ${b.color}88);"></div>
+
+              <div class="invoice-card-header">
+                <div class="invoice-bank-logo-wrap" style="background: ${b.color}18; border: 1px solid ${b.color}44;">
+                  ${bankLogo(inv.bank, 36)}
                 </div>
-                <div style="font-size:12px;color:var(--text-muted);margin-top:2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                  <span>Vence dia ${inv.due_day} • Fecha dia ${inv.closing_day}</span>
-                  <span class="invoice-highlight-badge badge" style="background:${isSelected ? b.color : b.color + '25'};color:${isSelected ? '#ffffff' : b.color};border:1px solid ${b.color}66;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:10px;">
-                    ${isSelected ? '✨ Parcelas Destacadas abaixo' : '🔍 Ver Parcelas desta Fatura'}
-                  </span>
+                <div class="invoice-card-info">
+                  <div class="invoice-card-title">
+                    <span class="invoice-card-name">${inv.card_name.toUpperCase()}</span>
+                    <span class="invoice-ref-tag">Ref: ${String(inv.month).padStart(2,'0')}/${inv.year}</span>
+                    ${userBadge}
+                  </div>
+                  <div class="invoice-card-meta">
+                    <span class="meta-chip">📅 Vence dia <strong>${inv.due_day}</strong></span>
+                    <span class="meta-chip">🔒 Fecha dia <strong>${inv.closing_day}</strong></span>
+                  </div>
                 </div>
               </div>
-            </div>
-            
-            <div style="display:flex;align-items:center;gap:16px">
-              <div style="display:flex;flex-direction:column;align-items:flex-end">
-                <div style="font-size:16px;font-weight:900;color:#ef4444">
-                  -${fmt.currency(netAmount)}
+              
+              <div class="invoice-card-middle">
+                <div class="invoice-card-amount-col">
+                  <div class="invoice-amount-label">Valor Total da Fatura</div>
+                  <div class="invoice-card-amount">
+                    ${fmt.currency(netAmount)}
+                  </div>
                 </div>
-                ${inv.is_renegotiated ? `
-                  <span class="transaction-status" style="font-size:11px;background:#f59e0b22;color:#f59e0b;border:1px solid #f59e0b44">
-                    🤝 Renegociada / Parcelada
-                  </span>
-                ` : inv.is_paid ? `
-                  <span class="transaction-status status-paid" style="font-size:11px;background:#10b98122;color:#10b981;border:1px solid #10b98144">
-                    ✓ Quitada em ${fmt.date(inv.payment_date)} (${inv.payment_account_name || 'Conta'})
-                  </span>
-                ` : `
-                  <span class="transaction-status status-pending" style="font-size:11px">
-                    ⏳ Aberta • Vence em ${fmt.date(inv.due_date)}
-                  </span>
-                `}
+                
+                <div class="invoice-card-status-wrap">
+                  ${inv.is_renegotiated ? `
+                    <span class="invoice-status-pill status-reneg">
+                      <span>🤝</span> Acordo / Parcelada
+                    </span>
+                  ` : inv.is_paid ? `
+                    <span class="invoice-status-pill status-paid" title="${inv.payment_account_name ? 'Conta: ' + inv.payment_account_name : ''}">
+                      <span>✓</span> Quitada ${inv.payment_date ? 'em ' + fmt.date(inv.payment_date) : ''}
+                    </span>
+                  ` : `
+                    <span class="invoice-status-pill status-pending ${isOverdue ? 'status-overdue' : ''}">
+                      <span>${isOverdue ? '⚠️' : '⏳'}</span> ${isOverdue ? 'Em Atraso' : 'Aberta'} • Vence ${fmt.date(inv.due_date)}
+                    </span>
+                  `}
+                </div>
               </div>
 
-              ${!inv.is_paid ? `
-                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                  <button class="btn renegotiate-invoice-btn" data-id="${inv.id}" style="background:#f59e0b;border-color:#f59e0b;color:#000;font-weight:700;padding:8px 12px;font-size:12px;border-radius:8px">
-                    🤝 Parcelar / Acordo
-                  </button>
-                  <button class="btn btn-primary pay-invoice-btn" data-id="${inv.id}" style="background:${b.color};border-color:${b.color};font-weight:600;padding:8px 14px;font-size:12px">
-                    💳 Pagar Fatura
-                  </button>
+              <div class="invoice-card-footer">
+                <button type="button" class="btn invoice-highlight-btn ${isSelected ? 'btn-highlight-active' : ''}">
+                  ${isSelected ? '✨ Parcelas Destacadas' : '🔍 Ver Parcelas desta Fatura'}
+                </button>
+
+                <div class="invoice-card-actions">
+                  ${!inv.is_paid ? `
+                    <button class="btn btn-sm renegotiate-invoice-btn" data-id="${inv.id}" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35); font-weight: 700; border-radius: 8px; padding: 6px 12px;">
+                      🤝 Acordo
+                    </button>
+                    <button class="btn btn-sm btn-primary pay-invoice-btn" data-id="${inv.id}" style="background:${b.color};border-color:${b.color}; color:#fff; font-weight: 700; border-radius: 8px; padding: 6px 14px; box-shadow: 0 2px 8px ${b.color}44;">
+                      💳 Pagar Fatura
+                    </button>
+                  ` : `
+                    <button class="btn btn-sm btn-secondary reopen-invoice-btn" data-id="${inv.id}" title="Reabrir fatura e restaurar lançamentos para edição" style="font-size: 11.5px; border-radius: 8px; padding: 6px 12px;">
+                      ${inv.is_renegotiated ? '↩️ Desfazer Acordo' : '↩️ Desfazer Pagamento'}
+                    </button>
+                  `}
                 </div>
-              ` : `
-                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                  <button class="btn btn-secondary reopen-invoice-btn" data-id="${inv.id}" style="font-size:12px;padding:8px 12px;border-radius:8px;color:${inv.is_renegotiated ? '#f59e0b' : 'var(--text-primary)'};border:1px solid ${inv.is_renegotiated ? '#f59e0b88' : 'var(--border)'}" title="Reabrir fatura e restaurar lançamentos para edição">
-                    ${inv.is_renegotiated ? '↩️ Desfazer Acordo / Reabrir' : '↩️ Desfazer Pagamento'}
-                  </button>
-                </div>
-              `}
+              </div>
             </div>
-          </div>
-        `;
-      }).join('')}
+          `;
+        }).join('')}
+      </div>
     </div>
   `;
 
   // Bind invoice card click to toggle highlight on its installments
   container.querySelectorAll('.invoice-card-item').forEach(cardEl => {
     cardEl.onclick = (e) => {
-      // If clicked inside an action button, do nothing
-      if (e.target.closest('.pay-invoice-btn, .renegotiate-invoice-btn, .reopen-invoice-btn')) {
+      if (e.target.closest('.pay-invoice-btn, .renegotiate-invoice-btn, .reopen-invoice-btn, .invoice-highlight-btn')) {
         return;
       }
+      const cardId = parseInt(cardEl.dataset.cardId);
+      const invoiceId = parseInt(cardEl.dataset.invoiceId);
+      const cardColor = cardEl.dataset.bankColor;
+      const cardName = cardEl.dataset.cardName;
+      toggleInvoiceHighlight(cardId, cardColor, cardName, invoiceId);
+    };
+  });
+
+  container.querySelectorAll('.invoice-highlight-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const cardEl = btn.closest('.invoice-card-item');
+      if (!cardEl) return;
       const cardId = parseInt(cardEl.dataset.cardId);
       const invoiceId = parseInt(cardEl.dataset.invoiceId);
       const cardColor = cardEl.dataset.bankColor;

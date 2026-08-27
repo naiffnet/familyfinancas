@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('api', {
   },
   server: {
     getInfo: () => ipcRenderer.invoke('server:getInfo'),
+    getMetrics: () => ipcRenderer.invoke('server:getMetrics'),
   },
   auth: {
     login:    (d) => ipcRenderer.invoke('auth:login', d),
@@ -40,7 +41,7 @@ contextBridge.exposeInMainWorld('api', {
     delete: (id)     => ipcRenderer.invoke('categories:delete', id),
   },
   recurring: {
-    getAll:          (userId, type, month, year) => ipcRenderer.invoke('recurring:getAll', { userId, type, month, year }),
+    getAll:          (userId, type, month, year) => (typeof userId === 'object' && userId !== null ? ipcRenderer.invoke('recurring:getAll', userId) : ipcRenderer.invoke('recurring:getAll', { userId, type, month, year })),
     create:          (d)            => ipcRenderer.invoke('recurring:create', d),
     update:          (d)            => ipcRenderer.invoke('recurring:update', d),
     delete:          (id, fromDate) => ipcRenderer.invoke('recurring:delete', { id, fromDate }),
@@ -57,10 +58,13 @@ contextBridge.exposeInMainWorld('api', {
     togglePaid:  (id) => ipcRenderer.invoke('transactions:togglePaid', id),
     togglePaidWithDate: (id, date, options) => ipcRenderer.invoke('transactions:togglePaidWithDate', id, date, options),
     updatePositions: (userId, positions) => ipcRenderer.invoke('transactions:updatePositions', { userId, positions }),
+    refund:      (d)  => ipcRenderer.invoke('transactions:refund', d),
   },
   invoices: {
     getMonthly:  (d) => ipcRenderer.invoke('invoices:getMonthly', d),
     pay:         (d) => ipcRenderer.invoke('invoices:pay', d),
+    payPartial:  (d) => ipcRenderer.invoke('cards:payInvoicePartial', d),
+    anticipate:  (d) => ipcRenderer.invoke('cards:anticipateInstallments', d),
     renegotiate: (d) => ipcRenderer.invoke('invoices:renegotiate', d),
     reopen:      (d) => ipcRenderer.invoke('invoices:reopen', d),
     recalculate: (d) => ipcRenderer.invoke('invoices:recalculate', d),
@@ -83,12 +87,14 @@ contextBridge.exposeInMainWorld('api', {
     getCategoryChart:(d)=> ipcRenderer.invoke('dashboard:getCategoryChart', d),
   },
   reports: {
-    getCashflow:  (d) => ipcRenderer.invoke('reports:getCashflow', d),
-    getPatrimony: (d) => ipcRenderer.invoke('reports:getPatrimony', d),
+    getCashflow:      (d) => ipcRenderer.invoke('reports:getCashflow', d),
+    getPatrimony:     (d) => ipcRenderer.invoke('reports:getPatrimony', d),
+    getInterestAudit: (d) => ipcRenderer.invoke('reports:getInterestAudit', d),
   },
   backup: {
     export: () => ipcRenderer.invoke('backup:export'),
     restore: (d) => ipcRenderer.invoke('backup:restore', d),
+    testIntegrity: (d) => ipcRenderer.invoke('backup:testIntegrity', d),
     exportExcel: (d) => ipcRenderer.invoke('backup:exportExcel', d),
     exportJson: (d) => ipcRenderer.invoke('backup:exportJson', d),
     exportCsv: (d) => ipcRenderer.invoke('backup:exportCsv', d),
@@ -107,6 +113,9 @@ contextBridge.exposeInMainWorld('api', {
   logs: {
     get: () => ipcRenderer.invoke('server:getLogs'),
     getByFamily: (id) => ipcRenderer.invoke('logs:getByFamily', id),
+  },
+  audit: {
+    getLogs: (d) => ipcRenderer.invoke('audit:getLogs', d),
   },
   importer: {
     parseOfx: (ofxString) => ipcRenderer.invoke('importer:parseOfx', { ofxString }),

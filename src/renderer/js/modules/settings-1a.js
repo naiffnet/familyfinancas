@@ -71,6 +71,9 @@ async function openSettingsModal(activeTab = 'profile') {
             <button class="settings-modal-tab-btn ${activeTab === 'backups' ? 'active' : ''}" data-tab="backups">
               <span>💾</span> Backups & Dados
             </button>
+            <button class="settings-modal-tab-btn ${activeTab === 'audit' ? 'active' : ''}" data-tab="audit">
+              <span>🛡️</span> Trilha de Auditoria
+            </button>
           </div>
         </div>
 
@@ -488,6 +491,10 @@ async function openSettingsModal(activeTab = 'profile') {
                 💾 Exportar .db
               </button>
               ${(State.user.profile_type === 1 || State.user.is_system_admin === 1) ? `
+              <button class="btn btn-secondary btn-sm" id="btn-test-backup" style="flex: 1; min-width: 110px; font-size: 12px; border: 1px dashed var(--accent);">
+                🔍 Testar .db
+              </button>
+              <input type="file" id="input-test-backup" accept=".db" style="display:none">
               <button class="btn btn-secondary btn-sm" id="btn-restore-backup" style="flex: 1; min-width: 110px; font-size: 12px; border: 1px dashed var(--border);">
                 📂 Restaurar .db
               </button>
@@ -563,6 +570,19 @@ async function openSettingsModal(activeTab = 'profile') {
           </div>
 
         </div>
+
+        <!-- PAINEL DE OBSERVABILIDADE & MÉTRICAS SQLITE (FASE 17) -->
+        <div style="margin-top: 24px; padding: 18px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-surface);">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+            <div style="font-weight: 700; font-size: 14px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+              <span>📊 Saúde do Banco de Dados & Observabilidade</span>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="btn-refresh-metrics" style="font-size: 11px; padding: 4px 10px;">🔄 Atualizar</button>
+          </div>
+          <div id="sqlite-metrics-content" style="font-size: 12px; color: var(--text-muted);">
+            Carregando métricas do SQLite...
+          </div>
+        </div>
       `;
 
       bindBackupTabEvents(capitalizedMonth);
@@ -571,6 +591,8 @@ async function openSettingsModal(activeTab = 'profile') {
       renderSettingsWikiTab(bodyEl);
     } else if (tab === 'lgpd') {
       renderSettingsLgpdTab(bodyEl);
+    } else if (tab === 'audit') {
+      await renderSettingsAuditTab(bodyEl);
     }
   };
 

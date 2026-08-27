@@ -4,6 +4,14 @@
  */
 module.exports = (Base) => class extends Base {
   getRecurringItems(userId, type, month, year) {
+    if (userId && typeof userId === 'object') {
+      type = type || userId.type;
+      month = month || userId.month;
+      year = year || userId.year;
+      userId = userId.userId || userId.id;
+    }
+    if (!userId) return [];
+
     const user = this.db.prepare('SELECT family_id, profile_type FROM users WHERE id = ?').get(userId);
     const familyId = user ? user.family_id : null;
     const profileType = user ? user.profile_type : 2;
@@ -107,16 +115,29 @@ module.exports = (Base) => class extends Base {
   }
 
   createRecurringItem(data) {
-    const { is_paid, ...insertData } = data;
-    if (!insertData.created_at) {
-      insertData.created_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
-    }
-    if (insertData.competence_offset === undefined || insertData.competence_offset === null) {
-      insertData.competence_offset = 0;
-    }
+    const { is_paid, ...rawInsert } = data;
+    const insertData = {
+      category_id: null,
+      is_priority: 0,
+      icon: null,
+      color: null,
+      notes: null,
+      repeat_months: 0,
+      start_installment: 1,
+      competence_offset: 0,
+      interest_rate: 0,
+      interest_type: 'daily',
+      penalty_fixed_rate: 0,
+      created_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+      ...rawInsert
+    };
+    insertData.interest_rate = insertData.interest_rate !== undefined ? parseFloat(insertData.interest_rate) || 0 : 0;
+    insertData.interest_type = insertData.interest_type || 'daily';
+    insertData.penalty_fixed_rate = insertData.penalty_fixed_rate !== undefined ? parseFloat(insertData.penalty_fixed_rate) || 0 : 0;
+
     const r = this.db.prepare(`
-      INSERT INTO recurring_items (user_id, name, type, amount, category_id, account_id, due_day, is_priority, icon, color, notes, repeat_months, start_installment, competence_offset, created_at)
-      VALUES (@user_id, @name, @type, @amount, @category_id, @account_id, @due_day, @is_priority, @icon, @color, @notes, @repeat_months, @start_installment, @competence_offset, @created_at)
+      INSERT INTO recurring_items (user_id, name, type, amount, category_id, account_id, due_day, is_priority, icon, color, notes, repeat_months, start_installment, competence_offset, interest_rate, interest_type, penalty_fixed_rate, created_at)
+      VALUES (@user_id, @name, @type, @amount, @category_id, @account_id, @due_day, @is_priority, @icon, @color, @notes, @repeat_months, @start_installment, @competence_offset, @interest_rate, @interest_type, @penalty_fixed_rate, @created_at)
     `).run(insertData);
     const newId = r.lastInsertRowid;
 
@@ -163,22 +184,42 @@ module.exports = (Base) => class extends Base {
         })();
       }
     }
+
+    this.logAudit({
+      userId: data.user_id,
+      action: 'RECURRING_CREATE',
+      entityType: 'recurring_item',
+      entityId: newId,
+      description: `Criou item de planejamento: "${data.name}" (${data.type}, R$ ${data.amount})`,
+      newValues: { name: data.name, type: data.type, amount: data.amount, due_day: data.due_day, repeat_months: data.repeat_months }
+    });
+
     return { success: true, id: newId };
   }
 
-
   updateRecurringItem(data) {
+    const existing = this.db.prepare('SELECT * FROM recurring_items WHERE id = ?').get(data.id);
+    if (!existing) return { success: false, error: 'Item não encontrado' };
+
+    const payload = {
+      ...existing,
+      ...data,
+      competence_offset: data.competence_offset !== undefined ? data.competence_offset : (existing.competence_offset || 0),
+      interest_rate: data.interest_rate !== undefined ? (parseFloat(data.interest_rate) || 0) : (existing.interest_rate || 0),
+      interest_type: data.interest_type || existing.interest_type || 'daily',
+      penalty_fixed_rate: data.penalty_fixed_rate !== undefined ? (parseFloat(data.penalty_fixed_rate) || 0) : (existing.penalty_fixed_rate || 0),
+    };
+
     const runUpdate = this.db.transaction(() => {
-      const payload = {
-        competence_offset: 0,
-        ...data
-      };
       this.db.prepare(`
         UPDATE recurring_items SET name=@name, type=@type, amount=@amount, category_id=@category_id,
         account_id=@account_id, due_day=@due_day, is_priority=@is_priority, icon=@icon, color=@color, notes=@notes, repeat_months=@repeat_months,
         start_installment=@start_installment,
-        competence_offset=COALESCE(@competence_offset, competence_offset, 0),
-        created_at=COALESCE(@created_at, created_at)
+        competence_offset=@competence_offset,
+        interest_rate=@interest_rate,
+        interest_type=@interest_type,
+        penalty_fixed_rate=@penalty_fixed_rate,
+        created_at=@created_at
         WHERE id=@id
       `).run(payload);
 
@@ -248,12 +289,25 @@ module.exports = (Base) => class extends Base {
     });
 
     runUpdate();
+
+    const updated = this.db.prepare('SELECT * FROM recurring_items WHERE id = ?').get(data.id);
+    if (updated) {
+      this.logAudit({
+        userId: updated.user_id,
+        action: 'RECURRING_UPDATE',
+        entityType: 'recurring_item',
+        entityId: data.id,
+        description: `Alterou item de planejamento: "${updated.name}" (R$ ${updated.amount})`,
+        newValues: { name: updated.name, type: updated.type, amount: updated.amount, due_day: updated.due_day }
+      });
+    }
+
     return { success: true };
   }
 
   deleteRecurringItem(id, fromDate) {
+    const item = this.db.prepare('SELECT * FROM recurring_items WHERE id = ?').get(id);
     this.db.transaction(() => {
-      const item = this.db.prepare('SELECT * FROM recurring_items WHERE id = ?').get(id);
       if (item && fromDate) {
         let createdYear, createdMonth;
         if (item.created_at) {
@@ -302,6 +356,18 @@ module.exports = (Base) => class extends Base {
         `).run(id, fromDate);
       }
     })();
+
+    if (item) {
+      this.logAudit({
+        userId: item.user_id,
+        action: 'RECURRING_DELETE',
+        entityType: 'recurring_item',
+        entityId: id,
+        description: `Excluiu/encerrou item de planejamento: "${item.name}" (a partir de ${fromDate || 'início'})`,
+        oldValues: { name: item.name, amount: item.amount, is_active: 1 }
+      });
+    }
+
     return { success: true };
   }
 

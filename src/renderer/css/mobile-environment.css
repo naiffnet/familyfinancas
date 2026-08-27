@@ -1,0 +1,828 @@
+/* ══════════════════════════════════════════════════════════
+   MOBILE ENVIRONMENT & NATIVE APP SHELL (FinançasFamília)
+   Versão Enxuta, Ultra-Rápida e Intuitiva
+   ══════════════════════════════════════════════════════════ */
+
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --mobile-nav-height: 60px;
+}
+
+@media (max-width: 768px) {
+  body {
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: contain;
+    user-select: none;
+  }
+
+  /* 1. App Shell Layout */
+  .app {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    position: relative !important;
+  }
+
+  /* Ocultar a sidebar lateral desktop completamente no mobile */
+  .sidebar,
+  aside.sidebar,
+  .app > .sidebar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    position: absolute !important;
+    transform: translateX(-100%) !important;
+  }
+
+  /* 2. Topbar / Header Mobile */
+  .titlebar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    height: 48px !important;
+    padding: var(--safe-top) 12px 0 12px !important;
+    background: color-mix(in srgb, var(--bg-surface) 92%, transparent) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    border-bottom: 1px solid var(--border) !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 100 !important;
+    flex-shrink: 0 !important;
+  }
+
+  .titlebar-menu-btn {
+    display: none !important;
+  }
+
+  .titlebar-controls button#btn-minimize,
+  .titlebar-controls button#btn-maximize,
+  .titlebar-controls button#btn-close {
+    display: none !important;
+  }
+
+  /* 3. Main Content */
+  .main-content,
+  .app > .main-content {
+    position: relative !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    flex: 1 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 10px 12px calc(var(--mobile-nav-height) + var(--safe-bottom) + 20px) 12px !important;
+    box-sizing: border-box !important;
+  }
+
+  .page {
+    padding: 0 0 12px 0 !important;
+    max-width: 100% !important;
+  }
+
+  /* 4. Fixed Bottom Navigation Bar */
+  .mobile-bottom-nav {
+    display: flex !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: calc(var(--mobile-nav-height) + var(--safe-bottom)) !important;
+    padding-bottom: var(--safe-bottom) !important;
+    background: color-mix(in srgb, var(--bg-surface) 94%, transparent) !important;
+    backdrop-filter: blur(24px) !important;
+    -webkit-backdrop-filter: blur(24px) !important;
+    border-top: 1px solid var(--border) !important;
+    z-index: 9990 !important;
+    box-sizing: border-box !important;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.18) !important;
+  }
+
+  .mobile-nav-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-muted);
+    padding: 6px 0 3px 0;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+  }
+
+  .mobile-nav-tab:active {
+    transform: scale(0.92);
+  }
+
+  .mobile-nav-tab .tab-icon {
+    font-size: 19px;
+    line-height: 1;
+    transition: transform 0.2s ease;
+  }
+
+  .mobile-nav-tab .tab-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .mobile-nav-tab.active {
+    color: var(--accent, #10b981) !important;
+  }
+
+  .mobile-nav-tab.active .tab-icon {
+    transform: translateY(-2px) scale(1.08);
+  }
+
+  /* 5. Floating Action Button (FAB) */
+  .mobile-quick-fab {
+    display: flex !important;
+    position: fixed !important;
+    bottom: calc(var(--mobile-nav-height) + var(--safe-bottom) + 12px) !important;
+    right: 14px !important;
+    width: 48px !important;
+    height: 48px !important;
+    border-radius: 50% !important;
+    background: linear-gradient(135deg, var(--accent, #10b981) 0%, #059669 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    box-shadow: 0 6px 18px rgba(16, 185, 129, 0.4) !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 22px !important;
+    cursor: pointer !important;
+    z-index: 9980 !important;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  }
+
+  .mobile-quick-fab:active {
+    transform: scale(0.9) !important;
+  }
+
+  .mobile-fab-menu {
+    position: fixed;
+    bottom: calc(var(--mobile-nav-height) + var(--safe-bottom) + 68px);
+    right: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-end;
+    z-index: 9985;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(12px) scale(0.95);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .mobile-fab-menu.open {
+    pointer-events: auto;
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  .mobile-fab-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    padding: 7px 12px;
+    border-radius: 20px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+    cursor: pointer;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .mobile-fab-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 9975;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+
+  .mobile-fab-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* 6. Modais Bottom Sheet */
+  .modal-overlay {
+    align-items: flex-end !important;
+    padding: 0 !important;
+    z-index: 10000 !important;
+  }
+
+  .modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 20px 20px 0 0 !important;
+    max-height: 88vh !important;
+    max-height: 88dvh !important;
+    margin: 0 !important;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1) !important;
+    padding-bottom: calc(var(--safe-bottom) + 16px) !important;
+    border-bottom: none !important;
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.4) !important;
+  }
+
+  .modal-overlay:not(.hidden) .modal {
+    transform: translateY(0) !important;
+  }
+
+  .modal-header::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 36px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+  }
+
+  .modal-header {
+    position: relative !important;
+    padding-top: 18px !important;
+  }
+
+  /* 7. Drawer Mais */
+  .mobile-more-drawer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--bg-surface);
+    border-radius: 20px 20px 0 0;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    z-index: 9995;
+    padding: 16px 14px calc(var(--safe-bottom) + 16px) 14px;
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.4);
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .mobile-more-drawer.open {
+    transform: translateY(0);
+  }
+
+  .mobile-more-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .mobile-more-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 12px 6px;
+    border-radius: 12px;
+    background: var(--bg-raised, rgba(255,255,255,0.03));
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+
+  /* 8. Inputs & Touch */
+  input, select, textarea, button {
+    font-size: 16px !important;
+  }
+
+  .btn {
+    min-height: 42px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  /* ══════════════════════════════════════════
+     9. MOBILE LEAN DASHBOARD (NOVO DESIGN ENXUTO)
+     ══════════════════════════════════════════ */
+  .mobile-lean-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-bottom: 20px;
+  }
+
+  .mobile-lean-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 2px;
+  }
+
+  .user-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+  }
+
+  .user-pill-texts {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .user-greeting {
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1.2;
+  }
+
+  .user-family-badge {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .mobile-compact-month {
+    display: inline-flex;
+    align-items: center;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 2px 4px;
+  }
+
+  .btn-compact-month {
+    background: none !important;
+    border: none !important;
+    font-size: 16px !important;
+    color: var(--text-primary) !important;
+    padding: 2px 6px !important;
+    cursor: pointer !important;
+    min-height: 28px !important;
+  }
+
+  .compact-month-text {
+    font-size: 11.5px;
+    font-weight: 800;
+    color: var(--text-primary);
+    padding: 0 2px;
+    white-space: nowrap;
+  }
+
+  /* Hero Balance Card */
+  .mobile-hero-balance-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 16px 14px;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.06);
+  }
+
+  .hero-balance-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2px;
+  }
+
+  .hero-balance-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .hero-patrimony-badge {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--accent);
+    background: rgba(16, 185, 129, 0.1);
+    padding: 2px 6px;
+    border-radius: 10px;
+  }
+
+  .hero-balance-value {
+    font-size: 24px;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    margin-bottom: 10px;
+  }
+
+  .hero-inout-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg-raised, rgba(255,255,255,0.03));
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 8px 10px;
+    margin-bottom: 12px;
+  }
+
+  .hero-inout-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .hero-inout-sep {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+    margin: 0 6px;
+  }
+
+  .inout-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .inout-val {
+    font-size: 12.5px;
+    font-weight: 800;
+    margin-top: 1px;
+  }
+
+  .inout-inc { color: #10b981; }
+  .inout-exp { color: #ef4444; }
+
+  .mobile-hero-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .hero-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 8px !important;
+    border-radius: 12px !important;
+    font-size: 12.5px !important;
+    font-weight: 800 !important;
+    cursor: pointer !important;
+    min-height: 44px !important;
+    transition: transform 0.15s ease !important;
+  }
+
+  .hero-btn:active {
+    transform: scale(0.96) !important;
+  }
+
+  .hero-btn-expense {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3) !important;
+  }
+
+  .hero-btn-income {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3) !important;
+  }
+
+  .hero-btn-scanner {
+    flex: 0 0 44px !important;
+    background: var(--bg-raised, rgba(255,255,255,0.06)) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text-primary) !important;
+    font-size: 17px !important;
+  }
+
+  /* Block Headers */
+  .mobile-block-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+
+  .block-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .block-title {
+    font-size: 12.5px;
+    font-weight: 800;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .block-badge {
+    font-size: 10px;
+    font-weight: 700;
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+    border-radius: 8px;
+    padding: 1px 5px;
+  }
+
+  .block-link {
+    font-size: 11.5px;
+    color: var(--accent);
+    background: none;
+    border: none;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  /* Cards Horizontal Slider */
+  .mobile-cards-slider {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    gap: 10px;
+    padding: 2px 2px 6px 2px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .slider-card-item {
+    flex: 0 0 260px;
+    scroll-snap-align: start;
+    border-radius: 16px;
+    padding: 14px;
+    color: #ffffff;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.1);
+    position: relative;
+  }
+
+  .slider-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+
+  .slider-bank-tag {
+    font-size: 10px;
+    font-weight: 800;
+    background: rgba(255,255,255,0.16);
+    padding: 2px 6px;
+    border-radius: 8px;
+    backdrop-filter: blur(8px);
+  }
+
+  .slider-holder {
+    font-size: 10px;
+    font-weight: 700;
+    opacity: 0.85;
+    text-transform: uppercase;
+  }
+
+  .slider-card-name {
+    font-size: 15px;
+    font-weight: 900;
+    margin-bottom: 8px;
+    color: #ffffff;
+  }
+
+  .slider-limit-highlight {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    background: rgba(0,0,0,0.22);
+    padding: 5px 8px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    border: 1px solid rgba(255,255,255,0.05);
+  }
+
+  .highlight-label {
+    font-size: 9.5px;
+    opacity: 0.75;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+
+  .highlight-val {
+    font-size: 13.5px;
+    font-weight: 900;
+  }
+
+  .slider-bar-wrap {
+    margin-bottom: 8px;
+  }
+
+  .slider-bar-bg {
+    height: 5px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 3px;
+  }
+
+  .slider-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+  }
+
+  .slider-bar-legend {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    opacity: 0.9;
+    font-weight: 600;
+  }
+
+  .slider-btn-row {
+    display: flex;
+  }
+
+  .slider-btn {
+    width: 100%;
+    padding: 6px 8px !important;
+    border-radius: 8px !important;
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    background: rgba(255,255,255,0.18) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255,255,255,0.25) !important;
+    cursor: pointer !important;
+    min-height: 30px !important;
+  }
+
+  /* Lean Accounts List */
+  .mobile-lean-accounts {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .lean-acc-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 12px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+  }
+
+  .lean-acc-row:active {
+    background: rgba(255,255,255,0.04);
+  }
+
+  .lean-acc-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .lean-acc-icon {
+    font-size: 16px;
+  }
+
+  .lean-acc-name {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--text-primary);
+  }
+
+  .lean-acc-owner {
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  .lean-acc-val {
+    font-size: 13px;
+  }
+
+  /* Lean Transactions List */
+  .mobile-lean-tx-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .lean-tx-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 12px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+  }
+
+  .lean-tx-item:active {
+    background: rgba(255,255,255,0.04);
+  }
+
+  .lean-tx-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .lean-tx-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.04);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .lean-tx-title {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--text-primary);
+  }
+
+  .lean-tx-sub {
+    font-size: 10px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .status-tag {
+    font-weight: 700;
+  }
+
+  .tag-paid { color: #10b981; }
+  .tag-pending { color: #f59e0b; }
+
+  .lean-tx-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .lean-tx-amount {
+    font-size: 12.5px;
+  }
+
+  .lean-pay-btn {
+    padding: 2px 7px !important;
+    border-radius: 6px !important;
+    background: #10b981 !important;
+    color: #ffffff !important;
+    border: none !important;
+    font-size: 10px !important;
+    font-weight: 800 !important;
+    cursor: pointer !important;
+    min-height: 24px !important;
+  }
+
+  .empty-slider-box,
+  .empty-tx-box {
+    background: var(--bg-surface);
+    border: 1px dashed var(--border);
+    border-radius: 14px;
+    padding: 16px;
+    text-align: center;
+  }
+}
+
+/* ── REGRAS PARA DESKTOP (Width > 768px) ── */
+@media (min-width: 769px) {
+  .mobile-bottom-nav,
+  .mobile-quick-fab,
+  .mobile-fab-menu,
+  .mobile-fab-backdrop,
+  .mobile-more-drawer {
+    display: none !important;
+  }
+}

@@ -220,22 +220,25 @@ let signupFamilyId = null;
 
 function openSignUpWizard() {
   const overlay = document.getElementById('signup-wizard-overlay');
-  overlay.classList.add('active');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    overlay.classList.add('active');
+  }
   currentSignUpStep = 1;
   signupFamilyId = null;
   updateSignUpWizardUI();
 
   // Clear inputs
-  document.getElementById('wiz-first-name').value = '';
-  document.getElementById('wiz-last-name').value = '';
-  document.getElementById('wiz-cpf').value = '';
-  document.getElementById('wiz-birth-date').value = '';
-  document.getElementById('wiz-email').value = '';
-  document.getElementById('wiz-phone').value = '';
-  document.getElementById('wiz-family-name').value = '';
-  document.getElementById('wiz-username').value = '';
-  document.getElementById('wiz-password').value = '';
-  document.getElementById('wiz-error-text').textContent = '';
+  const fn = document.getElementById('wiz-first-name'); if (fn) fn.value = '';
+  const ln = document.getElementById('wiz-last-name'); if (ln) ln.value = '';
+  const cpf = document.getElementById('wiz-cpf'); if (cpf) cpf.value = '';
+  const bd = document.getElementById('wiz-birth-date'); if (bd) bd.value = '';
+  const em = document.getElementById('wiz-email'); if (em) em.value = '';
+  const ph = document.getElementById('wiz-phone'); if (ph) ph.value = '';
+  const fam = document.getElementById('wiz-family-name'); if (fam) fam.value = '';
+  const un = document.getElementById('wiz-username'); if (un) un.value = '';
+  const pw = document.getElementById('wiz-password'); if (pw) pw.value = '';
+  const err = document.getElementById('wiz-error-text'); if (err) err.textContent = '';
 
   // Setup input listeners for sanitization & masks
   setupWizardMasksAndValidators();
@@ -563,7 +566,11 @@ setTimeout(() => {
         }
 
         toast('Família e conta criadas com sucesso!');
-        document.getElementById('signup-wizard-overlay').classList.remove('active');
+        const wizOverlay = document.getElementById('signup-wizard-overlay');
+        if (wizOverlay) {
+          wizOverlay.classList.remove('active');
+          setTimeout(() => { if (!wizOverlay.classList.contains('active')) wizOverlay.style.display = 'none'; }, 300);
+        }
         
         // Prefill login username
         document.getElementById('login-username').value = username;

@@ -116,16 +116,27 @@ module.exports = (Base) => class extends Base {
       credit_product: 'normal',
       due_date: null,
       pix_code: null,
+      penalty_amount: 0,
+      discount_amount: 0,
+      interest_rate: 0,
+      interest_type: 'daily',
+      penalty_fixed_rate: 0,
       ...data,
       payment_date: data.is_paid ? (data.payment_date || data.date) : null
     };
+    txData.interest_rate = parseFloat(txData.interest_rate) || 0;
+    txData.penalty_fixed_rate = parseFloat(txData.penalty_fixed_rate) || 0;
+    txData.penalty_amount = parseFloat(txData.penalty_amount) || 0;
+    txData.discount_amount = parseFloat(txData.discount_amount) || 0;
+
     const t = this.db.transaction(() => {
       const r = this.db.prepare(`
-        INSERT INTO transactions (user_id, account_id, category_id, recurring_item_id, type, amount, description, date, payment_date, competence_date, is_paid, is_avulso, notes, credit_product, due_date, pix_code)
-        VALUES (@user_id, @account_id, @category_id, @recurring_item_id, @type, @amount, @description, @date, @payment_date, @competence_date, @is_paid, @is_avulso, @notes, @credit_product, @due_date, @pix_code)
+        INSERT INTO transactions (user_id, account_id, category_id, recurring_item_id, type, amount, description, date, payment_date, competence_date, penalty_amount, discount_amount, interest_rate, interest_type, penalty_fixed_rate, is_paid, is_avulso, notes, credit_product, due_date, pix_code)
+        VALUES (@user_id, @account_id, @category_id, @recurring_item_id, @type, @amount, @description, @date, @payment_date, @competence_date, @penalty_amount, @discount_amount, @interest_rate, @interest_type, @penalty_fixed_rate, @is_paid, @is_avulso, @notes, @credit_product, @due_date, @pix_code)
       `).run(txData);
       if (txData.is_paid) {
-        const delta = txData.type === 'income' ? txData.amount : -txData.amount;
+        const net = txData.amount + txData.penalty_amount - txData.discount_amount;
+        const delta = txData.type === 'income' ? net : -net;
         this.db.prepare('UPDATE accounts SET balance = balance + ? WHERE id = ?').run(delta, txData.account_id);
       }
       return r.lastInsertRowid;
@@ -133,10 +144,23 @@ module.exports = (Base) => class extends Base {
     const id = t();
     const cleanType = data.type === 'income' ? 'receita' : 'despesa';
     this.logEvent('transaction:create', `Usuário "${user ? user.name : 'Desconhecido'}" lançou uma ${cleanType}: "${data.description}" (Valor: R$ ${data.amount}).`, familyId);
+    this.logAudit({
+      userId: data.user_id,
+      familyId,
+      userName: user ? user.name : null,
+      action: 'TRANSACTION_CREATE',
+      entityType: 'transaction',
+      entityId: id,
+      description: `Criou lançamento: "${data.description}" (R$ ${data.amount})`,
+      newValues: { description: data.description, amount: data.amount, type: data.type, date: data.date, is_paid: data.is_paid }
+    });
     return { success: true, id };
   }
 
-  updateTransaction(data) {
+  updateTransaction(data, maybePayload) {
+    if (typeof data !== 'object' || data === null) {
+      data = { id: data, ...(maybePayload || {}) };
+    }
     const old = this.db.prepare('SELECT * FROM transactions WHERE id = ?').get(data.id);
     if (!old) return { success: false, error: 'Lançamento não encontrado' };
     const txData = {
@@ -144,20 +168,42 @@ module.exports = (Base) => class extends Base {
       ...data,
       payment_date: (data.is_paid !== undefined ? data.is_paid : old.is_paid) ? (data.payment_date || old.payment_date || data.date || old.date) : null
     };
+    txData.interest_rate = txData.interest_rate !== undefined ? parseFloat(txData.interest_rate) || 0 : (old.interest_rate || 0);
+    txData.interest_type = txData.interest_type || old.interest_type || 'daily';
+    txData.penalty_fixed_rate = txData.penalty_fixed_rate !== undefined ? parseFloat(txData.penalty_fixed_rate) || 0 : (old.penalty_fixed_rate || 0);
+    txData.penalty_amount = txData.penalty_amount !== undefined ? parseFloat(txData.penalty_amount) || 0 : (old.penalty_amount || 0);
+    txData.discount_amount = txData.discount_amount !== undefined ? parseFloat(txData.discount_amount) || 0 : (old.discount_amount || 0);
+
     this.db.transaction(() => {
       if (old.is_paid) {
-        const d = old.type === 'income' ? -old.amount : old.amount;
+        const oldNet = old.amount + (old.penalty_amount || 0) - (old.discount_amount || 0);
+        const d = old.type === 'income' ? -oldNet : oldNet;
         this.db.prepare('UPDATE accounts SET balance = balance + ? WHERE id = ?').run(d, old.account_id);
       }
       this.db.prepare(`
         UPDATE transactions SET account_id=@account_id, category_id=@category_id, type=@type,
-        amount=@amount, description=@description, date=@date, payment_date=@payment_date, competence_date=@competence_date, is_paid=@is_paid, notes=@notes, credit_product=@credit_product, due_date=@due_date, pix_code=@pix_code WHERE id=@id
+        amount=@amount, description=@description, date=@date, payment_date=@payment_date, competence_date=@competence_date,
+        penalty_amount=@penalty_amount, discount_amount=@discount_amount,
+        interest_rate=@interest_rate, interest_type=@interest_type, penalty_fixed_rate=@penalty_fixed_rate,
+        is_paid=@is_paid, notes=@notes, credit_product=@credit_product, due_date=@due_date, pix_code=@pix_code WHERE id=@id
       `).run(txData);
       if (txData.is_paid) {
-        const d = txData.type === 'income' ? txData.amount : -txData.amount;
+        const newNet = txData.amount + (txData.penalty_amount || 0) - (txData.discount_amount || 0);
+        const d = txData.type === 'income' ? newNet : -newNet;
         this.db.prepare('UPDATE accounts SET balance = balance + ? WHERE id = ?').run(d, txData.account_id);
       }
     })();
+
+    this.logAudit({
+      userId: data.user_id || old.user_id,
+      action: 'TRANSACTION_UPDATE',
+      entityType: 'transaction',
+      entityId: old.id,
+      description: `Alterou lançamento: "${old.description}" ➔ "${txData.description}" (De R$ ${old.amount} para R$ ${txData.amount})`,
+      oldValues: { description: old.description, amount: old.amount, type: old.type, date: old.date, is_paid: old.is_paid },
+      newValues: { description: txData.description, amount: txData.amount, type: txData.type, date: txData.date, is_paid: txData.is_paid }
+    });
+
     return { success: true };
   }
 
@@ -174,17 +220,37 @@ module.exports = (Base) => class extends Base {
 
     this.db.transaction(() => {
       if (t.is_paid && t.type !== 'transfer') {
-        const d = t.type === 'income' ? -t.amount : t.amount;
+        const net = (t.amount || 0) + (t.penalty_amount || 0) - (t.discount_amount || 0);
+        const d = t.type === 'income' ? -net : net;
         this.db.prepare('UPDATE accounts SET balance = balance + ? WHERE id = ?').run(d, t.account_id);
       }
-      // Sempre deleta de verdade quando o usuário clica em excluir.
-      // A marcação [PULADA] (is_avulso=2) é usada apenas internamente pelo sistema de postergação.
-      this.db.prepare('DELETE FROM transactions WHERE id = ?').run(id);
+      if (t.recurring_item_id) {
+        // Se pertencia a uma recorrência/parcelamento, marcamos como cancelado no mês (is_avulso = 2)
+        // para que a rotina generateMonthlyRecurrences não recrie o item imediatamente
+        this.db.prepare(`
+          UPDATE transactions 
+          SET is_avulso = 2, amount = 0, is_paid = 0, description = description || ' [Cancelado no mês]'
+          WHERE id = ?
+        `).run(id);
+      } else {
+        this.db.prepare('DELETE FROM transactions WHERE id = ?').run(id);
+      }
     })();
 
     if (t.family_id) {
       this.logEvent('transaction:delete', `Usuário "${t.user_name || 'Desconhecido'}" excluiu o lançamento: "${t.description}" (Valor original: R$ ${t.amount}).`, t.family_id);
     }
+    this.logAudit({
+      userId: t.user_id,
+      familyId: t.family_id,
+      userName: t.user_name,
+      action: 'TRANSACTION_DELETE',
+      entityType: 'transaction',
+      entityId: t.id,
+      description: `Excluiu lançamento: "${t.description}" (R$ ${t.amount})`,
+      oldValues: { description: t.description, amount: t.amount, type: t.type, date: t.date }
+    });
+
     return { success: true };
   }
 
@@ -199,6 +265,17 @@ module.exports = (Base) => class extends Base {
       this.db.prepare('UPDATE accounts SET balance = balance + ? WHERE id = ?').run(delta, t.account_id);
       this.db.prepare('UPDATE transactions SET is_paid = ?, payment_date = ? WHERE id = ?').run(newPaid, newPaid ? (t.payment_date || t.date || todayStr) : null, id);
     })();
+
+    this.logAudit({
+      userId: t.user_id,
+      action: newPaid ? 'TRANSACTION_PAY' : 'TRANSACTION_UNPAY',
+      entityType: 'transaction',
+      entityId: t.id,
+      description: newPaid ? `Quitou lançamento: "${t.description}"` : `Desmarcou pagamento de: "${t.description}"`,
+      oldValues: { is_paid: t.is_paid },
+      newValues: { is_paid: newPaid }
+    });
+
     return { success: true };
   }
 
@@ -243,6 +320,19 @@ module.exports = (Base) => class extends Base {
         `).run(id);
       }
     })();
+
+    this.logAudit({
+      userId: t.user_id,
+      action: newPaid ? 'TRANSACTION_PAY' : 'TRANSACTION_UNPAY',
+      entityType: 'transaction',
+      entityId: t.id,
+      description: newPaid
+        ? `Quitou lançamento: "${t.description}" (Base: R$ ${t.amount}, Juros: R$ ${penalty}, Desc: R$ ${discount}, Data: ${paymentDate})`
+        : `Desmarcou pagamento do lançamento: "${t.description}"`,
+      oldValues: { is_paid: t.is_paid, payment_date: t.payment_date, penalty_amount: t.penalty_amount, discount_amount: t.discount_amount },
+      newValues: { is_paid: newPaid ? 1 : 0, payment_date: newPaid ? paymentDate : null, penalty_amount: penalty, discount_amount: discount }
+    });
+
     return { success: true };
   }
 

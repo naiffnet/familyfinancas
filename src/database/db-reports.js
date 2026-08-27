@@ -26,12 +26,12 @@ module.exports = (Base) => class extends Base {
 
     if (profileType === 1) {
       // ADM Geral
-      income = this.db.prepare(`SELECT COALESCE(SUM(amount),0) as v FROM transactions WHERE type='income' AND is_paid=1 AND strftime('%m',date)=? AND strftime('%Y',date)=?`).get(m, y).v;
-      expense = this.db.prepare(`SELECT COALESCE(SUM(amount),0) as v FROM transactions WHERE type='expense' AND is_paid=1 AND strftime('%m',date)=? AND strftime('%Y',date)=?`).get(m, y).v;
+      income = this.db.prepare(`SELECT COALESCE(SUM(amount + COALESCE(penalty_amount,0) - COALESCE(discount_amount,0)),0) as v FROM transactions WHERE type='income' AND is_paid=1 AND strftime('%m',date)=? AND strftime('%Y',date)=?`).get(m, y).v;
+      expense = this.db.prepare(`SELECT COALESCE(SUM(amount + COALESCE(penalty_amount,0) - COALESCE(discount_amount,0)),0) as v FROM transactions WHERE type='expense' AND is_paid=1 AND strftime('%m',date)=? AND strftime('%Y',date)=?`).get(m, y).v;
       pending = this.db.prepare(`SELECT COALESCE(SUM(amount),0) as v FROM transactions WHERE type='expense' AND is_paid=0 AND strftime('%m',date)=? AND strftime('%Y',date)=?`).get(m, y).v;
     } else if (perm.can_view_all === 1) {
       income = this.db.prepare(`
-        SELECT COALESCE(SUM(t.amount),0) as v 
+        SELECT COALESCE(SUM(t.amount + COALESCE(t.penalty_amount,0) - COALESCE(t.discount_amount,0)),0) as v 
         FROM transactions t 
         LEFT JOIN accounts a ON t.account_id = a.id
         LEFT JOIN users u_tx ON t.user_id = u_tx.id
@@ -39,7 +39,7 @@ module.exports = (Base) => class extends Base {
         WHERE (u_tx.family_id=? OR u_acc.family_id=?) AND t.type='income' AND t.is_paid=1 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
       `).get(familyId, familyId, m, y).v;
       expense = this.db.prepare(`
-        SELECT COALESCE(SUM(t.amount),0) as v 
+        SELECT COALESCE(SUM(t.amount + COALESCE(t.penalty_amount,0) - COALESCE(t.discount_amount,0)),0) as v 
         FROM transactions t 
         LEFT JOIN accounts a ON t.account_id = a.id
         LEFT JOIN users u_tx ON t.user_id = u_tx.id
@@ -56,13 +56,13 @@ module.exports = (Base) => class extends Base {
       `).get(familyId, familyId, m, y).v;
     } else {
       income = this.db.prepare(`
-        SELECT COALESCE(SUM(t.amount),0) as v 
+        SELECT COALESCE(SUM(t.amount + COALESCE(t.penalty_amount,0) - COALESCE(t.discount_amount,0)),0) as v 
         FROM transactions t 
         LEFT JOIN accounts a ON t.account_id = a.id
         WHERE (t.user_id=? OR a.user_id=?) AND t.type='income' AND t.is_paid=1 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
       `).get(userId, userId, m, y).v;
       expense = this.db.prepare(`
-        SELECT COALESCE(SUM(t.amount),0) as v 
+        SELECT COALESCE(SUM(t.amount + COALESCE(t.penalty_amount,0) - COALESCE(t.discount_amount,0)),0) as v 
         FROM transactions t 
         LEFT JOIN accounts a ON t.account_id = a.id
         WHERE (t.user_id=? OR a.user_id=?) AND t.type='expense' AND t.is_paid=1 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?
@@ -89,13 +89,25 @@ module.exports = (Base) => class extends Base {
           AND date >= ? AND date <= ?
         `).get(acc.id, cycle.start, cycle.end).v;
 
-        const totalUnpaid = this.db.prepare(`
-          SELECT COALESCE(SUM(amount),0) as v FROM transactions 
-          WHERE account_id=? AND type='expense' AND (is_paid=0 OR is_paid IS NULL)
+        // 1. Soma de todas as faturas abertas / não pagas do cartão
+        const openInvoicesSum = this.db.prepare(`
+          SELECT COALESCE(SUM(amount), 0) as v 
+          FROM invoices 
+          WHERE card_account_id = ? AND is_paid = 0 AND is_renegotiated = 0 AND amount > 0
         `).get(acc.id).v;
 
+        // 2. Despesas avulsas ou pendentes ainda não associadas a faturas abertas
+        const unInvoicedTxs = this.db.prepare(`
+          SELECT COALESCE(SUM(amount), 0) as v 
+          FROM transactions 
+          WHERE account_id = ? AND type = 'expense' AND (is_paid = 0 OR is_paid IS NULL) AND is_avulso != 2 
+          AND (invoice_id IS NULL OR invoice_id NOT IN (SELECT id FROM invoices WHERE card_account_id = ? AND is_paid = 0))
+        `).get(acc.id, acc.id).v;
+
+        const totalCommitted = openInvoicesSum + unInvoicedTxs;
+
         cardMonthlyInvoices[acc.id] = cycleSpent;
-        cardSpending[acc.id] = Math.max(cycleSpent, totalUnpaid);
+        cardSpending[acc.id] = totalCommitted;
       } else {
         // 1. Receitas Avulsas do Mês
         const avulsoIncome = this.db.prepare(`
@@ -414,11 +426,11 @@ module.exports = (Base) => class extends Base {
       const y = String(d.getFullYear());
       let income, expense;
       if (perm.can_view_all === 1) {
-        income = this.db.prepare(`SELECT COALESCE(SUM(amount),0) as v FROM transactions WHERE type='income' AND is_paid=1 AND strftime('%m',COALESCE(payment_date, date))=? AND strftime('%Y',COALESCE(payment_date, date))=?`).get(m, y).v;
-        expense = this.db.prepare(`SELECT COALESCE(SUM(amount),0) as v FROM transactions WHERE type='expense' AND is_paid=1 AND strftime('%m',COALESCE(payment_date, date))=? AND strftime('%Y',COALESCE(payment_date, date))=?`).get(m, y).v;
+        income = this.db.prepare(`SELECT COALESCE(SUM(amount + COALESCE(penalty_amount,0) - COALESCE(discount_amount,0)),0) as v FROM transactions WHERE type='income' AND is_paid=1 AND strftime('%m',COALESCE(payment_date, date))=? AND strftime('%Y',COALESCE(payment_date, date))=?`).get(m, y).v;
+        expense = this.db.prepare(`SELECT COALESCE(SUM(amount + COALESCE(penalty_amount,0) - COALESCE(discount_amount,0)),0) as v FROM transactions WHERE type='expense' AND is_paid=1 AND strftime('%m',COALESCE(payment_date, date))=? AND strftime('%Y',COALESCE(payment_date, date))=?`).get(m, y).v;
       } else {
-        income = this.db.prepare(`SELECT COALESCE(SUM(amount),0) as v FROM transactions WHERE user_id=? AND type='income' AND is_paid=1 AND strftime('%m',COALESCE(payment_date, date))=? AND strftime('%Y',COALESCE(payment_date, date))=?`).get(userId, m, y).v;
-        expense = this.db.prepare(`SELECT COALESCE(SUM(amount),0) as v FROM transactions WHERE user_id=? AND type='expense' AND is_paid=1 AND strftime('%m',COALESCE(payment_date, date))=? AND strftime('%Y',COALESCE(payment_date, date))=?`).get(userId, m, y).v;
+        income = this.db.prepare(`SELECT COALESCE(SUM(amount + COALESCE(penalty_amount,0) - COALESCE(discount_amount,0)),0) as v FROM transactions WHERE user_id=? AND type='income' AND is_paid=1 AND strftime('%m',COALESCE(payment_date, date))=? AND strftime('%Y',COALESCE(payment_date, date))=?`).get(userId, m, y).v;
+        expense = this.db.prepare(`SELECT COALESCE(SUM(amount + COALESCE(penalty_amount,0) - COALESCE(discount_amount,0)),0) as v FROM transactions WHERE user_id=? AND type='expense' AND is_paid=1 AND strftime('%m',COALESCE(payment_date, date))=? AND strftime('%Y',COALESCE(payment_date, date))=?`).get(userId, m, y).v;
       }
       const label = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
       result.push({ month: label, income, expense });
@@ -432,7 +444,7 @@ module.exports = (Base) => class extends Base {
     const y = String(year);
     if (perm.can_view_all === 1) {
       return this.db.prepare(`
-        SELECT c.name, c.color, c.icon, COALESCE(SUM(t.amount),0) as total
+        SELECT c.name, c.color, c.icon, COALESCE(SUM(t.amount + COALESCE(t.penalty_amount,0) - COALESCE(t.discount_amount,0)),0) as total
         FROM transactions t JOIN categories c ON t.category_id = c.id
         WHERE t.type='expense' AND t.is_paid=1
         AND strftime('%m',COALESCE(t.payment_date, t.date))=? AND strftime('%Y',COALESCE(t.payment_date, t.date))=?
@@ -440,7 +452,7 @@ module.exports = (Base) => class extends Base {
       `).all(m, y);
     } else {
       return this.db.prepare(`
-        SELECT c.name, c.color, c.icon, COALESCE(SUM(t.amount),0) as total
+        SELECT c.name, c.color, c.icon, COALESCE(SUM(t.amount + COALESCE(t.penalty_amount,0) - COALESCE(t.discount_amount,0)),0) as total
         FROM transactions t JOIN categories c ON t.category_id = c.id
         WHERE t.user_id=? AND t.type='expense' AND t.is_paid=1
         AND strftime('%m',COALESCE(t.payment_date, t.date))=? AND strftime('%Y',COALESCE(t.payment_date, t.date))=?
@@ -463,7 +475,7 @@ module.exports = (Base) => class extends Base {
       // ADM Geral
       return this.db.prepare(`
         SELECT b.*, c.name as category_name, c.color, c.icon,
-          COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.category_id=b.category_id AND t.type='expense' AND t.is_paid=1 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?), 0) as spent
+          COALESCE((SELECT SUM(t.amount + COALESCE(t.penalty_amount,0) - COALESCE(t.discount_amount,0)) FROM transactions t WHERE t.category_id=b.category_id AND t.type='expense' AND t.is_paid=1 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?), 0) as spent
         FROM budgets b JOIN categories c ON b.category_id = c.id
         WHERE b.user_id=? AND b.month=? AND b.year=?
       `).all(m, y, userId, month, year);
@@ -472,14 +484,14 @@ module.exports = (Base) => class extends Base {
     if (perm.can_view_all === 1) {
       return this.db.prepare(`
         SELECT b.*, c.name as category_name, c.color, c.icon,
-          COALESCE((SELECT SUM(t.amount) FROM transactions t JOIN users u ON t.user_id = u.id WHERE t.category_id=b.category_id AND u.family_id=? AND t.type='expense' AND t.is_paid=1 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?), 0) as spent
+          COALESCE((SELECT SUM(t.amount + COALESCE(t.penalty_amount,0) - COALESCE(t.discount_amount,0)) FROM transactions t JOIN users u ON t.user_id = u.id WHERE t.category_id=b.category_id AND u.family_id=? AND t.type='expense' AND t.is_paid=1 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?), 0) as spent
         FROM budgets b JOIN categories c ON b.category_id = c.id
         WHERE b.user_id=? AND b.month=? AND b.year=?
       `).all(familyId, m, y, userId, month, year);
     } else {
       return this.db.prepare(`
         SELECT b.*, c.name as category_name, c.color, c.icon,
-          COALESCE((SELECT SUM(t.amount) FROM transactions t WHERE t.category_id=b.category_id AND t.user_id=b.user_id AND t.type='expense' AND t.is_paid=1 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?), 0) as spent
+          COALESCE((SELECT SUM(t.amount + COALESCE(t.penalty_amount,0) - COALESCE(t.discount_amount,0)) FROM transactions t WHERE t.category_id=b.category_id AND t.user_id=b.user_id AND t.type='expense' AND t.is_paid=1 AND strftime('%m',t.date)=? AND strftime('%Y',t.date)=?), 0) as spent
         FROM budgets b JOIN categories c ON b.category_id = c.id
         WHERE b.user_id=? AND b.month=? AND b.year=?
       `).all(m, y, userId, month, year);
@@ -612,7 +624,7 @@ module.exports = (Base) => class extends Base {
       
       // Transactions only on debit/checking accounts
       let query = `
-        SELECT COALESCE(SUM(CASE WHEN t.type = 'income' THEN t.amount WHEN t.type = 'expense' THEN -t.amount ELSE 0 END), 0) as v
+        SELECT COALESCE(SUM(CASE WHEN t.type = 'income' THEN (t.amount + COALESCE(t.penalty_amount,0) - COALESCE(t.discount_amount,0)) WHEN t.type = 'expense' THEN -(t.amount + COALESCE(t.penalty_amount,0) - COALESCE(t.discount_amount,0)) ELSE 0 END), 0) as v
         FROM transactions t
         JOIN accounts a ON t.account_id = a.id
         WHERE t.is_paid = 1 AND t.type != 'transfer' AND a.type != 'credit' AND t.date > ?
@@ -632,6 +644,173 @@ module.exports = (Base) => class extends Base {
       });
     }
     return result;
+  }
+
+  getInterestAuditReport(userId, month, year) {
+    const user = this.db.prepare('SELECT family_id, profile_type FROM users WHERE id = ?').get(userId);
+    const familyId = user ? user.family_id : null;
+    const profileType = user ? user.profile_type : 2;
+    const perm = this.getUserPermissions(userId);
+
+    const m = month ? String(month).padStart(2, '0') : null;
+    const y = year ? String(year) : null;
+
+    let baseFilter = "WHERE t.is_paid = 1 AND (t.penalty_amount > 0 OR t.discount_amount > 0 OR (t.payment_date IS NOT NULL AND t.payment_date > t.date))";
+    const params = [];
+
+    if (profileType !== 1) {
+      if (perm.can_view_all === 1) {
+        baseFilter += " AND (u.family_id = ? OR u_acc.family_id = ?)";
+        params.push(familyId, familyId);
+      } else {
+        baseFilter += " AND (t.user_id = ? OR a.user_id = ?)";
+        params.push(userId, userId);
+      }
+    }
+
+    let periodFilter = "";
+    const periodParams = [];
+    if (m && y) {
+      periodFilter = " AND strftime('%m', COALESCE(t.payment_date, t.date)) = ? AND strftime('%Y', COALESCE(t.payment_date, t.date)) = ?";
+      periodParams.push(m, y);
+    } else if (y) {
+      periodFilter = " AND strftime('%Y', COALESCE(t.payment_date, t.date)) = ?";
+      periodParams.push(y);
+    }
+
+    const joins = `
+      FROM transactions t
+      LEFT JOIN categories c ON t.category_id = c.id
+      LEFT JOIN accounts a ON t.account_id = a.id
+      LEFT JOIN users u ON t.user_id = u.id
+      LEFT JOIN users u_acc ON a.user_id = u_acc.id
+    `;
+
+    // 1. Summary for Period
+    const summary = this.db.prepare(`
+      SELECT 
+        COALESCE(SUM(t.penalty_amount), 0) as total_penalty,
+        COALESCE(SUM(t.discount_amount), 0) as total_discount,
+        COUNT(CASE WHEN t.penalty_amount > 0 THEN 1 END) as count_late_paid,
+        COUNT(CASE WHEN t.discount_amount > 0 THEN 1 END) as count_discounted,
+        COUNT(*) as total_records
+      ${joins}
+      ${baseFilter} ${periodFilter}
+    `).get(...params, ...periodParams);
+
+    // 2. Year summary
+    let totalPenaltyYear = 0;
+    if (y) {
+      const yearFilter = " AND strftime('%Y', COALESCE(t.payment_date, t.date)) = ?";
+      totalPenaltyYear = this.db.prepare(`
+        SELECT COALESCE(SUM(t.penalty_amount), 0) as v
+        ${joins}
+        ${baseFilter} ${yearFilter}
+      `).get(...params, y).v;
+    }
+
+    // 3. Transactions detail
+    const transactions = this.db.prepare(`
+      SELECT t.*, 
+             c.name as category_name, c.color as category_color, c.icon as category_icon,
+             a.name as account_name, a.bank as account_bank
+      ${joins}
+      ${baseFilter} ${periodFilter}
+      ORDER BY t.penalty_amount DESC, COALESCE(t.payment_date, t.date) DESC
+    `).all(...params, ...periodParams);
+
+    // Calculate days late and daily rate for each transaction
+    let totalDaysLate = 0;
+    let lateTxsCount = 0;
+    let sumDailyRates = 0;
+
+    const enrichedTransactions = transactions.map(t => {
+      const due = t.date ? t.date.split(' ')[0] : null;
+      const pay = t.payment_date ? t.payment_date.split(' ')[0] : due;
+      let daysLate = 0;
+      if (due && pay && pay > due) {
+        const dDue = new Date(due + 'T00:00:00');
+        const dPay = new Date(pay + 'T00:00:00');
+        daysLate = Math.round((dPay - dDue) / (1000 * 60 * 60 * 24));
+      }
+      const penalty = t.penalty_amount || 0;
+      const base = t.amount || 0;
+      let totalPct = base > 0 && penalty > 0 ? (penalty / base) * 100 : 0;
+      let dailyPct = daysLate > 0 && totalPct > 0 ? (totalPct / daysLate) : totalPct;
+
+      if (penalty > 0 && daysLate > 0) {
+        totalDaysLate += daysLate;
+        sumDailyRates += dailyPct;
+        lateTxsCount++;
+      }
+
+      return {
+        ...t,
+        days_late: daysLate,
+        total_interest_pct: totalPct,
+        daily_interest_pct: dailyPct,
+        net_paid: base + penalty - (t.discount_amount || 0)
+      };
+    });
+
+    summary.avg_days_late = lateTxsCount > 0 ? Math.round(totalDaysLate / lateTxsCount) : 0;
+    summary.avg_daily_rate = lateTxsCount > 0 ? parseFloat((sumDailyRates / lateTxsCount).toFixed(3)) : 0;
+    summary.total_penalty_year = totalPenaltyYear;
+
+    // 4. By Category
+    const byCategory = this.db.prepare(`
+      SELECT 
+        COALESCE(c.id, 0) as category_id,
+        COALESCE(c.name, 'Sem Categoria') as category_name,
+        COALESCE(c.color, '#64748b') as category_color,
+        COALESCE(c.icon, '📦') as category_icon,
+        COALESCE(SUM(t.penalty_amount), 0) as total_penalty,
+        COALESCE(SUM(t.discount_amount), 0) as total_discount,
+        COUNT(CASE WHEN t.penalty_amount > 0 THEN 1 END) as count
+      ${joins}
+      ${baseFilter} ${periodFilter}
+      GROUP BY c.id
+      HAVING total_penalty > 0 OR total_discount > 0
+      ORDER BY total_penalty DESC
+    `).all(...params, ...periodParams);
+
+    // 5. By Supplier / Description
+    const bySupplier = this.db.prepare(`
+      SELECT 
+        t.description,
+        COALESCE(SUM(t.penalty_amount), 0) as total_penalty,
+        COALESCE(SUM(t.discount_amount), 0) as total_discount,
+        COUNT(CASE WHEN t.penalty_amount > 0 THEN 1 END) as count
+      ${joins}
+      ${baseFilter} ${periodFilter}
+      GROUP BY t.description
+      HAVING total_penalty > 0 OR total_discount > 0
+      ORDER BY total_penalty DESC
+      LIMIT 15
+    `).all(...params, ...periodParams);
+
+    // 6. By Account
+    const byAccount = this.db.prepare(`
+      SELECT 
+        a.id as account_id,
+        a.name as account_name,
+        a.bank as account_bank,
+        COALESCE(SUM(t.penalty_amount), 0) as total_penalty,
+        COUNT(CASE WHEN t.penalty_amount > 0 THEN 1 END) as count
+      ${joins}
+      ${baseFilter} ${periodFilter}
+      GROUP BY a.id
+      HAVING total_penalty > 0
+      ORDER BY total_penalty DESC
+    `).all(...params, ...periodParams);
+
+    return {
+      summary,
+      byCategory,
+      bySupplier,
+      byAccount,
+      transactions: enrichedTransactions
+    };
   }
 
   // ── FAMILIES & LOGS MANAGEMENT ─────────────────────────────────

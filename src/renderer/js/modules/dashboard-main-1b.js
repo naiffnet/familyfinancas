@@ -626,7 +626,8 @@ function setupCategoryInteractiveChart(wrapperElementId, chartStateKey, txs) {
         if (!catMap[name]) {
           catMap[name] = { name, color, icon, amount: 0, count: 0 };
         }
-        catMap[name].amount += (t.amount || 0);
+        const netAmount = (t.amount || 0) + (t.is_paid ? ((t.penalty_amount || 0) - (t.discount_amount || 0)) : 0);
+        catMap[name].amount += netAmount;
         catMap[name].count += 1;
       });
 

@@ -1,8 +1,8 @@
 /* ============================================
  * app.bundle.js — FamilyFinancas Renderer
  * Gerado por: npm run build:renderer
- * 2026-08-23T23:11:21.147Z
- * Modulos: 22
+ * 2026-08-27T11:22:59.570Z
+ * Modulos: 24
  * ============================================ */
 
 
@@ -73,6 +73,7 @@ if (!window.api) {
     },
     server: {
       getInfo: () => makeRpcCall('server:getInfo'),
+      getMetrics: () => makeRpcCall('server:getMetrics'),
     },
     auth: {
       login:    (d) => makeRpcCall('auth:login', d),
@@ -104,7 +105,7 @@ if (!window.api) {
       delete: (id)     => makeRpcCall('categories:delete', id),
     },
     recurring: {
-      getAll:          (userId, type, month, year) => makeRpcCall('recurring:getAll', { userId, type, month, year }),
+      getAll:          (userId, type, month, year) => (typeof userId === 'object' && userId !== null ? makeRpcCall('recurring:getAll', userId) : makeRpcCall('recurring:getAll', { userId, type, month, year })),
       create:          (d)            => makeRpcCall('recurring:create', d),
       update:          (d)            => makeRpcCall('recurring:update', d),
       delete:          (id, fromDate) => makeRpcCall('recurring:delete', { id, fromDate }),
@@ -121,10 +122,13 @@ if (!window.api) {
       togglePaid:  (id) => makeRpcCall('transactions:togglePaid', id),
       togglePaidWithDate: (id, date, options) => makeRpcCall('transactions:togglePaidWithDate', id, date, options),
       updatePositions: (userId, positions) => makeRpcCall('transactions:updatePositions', { userId, positions }),
+      refund:      (d)  => makeRpcCall('transactions:refund', d),
     },
     invoices: {
       getMonthly:  (d) => makeRpcCall('invoices:getMonthly', d),
       pay:         (d) => makeRpcCall('invoices:pay', d),
+      payPartial:  (d) => makeRpcCall('cards:payInvoicePartial', d),
+      anticipate:  (d) => makeRpcCall('cards:anticipateInstallments', d),
       renegotiate: (d) => makeRpcCall('invoices:renegotiate', d),
       reopen:      (d) => makeRpcCall('invoices:reopen', d),
       recalculate: (d) => makeRpcCall('invoices:recalculate', d),
@@ -147,12 +151,14 @@ if (!window.api) {
       getCategoryChart:(d)=> makeRpcCall('dashboard:getCategoryChart', d),
     },
     reports: {
-      getCashflow:  (d) => makeRpcCall('reports:getCashflow', d),
-      getPatrimony: (d) => makeRpcCall('reports:getPatrimony', d),
+      getCashflow:      (d) => makeRpcCall('reports:getCashflow', d),
+      getPatrimony:     (d) => makeRpcCall('reports:getPatrimony', d),
+      getInterestAudit: (d) => makeRpcCall('reports:getInterestAudit', d),
     },
     backup: {
       export: () => makeRpcCall('backup:export'),
       restore: (d) => makeRpcCall('backup:restore', d),
+      testIntegrity: (d) => makeRpcCall('backup:testIntegrity', d),
       exportExcel: (d) => makeRpcCall('backup:exportExcel', d),
       exportJson: (d) => makeRpcCall('backup:exportJson', d),
       exportCsv: (d) => makeRpcCall('backup:exportCsv', d),
@@ -171,6 +177,9 @@ if (!window.api) {
     logs: {
       get: () => makeRpcCall('server:getLogs'),
       getByFamily: (id) => makeRpcCall('logs:getByFamily', id),
+    },
+    audit: {
+      getLogs: (d) => makeRpcCall('audit:getLogs', d),
     },
     importer: {
       parseOfx: (ofxString) => makeRpcCall('importer:parseOfx', { ofxString }),
@@ -246,6 +255,151 @@ const fmt = {
     return isNaN(dateObj.getTime()) ? d : dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   }
 };
+
+/**
+ * Retorna os feriados nacionais bancários no Brasil (Anbima/Febraban) para o ano especificado
+ */
+function getNationalHolidays(year) {
+  const y = parseInt(year, 10) || new Date().getFullYear();
+  const holidays = new Set([
+    `${y}-01-01`, // Confraternização Universal
+    `${y}-04-21`, // Tiradentes
+    `${y}-05-01`, // Dia do Trabalho
+    `${y}-09-07`, // Independência do Brasil
+    `${y}-10-12`, // Nossa Senhora Aparecida
+    `${y}-11-02`, // Finados
+    `${y}-11-15`, // Proclamação da República
+    `${y}-11-20`, // Dia Nacional da Consciência Negra
+    `${y}-12-25`, // Natal
+  ]);
+
+  // Feriados Móveis baseados na Páscoa (Algoritmo de Meeus/Jones/Butcher)
+  const a = y % 19;
+  const b = Math.floor(y / 100);
+  const c = y % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+
+  const easter = new Date(y, month - 1, day);
+  const carnaval = new Date(easter.getTime() - 47 * 86400000);
+  const goodFriday = new Date(easter.getTime() - 2 * 86400000);
+  const corpusChristi = new Date(easter.getTime() + 60 * 86400000);
+
+  const formatIso = (dt) => `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+  
+  holidays.add(formatIso(carnaval));
+  holidays.add(formatIso(goodFriday));
+  holidays.add(formatIso(corpusChristi));
+
+  return holidays;
+}
+
+function isBusinessDay(dateStr) {
+  if (!dateStr) return true;
+  const clean = dateStr.split(' ')[0];
+  const parts = clean.split('-');
+  if (parts.length !== 3) return true;
+  const y = parseInt(parts[0], 10);
+  const d = new Date(clean + 'T12:00:00');
+  const dayOfWeek = d.getDay(); // 0 = Domingo, 6 = Sábado
+  if (dayOfWeek === 0 || dayOfWeek === 6) return false;
+
+  const holidays = getNationalHolidays(y);
+  return !holidays.has(clean);
+}
+
+function getNextBusinessDay(dateStr) {
+  if (!dateStr) return dateStr;
+  const clean = dateStr.split(' ')[0];
+  let d = new Date(clean + 'T12:00:00');
+  let currentIso = clean;
+  
+  while (!isBusinessDay(currentIso)) {
+    d = new Date(d.getTime() + 86400000);
+    currentIso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  return currentIso;
+}
+
+function isWeekendOrHoliday(dateStr) {
+  return !isBusinessDay(dateStr);
+}
+
+/**
+ * Calcula projeção de juros e encargos com base nas regras do contrato / instituição
+ * e aplica prorrogação legal automática para o próximo dia útil se vencer em fim de semana/feriado.
+ */
+function calculateProjectedInterest(baseAmount, dueDateStr, targetDateStr, rule = {}) {
+  const base = parseFloat(baseAmount) || 0;
+  if (!base || !dueDateStr || !targetDateStr) {
+    return { projectedAmount: base, penaltyAmount: 0, daysLate: 0, dailyRatePct: 0, fixedPenalty: 0, isLate: false };
+  }
+  const cleanDue = dueDateStr.split(' ')[0];
+  const cleanTarget = targetDateStr.split(' ')[0];
+  
+  // Prorrogação legal bancária: vencimento em fim de semana ou feriado prorroga para o 1º dia útil
+  const effectiveDue = getNextBusinessDay(cleanDue);
+  
+  const dEffectiveDue = new Date(effectiveDue + 'T00:00:00');
+  const dTarget = new Date(cleanTarget + 'T00:00:00');
+  const diffDays = Math.round((dTarget - dEffectiveDue) / 86400000);
+  const isLate = diffDays > 0;
+  const daysLate = isLate ? diffDays : 0;
+
+  if (!isLate) {
+    return { 
+      projectedAmount: base, 
+      penaltyAmount: 0, 
+      daysLate: 0, 
+      dailyRatePct: 0, 
+      fixedPenalty: 0, 
+      isLate: false, 
+      daysEarly: Math.abs(diffDays),
+      isProrogated: cleanDue !== effectiveDue,
+      effectiveDueDate: effectiveDue
+    };
+  }
+
+  const rate = parseFloat(rule.interest_rate) || 0;
+  const type = rule.interest_type || 'daily';
+  const fixedRate = parseFloat(rule.penalty_fixed_rate) || 0;
+
+  const fixedPenalty = (base * fixedRate) / 100;
+  let dailyRatePct = 0;
+
+  if (type === 'daily') {
+    dailyRatePct = rate;
+  } else if (type === 'monthly') {
+    dailyRatePct = rate / 30;
+  } else if (type === 'yearly') {
+    dailyRatePct = rate / 365;
+  } else if (type === 'installment' || type === 'contract') {
+    dailyRatePct = 0;
+  }
+
+  const dailyInterest = (base * (dailyRatePct / 100)) * daysLate;
+  const totalPenalty = Math.round((fixedPenalty + dailyInterest) * 100) / 100;
+
+  return {
+    projectedAmount: Math.round((base + totalPenalty) * 100) / 100,
+    penaltyAmount: totalPenalty,
+    daysLate,
+    dailyRatePct: parseFloat(dailyRatePct.toFixed(4)),
+    fixedPenalty,
+    isLate: true,
+    isProrogated: cleanDue !== effectiveDue,
+    effectiveDueDate: effectiveDue
+  };
+}
 
 // ── Bank Config ────────────────────────
 const BANKS = {
@@ -373,8 +527,10 @@ function navigate(page) {
     page = firstAllowed;
   }
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.mobile-nav-tab').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelector(`[data-page="${page}"]`)?.classList.add('active');
+  document.querySelector(`.sidebar-nav [data-page="${page}"]`)?.classList.add('active');
+  document.querySelector(`.mobile-bottom-nav [data-page="${page}"]`)?.classList.add('active');
   document.getElementById(`page-${page}`)?.classList.add('active');
   State.currentPage = page;
   renderPage(page);
@@ -753,6 +909,14 @@ async function renderDashboard() {
     return;
   }
 
+  // Se estiver em ambiente Mobile / Smartphone, renderizar o Dashboard Mobile focado em Lançamentos & Limites de Cartão
+  if (document.body.classList.contains('is-mobile-env') || window.innerWidth <= 768) {
+    if (typeof renderMobileAppDashboard === 'function') {
+      await renderMobileAppDashboard(page);
+      return;
+    }
+  }
+
   const currentMode = State.dashboardLayoutMode || 'executive';
   const modeLabels = {
     executive: '🌟 Executivo',
@@ -877,8 +1041,8 @@ async function renderDashboard() {
     const effectiveUnpaidExpenses = effectiveTxs.filter(t => t.type === 'expense' && (t.is_paid === 0 || t.is_paid === false));
     const effectivePaidIncomes = effectiveTxs.filter(t => t.type === 'income' && (t.is_paid === 1 || t.is_paid === true));
 
-    const income = effectivePaidIncomes.reduce((acc, t) => acc + (t.amount || 0), 0);
-    const expense = effectivePaidExpenses.reduce((acc, t) => acc + (t.amount || 0), 0);
+    const income = effectivePaidIncomes.reduce((acc, t) => acc + (t.amount || 0) + (t.penalty_amount || 0) - (t.discount_amount || 0), 0);
+    const expense = effectivePaidExpenses.reduce((acc, t) => acc + (t.amount || 0) + (t.penalty_amount || 0) - (t.discount_amount || 0), 0);
     const pending = effectiveUnpaidExpenses.reduce((acc, t) => acc + (t.amount || 0), 0);
     const balance = income - expense;
 
@@ -2118,7 +2282,8 @@ function setupCategoryInteractiveChart(wrapperElementId, chartStateKey, txs) {
         if (!catMap[name]) {
           catMap[name] = { name, color, icon, amount: 0, count: 0 };
         }
-        catMap[name].amount += (t.amount || 0);
+        const netAmount = (t.amount || 0) + (t.is_paid ? ((t.penalty_amount || 0) - (t.discount_amount || 0)) : 0);
+        catMap[name].amount += netAmount;
         catMap[name].count += 1;
       });
 
@@ -2536,6 +2701,14 @@ function renderRecurringList(container, items, monthlyTxs, type, accounts, categ
     const baseAmount = tx ? tx.amount : item.amount;
     const netAmount = baseAmount + (tx?.penalty_amount || 0) - (tx?.discount_amount || 0);
 
+    const todayStr = new Date().toISOString().split('T')[0];
+    const rule = {
+      interest_rate: (tx && tx.interest_rate !== undefined) ? tx.interest_rate : item.interest_rate,
+      interest_type: (tx && tx.interest_type) ? tx.interest_type : item.interest_type,
+      penalty_fixed_rate: (tx && tx.penalty_fixed_rate !== undefined) ? tx.penalty_fixed_rate : item.penalty_fixed_rate,
+    };
+    const proj = (!isPaid && isOverdue) ? calculateProjectedInterest(baseAmount, compDateStr, todayStr, rule) : null;
+
     let statusBadge = '';
     if (isPaid) {
       if (isEarlyPaid && hasDiscount) {
@@ -2550,7 +2723,7 @@ function renderRecurringList(container, items, monthlyTxs, type, accounts, categ
         statusBadge = `<span class="transaction-status status-paid">✓ Pago</span>`;
       }
     }
-    else if (isOverdue) statusBadge = `<span class="transaction-status" style="background:#7f1d1d;color:#f87171">⚠️ Atrasado</span>`;
+    else if (isOverdue) statusBadge = `<span class="transaction-status" style="background:#7f1d1d;color:#f87171" title="${Math.abs(daysLeft)}d de atraso${proj && proj.penaltyAmount > 0 ? ` • Juros estimados: +${fmt.currency(proj.penaltyAmount)}` : ''}">⚠️ Atrasado (${Math.abs(daysLeft)}d)</span>`;
     else if (isAlert) statusBadge = `<span class="transaction-status" style="background:var(--warning-dim);color:var(--warning)">🚨 Vence em ${daysLeft}d</span>`;
     else statusBadge = `<span class="transaction-status status-pending">⏳ Dia ${item.due_day}</span>`;
 
@@ -2597,6 +2770,11 @@ function renderRecurringList(container, items, monthlyTxs, type, accounts, categ
           <div class="transaction-amount ${type === 'income' ? 'income' : 'expense'}">
             ${type === 'income' ? '+' : '-'}${fmt.currency(isPaid ? netAmount : baseAmount)}
           </div>
+          ${!isPaid && isOverdue && proj && proj.penaltyAmount > 0 ? `
+            <div style="font-size:10px;font-weight:700;color:#f59e0b;margin-top:-2px" title="Valor aproximado atualizado para hoje com encargos (+${fmt.currency(proj.penaltyAmount)})">
+              Aprox. hoje: ${fmt.currency(proj.projectedAmount)}
+            </div>
+          ` : ''}
           ${isPaid && (hasPenalty || hasDiscount) ? `
             <div style="font-size:10px;color:var(--text-muted);margin-top:-2px">
               Base: ${fmt.currency(baseAmount)} • ${hasPenalty ? `Juros: +${fmt.currency(tx.penalty_amount)}` : `Desconto: -${fmt.currency(tx.discount_amount)}`}
@@ -2651,18 +2829,51 @@ function renderRecurringList(container, items, monthlyTxs, type, accounts, categ
 
       if (tx) {
         Modal.open('Editar Lançamento Fixo', `
-          <div style="padding: 16px; text-align: center;">
-            <p style="margin-bottom: 24px; font-size: 15px; color: var(--text-primary);">
-              Como deseja editar o item <strong>"${tx.description || item.name}"</strong>?
-            </p>
-            <div style="display: flex; flex-direction: column; gap: 12px;">
-              <button class="btn btn-primary" id="btn-edit-month" style="background: var(--accent); border-color: var(--accent); font-weight: 600;">
-                ✏️ Editar APENAS o valor/dados deste mês (${MONTHS[State.currentMonth - 1]} / ${State.currentYear})
-              </button>
-              <button class="btn btn-outline" id="btn-edit-all" style="background: var(--bg-raised); font-weight: 600;">
-                ⚙️ Editar o Cadastro Fixo Geral (Regra de todos os meses)
-              </button>
-              <button class="btn btn-secondary" id="btn-edit-cancel" style="margin-top: 8px;">
+          <div style="padding: 4px 2px;">
+            <div style="text-align: center; margin-bottom: 18px;">
+              <div style="display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; background: rgba(16, 185, 129, 0.12); color: #10b981; font-size: 20px; margin-bottom: 10px; border: 1px solid rgba(16, 185, 129, 0.25);">
+                ✏️
+              </div>
+              <h3 style="font-size: 15.5px; font-weight: 700; color: var(--text-primary); margin: 0 0 6px 0;">Como deseja editar este lançamento?</h3>
+              <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 20px; font-size: 12px; color: var(--text-secondary); max-width: 90%;">
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600;">📌 ${tx.description || item.name}</span>
+              </div>
+            </div>
+
+            <div class="choice-options-container">
+              <div class="choice-option-card card-accent-emerald" id="btn-edit-month">
+                <div class="choice-icon-wrap" style="background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25);">
+                  📅
+                </div>
+                <div class="choice-body">
+                  <div class="choice-title">
+                    <span>Apenas este mês (${MONTHS[State.currentMonth - 1]} / ${State.currentYear})</span>
+                  </div>
+                  <div class="choice-desc">
+                    Altera valor, vencimento ou categoria somente desta ocorrência. As outras parcelas continuam inalteradas.
+                  </div>
+                </div>
+                <div class="choice-chevron">›</div>
+              </div>
+
+              <div class="choice-option-card card-accent-indigo" id="btn-edit-all">
+                <div class="choice-icon-wrap" style="background: rgba(139, 92, 246, 0.12); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.25);">
+                  ⚙️
+                </div>
+                <div class="choice-body">
+                  <div class="choice-title">
+                    <span>Cadastro Fixo Geral (Regra Mestre)</span>
+                  </div>
+                  <div class="choice-desc">
+                    Altera a regra principal de valor, repetições, conta ou vencimento para todas as parcelas e meses futuros.
+                  </div>
+                </div>
+                <div class="choice-chevron">›</div>
+              </div>
+            </div>
+
+            <div style="margin-top: 16px; text-align: center;">
+              <button class="btn btn-secondary" id="btn-edit-cancel" style="min-width: 120px; font-size: 12.5px; border-radius: 8px;">
                 Cancelar
               </button>
             </div>
@@ -2693,20 +2904,53 @@ function renderRecurringList(container, items, monthlyTxs, type, accounts, categ
       const tx = monthlyTxs.find(t => t.recurring_item_id === itemId);
       
       Modal.open('Excluir Lançamento Fixo', `
-        <div style="padding: 16px; text-align: center;">
-          <p style="margin-bottom: 24px; font-size: 15px; color: var(--text-primary);">
-            Como deseja excluir o item <strong>"${item.name}"</strong>?
-          </p>
-          <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div style="padding: 4px 2px;">
+          <div style="text-align: center; margin-bottom: 18px;">
+            <div style="display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; background: rgba(239, 68, 68, 0.12); color: #f87171; font-size: 20px; margin-bottom: 10px; border: 1px solid rgba(239, 68, 68, 0.25);">
+              🗑️
+            </div>
+            <h3 style="font-size: 15.5px; font-weight: 700; color: var(--text-primary); margin: 0 0 6px 0;">Como deseja excluir este lançamento?</h3>
+            <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 20px; font-size: 12px; color: var(--text-secondary); max-width: 90%;">
+              <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600;">📌 ${item.name}</span>
+            </div>
+          </div>
+
+          <div class="choice-options-container">
             ${tx ? `
-              <button class="btn btn-primary" id="btn-del-month" style="background: var(--warning); border-color: var(--warning); color: #000; font-weight: 600;">
-                ❌ Excluir APENAS o lançamento deste mês
-              </button>
+            <div class="choice-option-card card-accent-amber" id="btn-del-month">
+              <div class="choice-icon-wrap" style="background: rgba(245, 158, 11, 0.12); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.25);">
+                🗓️
+              </div>
+              <div class="choice-body">
+                <div class="choice-title">
+                  <span>Excluir apenas neste mês (${MONTHS[State.currentMonth - 1]} / ${State.currentYear})</span>
+                </div>
+                <div class="choice-desc">
+                  Remove somente o lançamento desta competência. O cadastro fixo e os meses futuros continuam ativos.
+                </div>
+              </div>
+              <div class="choice-chevron">›</div>
+            </div>
             ` : ''}
-            <button class="btn btn-danger" id="btn-del-all" style="font-weight: 600;">
-              🗑️ Excluir TODAS as ocorrências futuras (Desativar item)
-            </button>
-            <button class="btn btn-secondary" id="btn-del-cancel" style="margin-top: 8px;">
+
+            <div class="choice-option-card card-accent-danger" id="btn-del-all">
+              <div class="choice-icon-wrap" style="background: rgba(239, 68, 68, 0.12); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25);">
+                🚫
+              </div>
+              <div class="choice-body">
+                <div class="choice-title">
+                  <span style="color: #f87171;">Desativar Cadastro Fixo (Todos os Meses)</span>
+                </div>
+                <div class="choice-desc">
+                  Desativa a regra mestre e remove todas as ocorrências futuras de forma definitiva.
+                </div>
+              </div>
+              <div class="choice-chevron">›</div>
+            </div>
+          </div>
+
+          <div style="margin-top: 16px; text-align: center;">
+            <button class="btn btn-secondary" id="btn-del-cancel" style="min-width: 120px; font-size: 12.5px; border-radius: 8px;">
               Cancelar
             </button>
           </div>
@@ -2718,18 +2962,51 @@ function renderRecurringList(container, items, monthlyTxs, type, accounts, categ
           if (item.repeat_months > 0) {
             // Limited installment expense - Ask if Postpone or Skip
             Modal.open('Opções do Parcelamento', `
-              <div style="padding: 16px; text-align: center;">
-                <p style="margin-bottom: 20px; font-size: 14px; color: var(--text-primary); line-height: 1.5;">
-                  Esta despesa é parcelada (<strong>${tx.description}</strong>).<br>Como deseja tratar a exclusão deste mês?
-                </p>
-                <div style="display: flex; flex-direction: column; gap: 12px;">
-                  <button class="btn btn-primary" id="btn-postpone" style="background: var(--accent); border-color: var(--accent); font-weight: 600;">
-                    ➡️ Postergar (Adiar para o próximo mês)
-                  </button>
-                  <button class="btn btn-outline" id="btn-skip" style="background: var(--bg-raised); font-weight: 600;">
-                    ❌ Pular Parcela (Cancelar a deste mês)
-                  </button>
-                  <button class="btn btn-secondary" id="btn-postpone-cancel" style="margin-top: 8px;">
+              <div style="padding: 4px 2px;">
+                <div style="text-align: center; margin-bottom: 18px;">
+                  <div style="display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; background: rgba(14, 165, 233, 0.12); color: #38bdf8; font-size: 20px; margin-bottom: 10px; border: 1px solid rgba(14, 165, 233, 0.25);">
+                    ⏳
+                  </div>
+                  <h3 style="font-size: 15.5px; font-weight: 700; color: var(--text-primary); margin: 0 0 6px 0;">Tratamento do Parcelamento</h3>
+                  <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 20px; font-size: 12px; color: var(--text-secondary); max-width: 90%;">
+                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600;">📌 ${tx.description}</span>
+                  </div>
+                </div>
+
+                <div class="choice-options-container">
+                  <div class="choice-option-card card-accent-emerald" id="btn-postpone">
+                    <div class="choice-icon-wrap" style="background: rgba(16, 185, 129, 0.12); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25);">
+                      ➡️
+                    </div>
+                    <div class="choice-body">
+                      <div class="choice-title">
+                        <span>Postergar Parcela (Adiar para o próximo mês)</span>
+                      </div>
+                      <div class="choice-desc">
+                        Empurra esta parcela e todas as subsequentes em 1 mês para a frente, mantendo o total de parcelas intacto.
+                      </div>
+                    </div>
+                    <div class="choice-chevron">›</div>
+                  </div>
+
+                  <div class="choice-option-card card-accent-amber" id="btn-skip">
+                    <div class="choice-icon-wrap" style="background: rgba(245, 158, 11, 0.12); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.25);">
+                      ⏭️
+                    </div>
+                    <div class="choice-body">
+                      <div class="choice-title">
+                        <span>Pular Parcela (Cancelar apenas deste mês)</span>
+                      </div>
+                      <div class="choice-desc">
+                        Cancela a cobrança deste mês sem alterar o cronograma das parcelas dos meses seguintes.
+                      </div>
+                    </div>
+                    <div class="choice-chevron">›</div>
+                  </div>
+                </div>
+
+                <div style="margin-top: 16px; text-align: center;">
+                  <button class="btn btn-secondary" id="btn-postpone-cancel" style="min-width: 120px; font-size: 12.5px; border-radius: 8px;">
                     Cancelar
                   </button>
                 </div>
@@ -2770,6 +3047,19 @@ function renderRecurringList(container, items, monthlyTxs, type, accounts, categ
       };
       
       document.getElementById('btn-del-cancel').onclick = Modal.close;
+    };
+  });
+
+  // Clique na linha do lançamento fixo para abrir Pop-up de Detalhes completos
+  list.querySelectorAll('.recurring-item').forEach(row => {
+    row.onclick = (e) => {
+      if (e.target.closest('.transaction-check-btn, .rec-pix, .rec-priority, .rec-edit, .rec-delete')) return;
+      const itemId = parseInt(row.dataset.id);
+      const item = items.find(i => i.id === itemId);
+      const tx = monthlyTxs.find(t => t.recurring_item_id === itemId);
+      if (typeof openTransactionDetailsModal === 'function') {
+        openTransactionDetailsModal({ tx, item, accounts, categories, type, onUpdate: () => renderRecurring() });
+      }
     };
   });
 }
@@ -2831,6 +3121,14 @@ function renderAvulsosList(container, txs, accounts, categories, tabType) {
     const baseAmount = t.amount;
     const netAmount = baseAmount + (t.penalty_amount || 0) - (t.discount_amount || 0);
 
+    const todayStr = new Date().toISOString().split('T')[0];
+    const rule = {
+      interest_rate: t.interest_rate,
+      interest_type: t.interest_type,
+      penalty_fixed_rate: t.penalty_fixed_rate,
+    };
+    const proj = (!isPaid && isOverdue) ? calculateProjectedInterest(baseAmount, compDateStr, todayStr, rule) : null;
+
     let statusBadge = '';
     if (isPaid) {
       if (isEarlyPaid && hasDiscount) {
@@ -2845,7 +3143,7 @@ function renderAvulsosList(container, txs, accounts, categories, tabType) {
         statusBadge = `<span class="transaction-status status-paid">✓ Pago${payDateStr ? ' (' + fmt.date(payDateStr) + ')' : ''}</span>`;
       }
     }
-    else if (isOverdue) statusBadge = `<span class="transaction-status" style="background:#7f1d1d;color:#f87171">⚠️ Atrasado</span>`;
+    else if (isOverdue) statusBadge = `<span class="transaction-status" style="background:#7f1d1d;color:#f87171" title="${Math.abs(daysLeft)}d de atraso${proj && proj.penaltyAmount > 0 ? ` • Juros estimados: +${fmt.currency(proj.penaltyAmount)}` : ''}">⚠️ Atrasado (${Math.abs(daysLeft)}d)</span>`;
     else if (isAlert) statusBadge = `<span class="transaction-status" style="background:var(--warning-dim);color:var(--warning)">🚨 Vence em ${daysLeft}d</span>`;
     else statusBadge = `<span class="transaction-status status-pending">⏳ Pendente</span>`;
 
@@ -2861,10 +3159,15 @@ function renderAvulsosList(container, txs, accounts, categories, tabType) {
           ${t.competence_date ? `<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:var(--bg-raised);color:var(--text-muted);border:1px solid var(--border);font-weight:600;margin-left:4px" title="Mês de Referência / Consumo">Ref: ${fmtCompetence(t.competence_date)}</span>` : ''}
           ${!canEdit ? '<span title="Apenas Leitura" style="font-size: 11px; opacity: 0.7;">🔒</span>' : ''}
         </div>
-        <div class="transaction-meta">${fmt.date(t.date)} • ${(t.account_type === 'credit' || accounts.find(a => a.id === t.account_id)?.type === 'credit') ? `<span style="font-size:10px;padding:1px 6px;border-radius:6px;background:rgba(236,72,153,0.15);color:#ec4899;border:1px solid rgba(236,72,153,0.3);font-weight:600">💳 ${t.account_name}</span>` : (t.account_name || '—')} ${t.category_name ? `• ${t.category_name}` : ''}</div>
+        <div class="transaction-meta">${fmt.date(t.date)}${typeof isWeekendOrHoliday === 'function' && isWeekendOrHoliday(t.date) && !isPaid ? ` <span style="font-size:10.5px;color:#60a5fa;font-weight:600" title="Vence em fim de semana ou feriado. Prorroga para o 1º dia útil: ${fmt.date(getNextBusinessDay(t.date))}">📅 Prorroga: ${fmt.date(getNextBusinessDay(t.date))}</span>` : ''} • ${(t.account_type === 'credit' || accounts.find(a => a.id === t.account_id)?.type === 'credit') ? `<span style="font-size:10px;padding:1px 6px;border-radius:6px;background:rgba(236,72,153,0.15);color:#ec4899;border:1px solid rgba(236,72,153,0.3);font-weight:600">💳 ${t.account_name}</span>` : (t.account_name || '—')} ${t.category_name ? `• ${t.category_name}` : ''}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
         <div class="transaction-amount ${t.type === 'income' ? 'income' : 'expense'}">${t.type === 'income' ? '+' : '-'}${fmt.currency(isPaid ? netAmount : baseAmount)}</div>
+        ${!isPaid && isOverdue && proj && proj.penaltyAmount > 0 ? `
+          <div style="font-size:10px;font-weight:700;color:#f59e0b;margin-top:-2px" title="Valor aproximado atualizado para hoje com encargos (+${fmt.currency(proj.penaltyAmount)})">
+            Aprox. hoje: ${fmt.currency(proj.projectedAmount)}
+          </div>
+        ` : ''}
         ${isPaid && (hasPenalty || hasDiscount) ? `
           <div style="font-size:10px;color:var(--text-muted);margin-top:-2px">
             Base: ${fmt.currency(baseAmount)} • ${hasPenalty ? `Juros: +${fmt.currency(t.penalty_amount)}` : `Desconto: -${fmt.currency(t.discount_amount)}`}
@@ -2917,13 +3220,27 @@ function renderAvulsosList(container, txs, accounts, categories, tabType) {
       const amountStr = tx ? fmt.currency(tx.amount) : '';
 
       Modal.open('Excluir Lançamento Variável', `
-        <div style="padding:16px;text-align:center">
-          <p style="margin-bottom:20px;font-size:15px;color:var(--text-primary);line-height:1.5">
-            Tem certeza que deseja excluir permanentemente a despesa <strong>${desc}</strong>${amountStr ? ' no valor de <strong style="color:var(--danger)">' + amountStr + '</strong>' : ''}?
-          </p>
-          <div style="display:flex;flex-direction:column;gap:10px">
-            <button class="btn btn-danger" id="btn-confirm-delete-avl" style="font-weight:600;padding:10px;background:#ef4444;border-color:#ef4444;color:#fff;border-radius:8px">🗑️ Sim, Excluir Definitivamente</button>
-            <button class="btn btn-secondary" id="btn-cancel-delete-avl" style="padding:8px">Cancelar</button>
+        <div style="padding: 4px 2px;">
+          <div style="text-align: center; margin-bottom: 18px;">
+            <div style="display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; background: rgba(239, 68, 68, 0.12); color: #f87171; font-size: 20px; margin-bottom: 10px; border: 1px solid rgba(239, 68, 68, 0.25);">
+              🗑️
+            </div>
+            <h3 style="font-size: 15.5px; font-weight: 700; color: var(--text-primary); margin: 0 0 6px 0;">Excluir Lançamento Variável</h3>
+            <p style="font-size: 13px; color: var(--text-muted); margin: 0 0 12px 0;">
+              Tem certeza que deseja excluir permanentemente este lançamento?
+            </p>
+            <div style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 20px; font-size: 12.5px; color: var(--text-secondary); max-width: 90%;">
+              <span>📌 <strong>${desc}</strong>${amountStr ? ' • <strong style="color:#f87171">' + amountStr + '</strong>' : ''}</span>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button class="btn btn-secondary" id="btn-cancel-delete-avl" style="flex: 1; padding: 10px; font-size: 13px; border-radius: 8px;">
+              Cancelar
+            </button>
+            <button class="btn btn-danger" id="btn-confirm-delete-avl" style="flex: 1.3; font-weight: 700; padding: 10px; background: #ef4444; border-color: #ef4444; color: #fff; border-radius: 8px; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <span>🗑️</span> Confirmar Exclusão
+            </button>
           </div>
         </div>
       `);
@@ -2935,6 +3252,18 @@ function renderAvulsosList(container, txs, accounts, categories, tabType) {
         if (res && res.error) toast(res.error, 'error');
         else { toast('Despesa variável excluída com sucesso!', 'success'); renderRecurring(); }
       };
+    };
+  });
+
+  // Clique na linha do lançamento avulso para abrir Pop-up de Detalhes completos
+  list.querySelectorAll('.transaction-item').forEach(row => {
+    row.onclick = (e) => {
+      if (e.target.closest('.transaction-check-btn, .avl-pix, .avl-edit, .avl-delete')) return;
+      const txId = parseInt(row.dataset.id);
+      const tx = txs.find(t => t.id == txId);
+      if (tx && typeof openTransactionDetailsModal === 'function') {
+        openTransactionDetailsModal({ tx, item: null, accounts, categories, type: tx.type, onUpdate: () => renderRecurring() });
+      }
     };
   });
 }
@@ -3142,92 +3471,151 @@ function renderInvoicesList(container, invoices, accounts) {
   }
 
   const mName = MONTHS[State.currentMonth - 1] || '';
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const totalAmount = invoices.reduce((sum, i) => sum + (i.amount || 0) + (i.penalty_amount || 0) - (i.discount_amount || 0), 0);
+  const paidInvoices = invoices.filter(i => i.is_paid);
+  const paidAmount = paidInvoices.reduce((sum, i) => sum + (i.amount || 0) + (i.penalty_amount || 0) - (i.discount_amount || 0), 0);
+  const openInvoices = invoices.filter(i => !i.is_paid);
+  const openAmount = openInvoices.reduce((sum, i) => sum + (i.amount || 0) + (i.penalty_amount || 0) - (i.discount_amount || 0), 0);
 
   container.innerHTML = `
-    <div class="section-title" style="margin-top:16px;margin-bottom:10px;font-size:16px;font-weight:600;color:var(--text-primary);display:flex;align-items:center;gap:8px">
-      <span style="font-size:18px">💳</span> Faturas de Cartão de Crédito (${mName} / ${State.currentYear})
-    </div>
-    <div class="invoices-list" style="display:flex;flex-direction:column;gap:10px">
-      ${invoices.map(inv => {
-        const b = BANKS[inv.bank] || BANKS.outro;
-        const netAmount = inv.amount + (inv.penalty_amount || 0) - (inv.discount_amount || 0);
-        const userBadge = inv.user_name ? `<span class="profile-badge" style="background:${inv.user_avatar_color || '#10b981'}22;color:${inv.user_avatar_color || '#10b981'};border:1px solid ${inv.user_avatar_color || '#10b981'}44;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600">${inv.user_name}</span>` : '';
-        const cardAccountId = inv.card_account_id || inv.card_id || inv.account_id;
-        const isSelected = (State.highlightCardId && State.highlightCardId === cardAccountId) || (State.highlightInvoiceId && State.highlightInvoiceId === inv.id);
-        
-        return `
-          <div class="invoice-card-item ${isSelected ? 'invoice-card-selected' : ''}" 
-               data-card-id="${cardAccountId || ''}" 
-               data-invoice-id="${inv.id || ''}" 
-               data-bank-color="${b.color}" 
-               data-card-name="${inv.card_name}"
-               style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-radius:var(--radius-md);background:${isSelected ? b.color + '25' : b.color + '15'};border:1.5px solid ${isSelected ? b.color : b.color + '44'};border-left:6px solid ${b.color};gap:12px;flex-wrap:wrap;cursor:pointer;${isSelected ? 'box-shadow: 0 0 20px ' + b.color + '44, inset 0 0 10px ' + b.color + '22;' : ''}">
-            <div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1">
-              ${bankLogo(inv.bank, 36)}
-              <div>
-                <div style="font-size:15px;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                  💳 FATURA ${inv.card_name.toUpperCase()} (Ref: ${String(inv.month).padStart(2,'0')}/${inv.year})
-                  ${userBadge}
+    <div class="invoices-section-wrap" style="margin-top: 20px; margin-bottom: 24px;">
+      <!-- Section Title & Executive KPI Bar -->
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
+        <div style="font-size: 15.5px; font-weight: 800; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 20px;">💳</span> Faturas de Cartão de Crédito
+          <span style="font-size: 11.5px; font-weight: 600; color: var(--text-muted); background: var(--bg-surface); padding: 3px 9px; border-radius: 12px; border: 1px solid var(--border);">
+            ${invoices.length} ${invoices.length === 1 ? 'cartão' : 'cartões'} • ${mName}/${State.currentYear}
+          </span>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 6px; background: var(--bg-surface); border: 1px solid var(--border); padding: 5px 12px; border-radius: 8px; font-size: 11.5px; box-shadow: 0 1px 4px rgba(0,0,0,0.03);">
+            <span style="color: var(--text-muted);">Total Geral:</span>
+            <strong style="color: var(--text-primary); font-weight: 800;">${fmt.currency(totalAmount)}</strong>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); padding: 5px 12px; border-radius: 8px; font-size: 11.5px;">
+            <span style="color: #10b981; font-weight: 700;">✓ Pago (${paidInvoices.length}):</span>
+            <strong style="color: #10b981; font-weight: 800;">${fmt.currency(paidAmount)}</strong>
+          </div>
+          ${openInvoices.length > 0 ? `
+          <div style="display: flex; align-items: center; gap: 6px; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); padding: 5px 12px; border-radius: 8px; font-size: 11.5px;">
+            <span style="color: #f59e0b; font-weight: 700;">⏳ Aberto (${openInvoices.length}):</span>
+            <strong style="color: #f87171; font-weight: 800;">${fmt.currency(openAmount)}</strong>
+          </div>` : ''}
+        </div>
+      </div>
+
+      <!-- Invoices Responsive Grid -->
+      <div class="invoices-list" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 14px;">
+        ${invoices.map(inv => {
+          const b = BANKS[inv.bank] || BANKS.outro;
+          const netAmount = inv.amount + (inv.penalty_amount || 0) - (inv.discount_amount || 0);
+          const userBadge = inv.user_name ? `<span class="profile-badge" style="background:${inv.user_avatar_color || '#10b981'}18;color:${inv.user_avatar_color || '#10b981'};border:1px solid ${inv.user_avatar_color || '#10b981'}33;padding:2px 7px;border-radius:10px;font-size:10.5px;font-weight:700">${inv.user_name}</span>` : '';
+          const cardAccountId = inv.card_account_id || inv.card_id || inv.account_id;
+          const isSelected = (State.highlightCardId && State.highlightCardId === cardAccountId) || (State.highlightInvoiceId && State.highlightInvoiceId === inv.id);
+          const isOverdue = !inv.is_paid && inv.due_date && inv.due_date < todayStr;
+          
+          return `
+            <div class="invoice-card-item ${isSelected ? 'invoice-card-selected' : ''}" 
+                 data-card-id="${cardAccountId || ''}" 
+                 data-invoice-id="${inv.id || ''}" 
+                 data-bank-color="${b.color}" 
+                 data-card-name="${inv.card_name}"
+                 style="--card-bank-color: ${b.color};">
+              
+              <!-- Colored Top Indicator Line -->
+              <div class="invoice-card-top-bar" style="background: linear-gradient(90deg, ${b.color}, ${b.color}88);"></div>
+
+              <div class="invoice-card-header">
+                <div class="invoice-bank-logo-wrap" style="background: ${b.color}18; border: 1px solid ${b.color}44;">
+                  ${bankLogo(inv.bank, 36)}
                 </div>
-                <div style="font-size:12px;color:var(--text-muted);margin-top:2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                  <span>Vence dia ${inv.due_day} • Fecha dia ${inv.closing_day}</span>
-                  <span class="invoice-highlight-badge badge" style="background:${isSelected ? b.color : b.color + '25'};color:${isSelected ? '#ffffff' : b.color};border:1px solid ${b.color}66;font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:10px;">
-                    ${isSelected ? '✨ Parcelas Destacadas abaixo' : '🔍 Ver Parcelas desta Fatura'}
-                  </span>
+                <div class="invoice-card-info">
+                  <div class="invoice-card-title">
+                    <span class="invoice-card-name">${inv.card_name.toUpperCase()}</span>
+                    <span class="invoice-ref-tag">Ref: ${String(inv.month).padStart(2,'0')}/${inv.year}</span>
+                    ${userBadge}
+                  </div>
+                  <div class="invoice-card-meta">
+                    <span class="meta-chip">📅 Vence dia <strong>${inv.due_day}</strong></span>
+                    <span class="meta-chip">🔒 Fecha dia <strong>${inv.closing_day}</strong></span>
+                  </div>
                 </div>
               </div>
-            </div>
-            
-            <div style="display:flex;align-items:center;gap:16px">
-              <div style="display:flex;flex-direction:column;align-items:flex-end">
-                <div style="font-size:16px;font-weight:900;color:#ef4444">
-                  -${fmt.currency(netAmount)}
+              
+              <div class="invoice-card-middle">
+                <div class="invoice-card-amount-col">
+                  <div class="invoice-amount-label">Valor Total da Fatura</div>
+                  <div class="invoice-card-amount">
+                    ${fmt.currency(netAmount)}
+                  </div>
                 </div>
-                ${inv.is_renegotiated ? `
-                  <span class="transaction-status" style="font-size:11px;background:#f59e0b22;color:#f59e0b;border:1px solid #f59e0b44">
-                    🤝 Renegociada / Parcelada
-                  </span>
-                ` : inv.is_paid ? `
-                  <span class="transaction-status status-paid" style="font-size:11px;background:#10b98122;color:#10b981;border:1px solid #10b98144">
-                    ✓ Quitada em ${fmt.date(inv.payment_date)} (${inv.payment_account_name || 'Conta'})
-                  </span>
-                ` : `
-                  <span class="transaction-status status-pending" style="font-size:11px">
-                    ⏳ Aberta • Vence em ${fmt.date(inv.due_date)}
-                  </span>
-                `}
+                
+                <div class="invoice-card-status-wrap">
+                  ${inv.is_renegotiated ? `
+                    <span class="invoice-status-pill status-reneg">
+                      <span>🤝</span> Acordo / Parcelada
+                    </span>
+                  ` : inv.is_paid ? `
+                    <span class="invoice-status-pill status-paid" title="${inv.payment_account_name ? 'Conta: ' + inv.payment_account_name : ''}">
+                      <span>✓</span> Quitada ${inv.payment_date ? 'em ' + fmt.date(inv.payment_date) : ''}
+                    </span>
+                  ` : `
+                    <span class="invoice-status-pill status-pending ${isOverdue ? 'status-overdue' : ''}">
+                      <span>${isOverdue ? '⚠️' : '⏳'}</span> ${isOverdue ? 'Em Atraso' : 'Aberta'} • Vence ${fmt.date(inv.due_date)}
+                    </span>
+                  `}
+                </div>
               </div>
 
-              ${!inv.is_paid ? `
-                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                  <button class="btn renegotiate-invoice-btn" data-id="${inv.id}" style="background:#f59e0b;border-color:#f59e0b;color:#000;font-weight:700;padding:8px 12px;font-size:12px;border-radius:8px">
-                    🤝 Parcelar / Acordo
-                  </button>
-                  <button class="btn btn-primary pay-invoice-btn" data-id="${inv.id}" style="background:${b.color};border-color:${b.color};font-weight:600;padding:8px 14px;font-size:12px">
-                    💳 Pagar Fatura
-                  </button>
+              <div class="invoice-card-footer">
+                <button type="button" class="btn invoice-highlight-btn ${isSelected ? 'btn-highlight-active' : ''}">
+                  ${isSelected ? '✨ Parcelas Destacadas' : '🔍 Ver Parcelas desta Fatura'}
+                </button>
+
+                <div class="invoice-card-actions">
+                  ${!inv.is_paid ? `
+                    <button class="btn btn-sm renegotiate-invoice-btn" data-id="${inv.id}" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35); font-weight: 700; border-radius: 8px; padding: 6px 12px;">
+                      🤝 Acordo
+                    </button>
+                    <button class="btn btn-sm btn-primary pay-invoice-btn" data-id="${inv.id}" style="background:${b.color};border-color:${b.color}; color:#fff; font-weight: 700; border-radius: 8px; padding: 6px 14px; box-shadow: 0 2px 8px ${b.color}44;">
+                      💳 Pagar Fatura
+                    </button>
+                  ` : `
+                    <button class="btn btn-sm btn-secondary reopen-invoice-btn" data-id="${inv.id}" title="Reabrir fatura e restaurar lançamentos para edição" style="font-size: 11.5px; border-radius: 8px; padding: 6px 12px;">
+                      ${inv.is_renegotiated ? '↩️ Desfazer Acordo' : '↩️ Desfazer Pagamento'}
+                    </button>
+                  `}
                 </div>
-              ` : `
-                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                  <button class="btn btn-secondary reopen-invoice-btn" data-id="${inv.id}" style="font-size:12px;padding:8px 12px;border-radius:8px;color:${inv.is_renegotiated ? '#f59e0b' : 'var(--text-primary)'};border:1px solid ${inv.is_renegotiated ? '#f59e0b88' : 'var(--border)'}" title="Reabrir fatura e restaurar lançamentos para edição">
-                    ${inv.is_renegotiated ? '↩️ Desfazer Acordo / Reabrir' : '↩️ Desfazer Pagamento'}
-                  </button>
-                </div>
-              `}
+              </div>
             </div>
-          </div>
-        `;
-      }).join('')}
+          `;
+        }).join('')}
+      </div>
     </div>
   `;
 
   // Bind invoice card click to toggle highlight on its installments
   container.querySelectorAll('.invoice-card-item').forEach(cardEl => {
     cardEl.onclick = (e) => {
-      // If clicked inside an action button, do nothing
-      if (e.target.closest('.pay-invoice-btn, .renegotiate-invoice-btn, .reopen-invoice-btn')) {
+      if (e.target.closest('.pay-invoice-btn, .renegotiate-invoice-btn, .reopen-invoice-btn, .invoice-highlight-btn')) {
         return;
       }
+      const cardId = parseInt(cardEl.dataset.cardId);
+      const invoiceId = parseInt(cardEl.dataset.invoiceId);
+      const cardColor = cardEl.dataset.bankColor;
+      const cardName = cardEl.dataset.cardName;
+      toggleInvoiceHighlight(cardId, cardColor, cardName, invoiceId);
+    };
+  });
+
+  container.querySelectorAll('.invoice-highlight-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const cardEl = btn.closest('.invoice-card-item');
+      if (!cardEl) return;
       const cardId = parseInt(cardEl.dataset.cardId);
       const invoiceId = parseInt(cardEl.dataset.invoiceId);
       const cardColor = cardEl.dataset.bankColor;
@@ -3552,6 +3940,291 @@ function openRenegotiateInvoiceModal(inv, accounts) {
   };
 }
 
+/**
+ * Abre o Pop-up com todas as informações detalhadas do lançamento
+ * e os 3 botões de ação: Excluir, Editar e Pagar.
+ */
+function openTransactionDetailsModal({ tx, item, accounts = [], categories = [], type = 'expense', onUpdate = null }) {
+  const isPaid = tx ? !!tx.is_paid : false;
+  const description = tx ? (tx.description || (item ? item.name : 'Lançamento')) : (item ? item.name : 'Lançamento');
+  const baseAmount = tx ? (tx.amount || 0) : (item ? (item.amount || 0) : 0);
+  const penalty = tx ? (tx.penalty_amount || 0) : 0;
+  const discount = tx ? (tx.discount_amount || 0) : 0;
+  const netAmount = baseAmount + (isPaid ? (penalty - discount) : 0);
+
+  const txDate = tx ? tx.date : (item ? `${State.currentYear}-${String(State.currentMonth).padStart(2, '0')}-${String(item.due_day || 1).padStart(2, '0')}` : null);
+  const payDate = tx ? tx.payment_date : null;
+  const compDate = tx ? tx.competence_date : null;
+
+  // Account
+  const accId = (tx ? tx.account_id : null) || (item ? item.account_id : null);
+  const acc = accounts.find(a => a.id === accId) || {};
+  const isCreditCard = acc.type === 'credit' || (item && item.account_type === 'credit');
+
+  // Category
+  const catId = (tx ? tx.category_id : null) || (item ? item.category_id : null);
+  const cat = categories.find(c => c.id === catId) || {};
+  const catName = cat.name || (tx ? tx.category_name : null) || (item ? item.category_name : null) || 'Sem Categoria';
+  const catIcon = cat.icon || (tx ? tx.category_icon : null) || (item ? item.icon : null) || (type === 'income' ? '💰' : '📋');
+  const catColor = cat.color || (item ? item.color : null) || '#94a3b8';
+
+  // User
+  const userName = (tx ? tx.user_name : null) || (acc ? acc.user_name : null) || (item ? item.user_name : null) || (State.user ? State.user.name : 'Titular');
+  const userColor = (tx ? tx.user_avatar_color : null) || (acc ? acc.user_avatar_color : null) || '#10b981';
+
+  // Notes & PIX
+  const notes = (tx ? tx.notes : null) || (item ? item.notes : null) || '';
+  const pixCode = (tx ? tx.pix_code : null) || (item ? item.pix_code : null) || (notes && notes.includes('000201') ? notes : null);
+
+  // Overdue calculation
+  const todayStr = new Date().toISOString().split('T')[0];
+  const isOverdue = !isPaid && txDate && txDate < todayStr;
+  const holidayOrWeekend = txDate && typeof isWeekendOrHoliday === 'function' && isWeekendOrHoliday(txDate);
+  const nextBusinessDay = holidayOrWeekend && typeof getNextBusinessDay === 'function' ? getNextBusinessDay(txDate) : null;
+
+  // Projected interest if overdue
+  let proj = null;
+  if (isOverdue && typeof calculateOverdueProjections === 'function') {
+    const dailyRate = (item && item.interest_rate) || 0.033;
+    const penaltyRate = (item && item.penalty_fixed_rate) || 2.0;
+    proj = calculateOverdueProjections(baseAmount, txDate, todayStr, dailyRate, penaltyRate);
+  }
+
+  // Nature (Fixo / Parcela / Avulso)
+  let natureLabel = 'Lançamento Avulso (Variável)';
+  if (item) {
+    if (item.repeat_months > 0) {
+      natureLabel = `Parcelamento (${item.repeat_months}x)`;
+    } else {
+      natureLabel = 'Lançamento Fixo Recorrente';
+    }
+  }
+
+  // Can user edit
+  const canEdit = State.user.profile_type === 1 || (State.permissions && State.permissions.can_edit_all) || (tx && tx.user_id === State.user.id) || (item && item.user_id === State.user.id);
+
+  // Status Badge
+  let statusBadgeHtml = '';
+  if (isPaid) {
+    statusBadgeHtml = `<span class="badge badge-green" style="font-size: 11px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px;">✓ Pago${payDate ? ' em ' + fmt.date(payDate) : ''}</span>`;
+  } else if (isOverdue) {
+    statusBadgeHtml = `<span class="badge badge-danger" style="font-size: 11px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px;">⚠️ Em Atraso${proj ? ` (${proj.daysLate} dias)` : ''}</span>`;
+  } else {
+    statusBadgeHtml = `<span class="badge badge-yellow" style="font-size: 11px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 4px;">⏳ Pendente</span>`;
+  }
+
+  Modal.open('Detalhes do Lançamento', `
+    <div style="padding: 2px;">
+      <!-- Top Card Header -->
+      <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 18px; margin-bottom: 16px; position: relative; overflow: hidden;">
+        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 14px;">
+          <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+            <div style="width: 48px; height: 48px; border-radius: 12px; background: ${catColor}22; border: 1px solid ${catColor}44; display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0;">
+              ${catIcon}
+            </div>
+            <div style="min-width: 0;">
+              <h3 style="font-size: 16px; font-weight: 800; color: var(--text-primary); margin: 0 0 4px 0; line-height: 1.3; word-break: break-word;">
+                ${item && item.is_priority ? '<span title="Item Prioritário" style="margin-right: 4px;">⭐</span>' : ''}${description}
+              </h3>
+              <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                <span class="badge ${type === 'income' ? 'badge-green' : 'badge-red'}" style="font-size: 10px; text-transform: uppercase;">
+                  ${type === 'income' ? 'Receita' : 'Despesa'}
+                </span>
+                <span class="badge" style="font-size: 10px; background: rgba(255,255,255,0.06); color: var(--text-secondary); border: 1px solid var(--border);">
+                  ${natureLabel}
+                </span>
+                ${statusBadgeHtml}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Big Highlight Amount -->
+        <div style="padding-top: 12px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;">
+              ${isPaid ? 'Valor Líquido Liquidado' : 'Valor Total'}
+            </div>
+            <div style="font-size: 26px; font-weight: 900; color: ${type === 'income' ? 'var(--accent-light)' : '#f87171'}; letter-spacing: -0.02em;">
+              ${type === 'income' ? '+' : '-'}${fmt.currency(netAmount)}
+            </div>
+          </div>
+          ${(penalty > 0 || discount > 0) && isPaid ? `
+            <div style="text-align: right; font-size: 11px; color: var(--text-muted); background: rgba(255,255,255,0.02); padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border);">
+              <div>Base: <strong>${fmt.currency(baseAmount)}</strong></div>
+              ${penalty > 0 ? `<div style="color: #f87171;">Juros/Multa: +${fmt.currency(penalty)}</div>` : ''}
+              ${discount > 0 ? `<div style="color: var(--accent-light);">Desconto: -${fmt.currency(discount)}</div>` : ''}
+            </div>
+          ` : ''}
+          ${!isPaid && isOverdue && proj && proj.penaltyAmount > 0 ? `
+            <div style="text-align: right; font-size: 11.5px; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); padding: 6px 10px; border-radius: 6px; color: #fbbf24;">
+              <div>Atualizado hoje: <strong>${fmt.currency(proj.projectedAmount)}</strong></div>
+              <div style="font-size: 10px; opacity: 0.8;">(+${fmt.currency(proj.penaltyAmount)} encargos)</div>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+
+      <!-- Information Grid -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 16px;">
+        <!-- Vencimento -->
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px;">
+          <div style="font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">📅 Vencimento / Competência</div>
+          <div style="font-size: 13px; font-weight: 700; color: var(--text-primary);">${txDate ? fmt.date(txDate) : '—'}</div>
+          ${nextBusinessDay && !isPaid ? `
+            <div style="font-size: 10px; color: #60a5fa; font-weight: 600; margin-top: 2px;">
+              📅 Prorroga: ${fmt.date(nextBusinessDay)} (1º dia útil)
+            </div>
+          ` : ''}
+          ${compDate ? `
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">
+              Ref: ${fmtCompetence(compDate)}
+            </div>
+          ` : ''}
+        </div>
+
+        <!-- Conta / Cartão -->
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px;">
+          <div style="font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">💳 Conta / Cartão</div>
+          <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+            ${isCreditCard ? '💳' : '🏦'} ${acc.name || 'Conta Geral'}
+          </div>
+          <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">
+            ${acc.bank ? (BANKS[acc.bank]?.name || acc.bank) : 'Geral'} • ${isCreditCard ? 'Cartão de Crédito' : (ACCOUNT_TYPES[acc.type] || 'Conta Corrente')}
+          </div>
+        </div>
+
+        <!-- Categoria -->
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px;">
+          <div style="font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">📁 Categoria</div>
+          <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+            <span>${catIcon}</span> ${catName}
+          </div>
+        </div>
+
+        <!-- Responsável -->
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px;">
+          <div style="font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">👤 Responsável / Membro</div>
+          <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+            <span style="width: 8px; height: 8px; border-radius: 50%; background: ${userColor}; display: inline-block;"></span>
+            ${userName}
+          </div>
+        </div>
+      </div>
+
+      <!-- Notes / PIX details if present -->
+      ${notes ? `
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 16px;">
+          <div style="font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; margin-bottom: 4px;">📝 Observações</div>
+          <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; word-break: break-word;">${notes}</div>
+        </div>
+      ` : ''}
+
+      ${pixCode ? `
+        <div style="background: rgba(6,182,212,0.08); border: 1px solid rgba(6,182,212,0.3); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+          <div style="min-width: 0; flex: 1;">
+            <div style="font-size: 11px; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
+              <span>⚡</span> Chave PIX / Código Copia e Cola
+            </div>
+            <div style="font-size: 10.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: monospace;">
+              ${pixCode}
+            </div>
+          </div>
+          <button class="btn btn-sm" id="tdm-btn-copy-pix" style="background: rgba(6,182,212,0.2); color: #38bdf8; border-color: rgba(6,182,212,0.5); font-size: 11px; font-weight: 700; flex-shrink: 0; padding: 4px 10px; border-radius: 6px;">
+            📋 Copiar
+          </button>
+        </div>
+      ` : ''}
+
+      <!-- 3 Botões de Ação Principais: Excluir, Editar e Pagar -->
+      <div style="display: flex; gap: 10px; align-items: center; padding-top: 14px; border-top: 1px solid var(--border); flex-wrap: wrap;">
+        <!-- Botão 1: Excluir -->
+        <button type="button" class="btn btn-outline" id="tdm-btn-delete" style="border-color: rgba(239,68,68,0.4); color: #f87171; font-weight: 700; display: flex; align-items: center; gap: 6px; padding: 10px 16px; border-radius: 8px;" ${!canEdit ? 'disabled' : ''}>
+          <span>🗑️</span> Excluir
+        </button>
+
+        <!-- Botão 2: Editar -->
+        <button type="button" class="btn btn-outline" id="tdm-btn-edit" style="border-color: rgba(139,92,246,0.4); color: #c084fc; font-weight: 700; display: flex; align-items: center; gap: 6px; padding: 10px 16px; border-radius: 8px;" ${!canEdit ? 'disabled' : ''}>
+          <span>✏️</span> Editar
+        </button>
+
+        <!-- Botão 3: Pagar / Desfazer -->
+        ${isPaid ? `
+          <button type="button" class="btn btn-secondary" id="tdm-btn-pay" style="flex: 1; min-width: 150px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 16px; border-radius: 8px; background: rgba(255,255,255,0.06);" ${!canEdit ? 'disabled' : ''}>
+            <span>↩️</span> Desfazer Pagamento
+          </button>
+        ` : `
+          <button type="button" class="btn btn-primary" id="tdm-btn-pay" style="flex: 1; min-width: 150px; background: #10b981; border-color: #10b981; color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 16px; border-radius: 8px;" ${!canEdit ? 'disabled' : ''}>
+            <span>✅</span> Liquidar / Pagar
+          </button>
+        `}
+      </div>
+    </div>
+  `);
+
+  // 1. Copy PIX handler
+  const copyBtn = document.getElementById('tdm-btn-copy-pix');
+  if (copyBtn && pixCode) {
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(pixCode);
+      toast('Código PIX copiado para a área de transferência!', 'success');
+    };
+  }
+
+  // 2. Action: Excluir
+  const delBtn = document.getElementById('tdm-btn-delete');
+  if (delBtn) {
+    delBtn.onclick = () => {
+      Modal.close();
+      if (item) {
+        const delEl = document.querySelector(`.rec-delete[data-id="${item.id}"]`);
+        if (delEl) delEl.click();
+      } else if (tx) {
+        const delEl = document.querySelector(`.avl-delete[data-id="${tx.id}"]`);
+        if (delEl) delEl.click();
+      }
+    };
+  }
+
+  // 3. Action: Editar
+  const editBtn = document.getElementById('tdm-btn-edit');
+  if (editBtn) {
+    editBtn.onclick = () => {
+      Modal.close();
+      if (item) {
+        const editEl = document.querySelector(`.rec-edit[data-id="${item.id}"]`);
+        if (editEl) editEl.click();
+      } else if (tx) {
+        const editEl = document.querySelector(`.avl-edit[data-id="${tx.id}"]`);
+        if (editEl) editEl.click();
+      }
+    };
+  }
+
+  // 4. Action: Pagar / Desfazer
+  const payBtn = document.getElementById('tdm-btn-pay');
+  if (payBtn) {
+    payBtn.onclick = async () => {
+      if (isPaid && tx) {
+        Modal.close();
+        await window.api.transactions.togglePaid(tx.id);
+        toast('Pagamento desfeito! Lançamento voltou para pendente.');
+        onUpdate?.();
+      } else if (tx) {
+        Modal.close();
+        openPaymentDateModal(tx.id, tx.date, () => {
+          onUpdate?.();
+        });
+      } else if (item) {
+        Modal.close();
+        openPaymentDateModal(item.id, txDate, () => {
+          onUpdate?.();
+        });
+      }
+    };
+  }
+}
+
 
 /* ==== recurring-modal.js ==== */
 /* ===
@@ -3742,7 +4415,35 @@ function attachRealtimeDuplicateChecker({ amountInput, dateInput, descInput, acc
   return scheduleCheck;
 }
 
-function openRecurringModal(item, accounts, categories, type) {
+async function openRecurringModal(item, accounts, categories, type) {
+  if (typeof item === 'string') {
+    type = item;
+    item = null;
+  }
+  if (!type) type = 'expense';
+
+  if (!Array.isArray(accounts) || accounts.length === 0) {
+    try {
+      const accRes = await window.api.accounts.getAll(State.user?.id || 1);
+      accounts = Array.isArray(accRes) ? accRes : [];
+    } catch (e) {
+      accounts = [];
+    }
+  }
+
+  if (!Array.isArray(categories) || categories.length === 0) {
+    if (Array.isArray(State.categories) && State.categories.length > 0) {
+      categories = State.categories;
+    } else {
+      try {
+        const catRes = await window.api.categories.getAll(State.user?.id || 1);
+        categories = Array.isArray(catRes) ? catRes : [];
+      } catch (e) {
+        categories = [];
+      }
+    }
+  }
+
   const isEdit = !!item;
   if (isEdit) {
     const canEdit = State.permissions.can_edit_all === 1 || item.user_id === State.user.id;
@@ -3769,6 +4470,14 @@ function openRecurringModal(item, accounts, categories, type) {
   }
 
   Modal.open(isEdit ? 'Editar Item Recorrente' : `Nova ${type === 'income' ? 'Receita' : 'Despesa'} Fixa`, `
+    <div style="margin-bottom: 14px;">
+      <button type="button" class="btn btn-outline" id="rec-scan-qr" style="width: 100%; border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.08); color: var(--accent-light); font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px; border-radius: 8px; font-size: 13px;">
+        <span>📷</span> Escanear Fatura / QR Code / Pix
+      </button>
+    </div>
+    <div id="rec-scanned-info" style="display:none; margin-bottom:12px; padding:8px 12px; border-radius:6px; background:rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.3); font-size:11.5px; color:#38bdf8; animation:fadeIn 0.25s ease;">
+      <div id="rec-scanned-text">⚡ Dados extraídos da fatura!</div>
+    </div>
     <div id="rec-dup-warning" style="display:none; margin-bottom:12px; padding:10px 14px; border-radius:8px; font-size:12px; animation:fadeIn 0.25s ease;"></div>
     <div class="form-group">
       <label>Nome</label>
@@ -3802,7 +4511,6 @@ function openRecurringModal(item, accounts, categories, type) {
         </select>
       </div>
     </div>
-    </div>
     <div class="form-row">
       <div class="form-group">
         <label title="Mês em que a primeira cobrança/lançamento será gerada">📅 Mês de Vencimento <span style="font-size:11px;opacity:0.65;font-weight:400">(1ª ocorrência)</span></label>
@@ -3833,6 +4541,36 @@ function openRecurringModal(item, accounts, categories, type) {
       <label><input type="checkbox" id="rec-paid"> ${type === 'income' ? '💰 Já foi recebida este mês' : '💸 Já foi paga este mês'}</label>
     </div>
     ` : ''}
+    <!-- SEÇÃO DE JUROS E PREVISIBILIDADE CONTRATUAL -->
+    <div style="background: rgba(255,255,255,0.02); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 14px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+        <span style="font-size: 12px; font-weight: 700; color: var(--text-primary);">📈 Regra de Juros / Encargos (Opcional)</span>
+        <span style="font-size: 11px; color: var(--text-muted);">Para projeção de valor atualizado</span>
+      </div>
+      <div class="form-row" style="margin-bottom: 8px;">
+        <div class="form-group" style="flex: 1.2;">
+          <label style="font-size: 11px; color: var(--text-muted);">Taxa de Juros</label>
+          <input type="number" step="0.001" min="0" id="rec-interest-rate" placeholder="Ex: 0.033 ou 2.0" value="${item?.interest_rate || ''}">
+        </div>
+        <div class="form-group" style="flex: 1.5;">
+          <label style="font-size: 11px; color: var(--text-muted);">Periodicidade dos Juros</label>
+          <select id="rec-interest-type" style="width: 100%; padding: 8px; font-size: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-primary);">
+            <option value="daily" ${(item?.interest_type === 'daily' || !item?.interest_type) ? 'selected' : ''}>% ao Dia (ex: 0,033% a.d. mora)</option>
+            <option value="monthly" ${item?.interest_type === 'monthly' ? 'selected' : ''}>% ao Mês (ex: 2,0% a.m.)</option>
+            <option value="yearly" ${item?.interest_type === 'yearly' ? 'selected' : ''}>% ao Ano (ex: 15% a.a.)</option>
+            <option value="installment" ${item?.interest_type === 'installment' ? 'selected' : ''}>Fixo por Parcela</option>
+            <option value="contract" ${item?.interest_type === 'contract' ? 'selected' : ''}>Fixo por Contrato</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom: 0;">
+        <div class="form-group" style="flex: 1;">
+          <label style="font-size: 11px; color: var(--text-muted);">Multa Fixa por Atraso (%)</label>
+          <input type="number" step="0.01" min="0" id="rec-penalty-fixed-rate" placeholder="Ex: 2.0" value="${item?.penalty_fixed_rate || ''}">
+        </div>
+      </div>
+    </div>
+
     <div class="form-group">
       <label>Observação (opcional)</label>
       <input type="text" id="rec-notes" placeholder="Anotação sobre este item..." value="${item?.notes || ''}">
@@ -3856,6 +4594,57 @@ function openRecurringModal(item, accounts, categories, type) {
       <button class="btn btn-primary" id="rec-save">${isEdit ? 'Salvar' : 'Adicionar'}</button>
     </div>
   `);
+
+  // QR Code Scanner Integration for Recurring Items
+  const recScanBtn = document.getElementById('rec-scan-qr');
+  if (recScanBtn && typeof openNFCeScannerModal === 'function') {
+    recScanBtn.onclick = () => {
+      openNFCeScannerModal((parsed) => {
+        if (!parsed) return;
+        const updated = [];
+        if (parsed.description && (!document.getElementById('rec-name').value || document.getElementById('rec-name').value.startsWith('Nova '))) {
+          const nameEl = document.getElementById('rec-name');
+          if (nameEl) { nameEl.value = parsed.description; updated.push(`Nome: "${parsed.description}"`); }
+        }
+        if (parsed.amount != null && parsed.amount > 0) {
+          const amtEl = document.getElementById('rec-amount');
+          if (amtEl) { amtEl.value = parsed.amount; updated.push(`Valor: ${fmt.currency(parsed.amount)}`); }
+        }
+        const targetDate = parsed.dueDate || parsed.date;
+        if (targetDate) {
+          const day = parseInt(targetDate.split('-')[2], 10);
+          const dayEl = document.getElementById('rec-due-day');
+          if (dayEl && day >= 1 && day <= 31) { dayEl.value = day; updated.push(`Dia: ${day}`); }
+        }
+        if (parsed.competence) {
+          const compEl = document.getElementById('rec-competence-month');
+          if (compEl) { compEl.value = parsed.competence; updated.push(`Competência: ${parsed.competence}`); }
+        }
+        if (parsed.suggestedCategory) {
+          const catNameLower = parsed.suggestedCategory.toLowerCase();
+          const matchCat = filteredCats.find(c => c.name.toLowerCase().includes(catNameLower) || catNameLower.includes(c.name.toLowerCase()));
+          if (matchCat) {
+            const catEl = document.getElementById('rec-category');
+            if (catEl) { catEl.value = matchCat.id; updated.push(`Categoria: ${matchCat.name}`); }
+          }
+        }
+        if (parsed.pixCode || parsed.notes) {
+          const notesEl = document.getElementById('rec-notes');
+          if (notesEl) {
+            const extra = parsed.pixCode ? `PIX: ${parsed.pixCode}` : (parsed.notes || '');
+            notesEl.value = (notesEl.value ? notesEl.value + ' | ' : '') + extra;
+          }
+        }
+        const infoBox = document.getElementById('rec-scanned-info');
+        const infoText = document.getElementById('rec-scanned-text');
+        if (infoBox && infoText) {
+          infoBox.style.display = 'block';
+          infoText.innerHTML = `✅ <strong>QR Code Lido:</strong> ${updated.join(' • ')}`;
+        }
+        toast(`✅ Dados da fatura aplicados! (${updated.join(', ')})`, 'success');
+      });
+    };
+  }
 
   let icon = item?.icon || (type === 'income' ? '💰' : '📋');
   let color = item?.color || '#10b981';
@@ -3952,6 +4741,9 @@ function openRecurringModal(item, accounts, categories, type) {
         repeat_months: parseInt(document.getElementById('rec-repeat-months').value) || 0,
         start_installment: parseInt(document.getElementById('rec-start-installment').value) || 1,
         competence_offset,
+        interest_rate: parseFloat(document.getElementById('rec-interest-rate')?.value) || 0,
+        interest_type: document.getElementById('rec-interest-type')?.value || 'daily',
+        penalty_fixed_rate: parseFloat(document.getElementById('rec-penalty-fixed-rate')?.value) || 0,
         created_at
       };
       if (!isEdit) {
@@ -4002,8 +4794,21 @@ function openEditMonthTransactionModal(tx, item, accounts, categories, type) {
   const categoryVal = tx.category_id || item.category_id || '';
   
   const defaultComp = tx.competence_date ? tx.competence_date.slice(0,7) : `${State.currentYear}-${String(State.currentMonth).padStart(2,'0')}`;
+  let scannedPixCode = tx.pix_code || (item && item.pix_code) || null;
+  let currentNotes = tx.notes || (item && item.notes) || '';
 
   Modal.open(`Editar Lançamento do Mês (${MONTHS[State.currentMonth - 1]} / ${State.currentYear})`, `
+    <div style="margin-bottom: 14px;">
+      <button type="button" class="btn btn-outline" id="mod-tx-scan-qr" style="width: 100%; border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.08); color: var(--accent-light); font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px; border-radius: 8px; font-size: 13px;">
+        <span>📷</span> Escanear Fatura / QR Code / Pix
+      </button>
+    </div>
+    <div id="mod-tx-scanned-info" style="display: ${scannedPixCode ? 'block' : 'none'}; margin-bottom: 12px; padding: 8px 12px; border-radius: 6px; background: rgba(6, 182, 212, 0.1); border: 1px solid rgba(6, 182, 212, 0.3); font-size: 11.5px; color: #38bdf8; animation: fadeIn 0.25s ease;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap;">
+        <span id="mod-tx-scanned-text">${scannedPixCode ? '⚡ Chave/Código PIX vinculado à fatura' : '⚡ Dados atualizados via QR Code!'}</span>
+        ${scannedPixCode ? `<span class="badge badge-cyan" style="font-size: 10px; padding: 2px 6px;">PIX Anexado</span>` : ''}
+      </div>
+    </div>
     <div id="mod-tx-dup-warning" style="display:none; margin-bottom:12px; padding:10px 14px; border-radius:8px; font-size:12px; animation:fadeIn 0.25s ease;"></div>
     <div class="form-row">
       <div class="form-group">
@@ -4050,6 +4855,58 @@ function openEditMonthTransactionModal(tx, item, accounts, categories, type) {
     </div>
   `);
 
+  // QR Code Scanner Integration for Monthly Transaction Edit
+  const scanBtn = document.getElementById('mod-tx-scan-qr');
+  if (scanBtn && typeof openNFCeScannerModal === 'function') {
+    scanBtn.onclick = () => {
+      openNFCeScannerModal((parsed) => {
+        if (!parsed) return;
+        const updatedFields = [];
+        if (parsed.amount != null && parsed.amount > 0) {
+          const amtEl = document.getElementById('mod-tx-amount');
+          if (amtEl) {
+            amtEl.value = parsed.amount;
+            amtEl.style.borderColor = 'var(--accent)';
+            updatedFields.push(`Valor: ${fmt.currency(parsed.amount)}`);
+          }
+        }
+        const targetDate = parsed.dueDate || parsed.date;
+        if (targetDate) {
+          const dateEl = document.getElementById('mod-tx-date');
+          if (dateEl) {
+            dateEl.value = targetDate;
+            dateEl.style.borderColor = 'var(--accent)';
+            updatedFields.push(`Vencimento: ${fmt.date(targetDate)}`);
+          }
+        }
+        const targetComp = parsed.competence || (targetDate ? targetDate.slice(0, 7) : null);
+        if (targetComp) {
+          const compEl = document.getElementById('mod-tx-competence');
+          if (compEl) {
+            compEl.value = targetComp;
+            compEl.style.borderColor = 'var(--accent)';
+            updatedFields.push(`Competência: ${targetComp}`);
+          }
+        }
+        if (parsed.pixCode) {
+          scannedPixCode = parsed.pixCode;
+          updatedFields.push('Chave PIX');
+        }
+        if (parsed.notes) {
+          currentNotes = (currentNotes ? currentNotes + '\n' : '') + parsed.notes;
+        }
+
+        const infoBox = document.getElementById('mod-tx-scanned-info');
+        const infoText = document.getElementById('mod-tx-scanned-text');
+        if (infoBox && infoText) {
+          infoBox.style.display = 'block';
+          infoText.innerHTML = `✅ <strong>QR Code Lido:</strong> ${updatedFields.join(' • ')}`;
+        }
+        toast(`✅ Fatura escaneada com sucesso! (${updatedFields.join(', ')})`, 'success');
+      });
+    };
+  }
+
   attachRealtimeDuplicateChecker({
     amountInput: document.getElementById('mod-tx-amount'),
     dateInput: document.getElementById('mod-tx-date'),
@@ -4091,7 +4948,8 @@ function openEditMonthTransactionModal(tx, item, accounts, categories, type) {
         date,
         competence_date,
         is_paid: tx.is_paid,
-        notes: tx.notes
+        notes: currentNotes || tx.notes,
+        pix_code: scannedPixCode || tx.pix_code || null
       });
       if (res && res.error) {
         toast(res.error, 'error');
@@ -4153,7 +5011,43 @@ async function showDidacticFeedback(data) {
   }
 }
 
-function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense', prefillData = null) {
+async function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense', prefillData = null) {
+  if (typeof accounts === 'string') {
+    defaultType = accounts;
+    accounts = null;
+  } else if (accounts && typeof accounts === 'object' && !Array.isArray(accounts)) {
+    if (accounts.accountId) {
+      prefillData = prefillData || {};
+      prefillData.accountId = accounts.accountId;
+    }
+    accounts = null;
+  }
+
+  if (!Array.isArray(accounts) || accounts.length === 0) {
+    try {
+      const accRes = await window.api.accounts.getAll(State.user?.id || 1);
+      accounts = Array.isArray(accRes) ? accRes : [];
+    } catch (e) {
+      accounts = [];
+    }
+  }
+
+  if (!Array.isArray(categories) || categories.length === 0) {
+    if (Array.isArray(State.categories) && State.categories.length > 0) {
+      categories = State.categories;
+    } else {
+      try {
+        const catRes = await window.api.categories.getAll(State.user?.id || 1);
+        categories = Array.isArray(catRes) ? catRes : [];
+      } catch (e) {
+        categories = [];
+      }
+    }
+  }
+
+  if (!Array.isArray(accounts)) accounts = [];
+  if (!Array.isArray(categories)) categories = [];
+
   const isEdit = !!tx;
   if (isEdit) {
     const canEdit = (State.user.profile_type === 1 || State.user.profile_type === 2) || (State.permissions && State.permissions.can_edit_all === 1) || (!tx.user_id || tx.user_id === State.user.id);
@@ -4166,7 +5060,7 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
   const dateVal = isEdit && tx.date ? tx.date.split(' ')[0] : (prefillData && prefillData.date ? prefillData.date : today);
   const amountVal = isEdit ? tx.amount : (prefillData && prefillData.amount ? prefillData.amount : '');
   const descVal = isEdit ? tx.description : (prefillData && prefillData.description ? prefillData.description : '');
-  const accountVal = isEdit ? tx.account_id : (accounts[0]?.id || '');
+  const accountVal = isEdit ? tx.account_id : (prefillData && prefillData.accountId ? prefillData.accountId : (accounts[0]?.id || ''));
   
   let categoryVal = isEdit ? (tx.category_id || '') : '';
   if (!categoryVal && prefillData && prefillData.suggestedCategory) {
@@ -4222,7 +5116,7 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
         <label>Conta</label>
         <select id="avl-account">
           <option value="">Selecione...</option>
-          ${accounts.map(a => `<option value="${a.id}" ${a.id == accountVal ? 'selected' : ''}>${a.name}</option>`).join('')}
+          ${(accounts || []).map(a => `<option value="${a.id}" ${a.id == accountVal ? 'selected' : ''}>${a.name}</option>`).join('')}
         </select>
       </div>
       <div class="form-group">
@@ -4245,6 +5139,36 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
       <div class="form-group" id="group-due-date" style="${(tx && tx.credit_product === 'banricompras') ? '' : 'display:none'}">
         <label style="font-size:12px; font-weight:600; color:#fbbf24;">Data do Débito (Banricompras)</label>
         <input type="date" id="avl-due-date" value="${(tx && tx.due_date) ? tx.due_date : ''}">
+      </div>
+    </div>
+
+    <!-- SEÇÃO DE JUROS E PREVISIBILIDADE CONTRATUAL -->
+    <div style="background: rgba(255,255,255,0.02); border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 14px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+        <span style="font-size: 12px; font-weight: 700; color: var(--text-primary);">📈 Regra de Juros / Encargos (Opcional)</span>
+        <span style="font-size: 11px; color: var(--text-muted);">Para projeção de valor atualizado</span>
+      </div>
+      <div class="form-row" style="margin-bottom: 8px;">
+        <div class="form-group" style="flex: 1.2;">
+          <label style="font-size: 11px; color: var(--text-muted);">Taxa de Juros</label>
+          <input type="number" step="0.001" min="0" id="avl-interest-rate" placeholder="Ex: 0.033 ou 2.0" value="${tx?.interest_rate || ''}">
+        </div>
+        <div class="form-group" style="flex: 1.5;">
+          <label style="font-size: 11px; color: var(--text-muted);">Periodicidade dos Juros</label>
+          <select id="avl-interest-type" style="width: 100%; padding: 8px; font-size: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-primary);">
+            <option value="daily" ${(tx?.interest_type === 'daily' || !tx?.interest_type) ? 'selected' : ''}>% ao Dia (ex: 0,033% a.d. mora)</option>
+            <option value="monthly" ${tx?.interest_type === 'monthly' ? 'selected' : ''}>% ao Mês (ex: 2,0% a.m.)</option>
+            <option value="yearly" ${tx?.interest_type === 'yearly' ? 'selected' : ''}>% ao Ano (ex: 15% a.a.)</option>
+            <option value="installment" ${tx?.interest_type === 'installment' ? 'selected' : ''}>Fixo por Parcela</option>
+            <option value="contract" ${tx?.interest_type === 'contract' ? 'selected' : ''}>Fixo por Contrato</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row" style="margin-bottom: 0;">
+        <div class="form-group" style="flex: 1;">
+          <label style="font-size: 11px; color: var(--text-muted);">Multa Fixa por Atraso (%)</label>
+          <input type="number" step="0.01" min="0" id="avl-penalty-fixed-rate" placeholder="Ex: 2.0" value="${tx?.penalty_fixed_rate || ''}">
+        </div>
       </div>
     </div>
 
@@ -4372,7 +5296,10 @@ function openAvulsoModal(accounts, categories, tx = null, defaultType = 'expense
         notes: isEdit ? tx.notes : null,
         credit_product,
         due_date,
-        competence_date
+        competence_date,
+        interest_rate: parseFloat(document.getElementById('avl-interest-rate')?.value) || 0,
+        interest_type: document.getElementById('avl-interest-type')?.value || 'daily',
+        penalty_fixed_rate: parseFloat(document.getElementById('avl-penalty-fixed-rate')?.value) || 0
       };
 
       if (isEdit) {
@@ -5164,6 +6091,11 @@ function openNFCeScannerModal(customCallback = null) {
   NFCeCameraManager.start(videoEl, handleSuccess, handleError);
 }
 
+function openNfceScannerModal(customCallback = null) {
+  return openNFCeScannerModal(customCallback);
+}
+
+
 function openNFCeConfirmationModal(parsedData, accounts, categories) {
   const today = new Date().toISOString().split('T')[0];
   const dateVal = parsedData.date || parsedData.dueDate || today;
@@ -5423,10 +6355,10 @@ async function openPaymentDateModal(txId, currentDate, onComplete) {
     const allTxs = await window.api.transactions.getAll({ userId: State.user.id });
     tx = allTxs.find(t => t.id == txId);
     if (tx && tx.recurring_item_id) {
-      const allRec = await window.api.recurring.getAll({ userId: State.user.id });
+      const allRec = await window.api.recurring.getAll(State.user.id);
       recItem = allRec.find(r => r.id == tx.recurring_item_id);
     } else if (!tx) {
-      const allRec = await window.api.recurring.getAll({ userId: State.user.id });
+      const allRec = await window.api.recurring.getAll(State.user.id);
       recItem = allRec.find(r => r.id == txId);
       if (recItem) tx = allTxs.find(t => t.recurring_item_id == recItem.id);
     }
@@ -5464,11 +6396,23 @@ async function openPaymentDateModal(txId, currentDate, onComplete) {
     if (m) boletoCode = (m[1] || m[0]).replace(/[^0-9]/g, '');
   }
 
+  const rule = {
+    interest_rate: (tx && tx.interest_rate !== undefined && tx.interest_rate !== null) ? tx.interest_rate : (recItem ? recItem.interest_rate : 0),
+    interest_type: (tx && tx.interest_type) ? tx.interest_type : (recItem ? recItem.interest_type : 'daily'),
+    penalty_fixed_rate: (tx && tx.penalty_fixed_rate !== undefined && tx.penalty_fixed_rate !== null) ? tx.penalty_fixed_rate : (recItem ? recItem.penalty_fixed_rate : 0),
+  };
+
+  const initialProjection = calculateProjectedInterest(baseAmount, compDate, cleanDate, rule);
+  const initialPaymentValue = (tx && tx.is_paid && tx.penalty_amount)
+    ? (baseAmount + (tx.penalty_amount || 0) - (tx.discount_amount || 0))
+    : initialProjection.projectedAmount;
+
   Modal.open('Confirmar Pagamento / Liquidação', `
     <div style="padding: 14px 16px;">
       <div style="text-align: center; margin-bottom: 14px;">
         <div style="font-size: 15px; font-weight: 800; color: var(--text-primary); margin-bottom: 2px;">${desc}</div>
         <div style="font-size: 26px; font-weight: 900; color: var(--accent-light); letter-spacing: -0.02em;">${fmt.currency(baseAmount)}</div>
+        <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 2px;">Vencimento Original: <strong>${fmt.date(compDate)}</strong></div>
       </div>
 
       <!-- PAINEL PIX E BOLETO -->
@@ -5522,19 +6466,26 @@ async function openPaymentDateModal(txId, currentDate, onComplete) {
       </div>
 
       <p style="margin-bottom: 12px; font-size: 12.5px; color: var(--text-secondary); text-align: center;">
-        Informe a data do efetivo pagamento e eventuais ajustes (juros ou desconto):
+        Informe a <strong>Data</strong> e o <strong>Valor Pago</strong> para cálculo automático de encargos:
       </p>
       
-      <div class="form-group" style="margin-bottom: 14px;">
-        <label style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Data do Efetivo Pagamento</label>
-        <input type="date" id="payment-date-input" value="${cleanDate}" style="width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-raised); color: var(--text-primary); text-align: center; font-weight: 600; font-size: 13px;">
+      <!-- VALORES E DATAS DE PAGAMENTO -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Data do Pagamento</label>
+          <input type="date" id="payment-date-input" value="${cleanDate}" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-raised); color: var(--text-primary); text-align: center; font-weight: 700; font-size: 13px;">
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-muted)">Valor Pago (R$)</label>
+          <input type="number" step="0.01" min="0" id="payment-amount-input" value="${initialPaymentValue.toFixed(2)}" style="width: 100%; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-raised); color: var(--text-primary); text-align: center; font-weight: 800; font-size: 14px;">
+        </div>
       </div>
 
-      <div id="payment-options-container" style="background: var(--bg-raised); padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 14px;">
-      </div>
+      <!-- CARD DINÂMICO DE JUROS / DIAS / TAXA DIÁRIA -->
+      <div id="payment-interest-calc-card" style="margin-bottom: 14px;"></div>
 
       <div id="payment-summary-box" style="padding: 10px; background: rgba(16, 185, 129, 0.1); border-radius: var(--radius-sm); font-size: 13px; margin-bottom: 14px; text-align: center; border: 1px solid rgba(16, 185, 129, 0.3);">
-        <strong>Total a Debitar da Conta:</strong> <span id="payment-total-preview" style="font-weight:700; font-size:15px; color:var(--accent-light);">${fmt.currency(baseAmount)}</span>
+        <strong>Total a Debitar da Conta:</strong> <span id="payment-total-preview" style="font-weight:700; font-size:15px; color:var(--accent-light);">${fmt.currency(initialPaymentValue)}</span>
       </div>
 
       <div style="display: flex; gap: 12px; justify-content: center;">
@@ -5547,87 +6498,81 @@ async function openPaymentDateModal(txId, currentDate, onComplete) {
   `);
 
   const dateInput = document.getElementById('payment-date-input');
-  const optContainer = document.getElementById('payment-options-container');
+  const amountInput = document.getElementById('payment-amount-input');
+  const calcCard = document.getElementById('payment-interest-calc-card');
   const totalPreview = document.getElementById('payment-total-preview');
 
-  function updatePaymentOptionsUI() {
-    const selDate = dateInput.value;
-    let html = '';
-    let isEarly = selDate < compDate;
-    let isLate = selDate > compDate;
+  let hasManuallyEditedAmount = false;
+  amountInput.oninput = () => {
+    hasManuallyEditedAmount = true;
+    recalcPaymentUI();
+  };
 
-    if (isEarly) {
+  dateInput.onchange = () => {
+    if (!hasManuallyEditedAmount) {
+      const proj = calculateProjectedInterest(baseAmount, compDate, dateInput.value, rule);
+      amountInput.value = proj.projectedAmount.toFixed(2);
+    }
+    recalcPaymentUI();
+  };
+
+  function recalcPaymentUI() {
+    const selDate = dateInput.value;
+    const paidVal = parseFloat(amountInput.value) || 0;
+    const diff = Math.round((paidVal - baseAmount) * 100) / 100;
+
+    let daysDiff = 0;
+    if (selDate && compDate) {
+      const d1 = new Date(selDate + 'T00:00:00');
+      const d2 = new Date(compDate + 'T00:00:00');
+      daysDiff = Math.round((d1 - d2) / 86400000);
+    }
+    const daysLate = Math.max(0, daysDiff);
+    const daysEarly = Math.max(0, -daysDiff);
+
+    let html = '';
+    if (diff > 0.005) {
+      const totalPct = baseAmount > 0 ? ((diff / baseAmount) * 100).toFixed(2) : '0.00';
+      const dailyRatePct = daysLate > 0 ? (totalPct / daysLate).toFixed(3) : totalPct;
+      const dailyVal = daysLate > 0 ? (diff / daysLate) : diff;
+
       html = `
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;font-weight:600;color:var(--accent-light)">
-            <input type="checkbox" id="chk-discount"> 🏷️ Aplicar desconto por antecipação
-          </label>
-          <div id="row-discount-val" style="display:none;margin-top:4px">
-            <label style="font-size:11px;color:var(--text-muted)">Valor do Desconto (R$)</label>
-            <input type="number" step="0.01" min="0" id="input-discount-val" placeholder="0.00" style="width:100%;padding:6px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-surface);color:var(--text-primary);font-size:12.5px">
+        <div style="background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(239,68,68,0.08)); border: 1px solid rgba(245,158,11,0.35); border-radius: var(--radius-sm); padding: 12px; text-align: center;">
+          <div style="display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 800; font-size: 13.5px; color: #f59e0b; margin-bottom: 6px;">
+            <span>⚠️</span> Juros / Encargos: +${fmt.currency(diff)} (+${totalPct}%)
+          </div>
+          <div style="font-size: 12px; color: var(--text-secondary); display: flex; justify-content: center; gap: 14px; flex-wrap: wrap;">
+            ${daysLate > 0 ? `<span>📅 <strong>${daysLate} ${daysLate === 1 ? 'dia' : 'dias'} de atraso</strong></span>` : `<span>⚡ Pago na data c/ encargos</span>`}
+            ${daysLate > 0 ? `<span>📈 Taxa diária: <strong style="color:#fbbf24">${dailyRatePct}% ao dia</strong> (${fmt.currency(dailyVal)}/dia)</span>` : ''}
           </div>
         </div>
       `;
-    } else if (isLate) {
+    } else if (diff < -0.005) {
+      const absDiff = Math.abs(diff);
+      const discPct = baseAmount > 0 ? ((absDiff / baseAmount) * 100).toFixed(2) : '0.00';
       html = `
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;font-weight:600;color:#fbbf24">
-            <input type="checkbox" id="chk-penalty"> ⚠️ Aplicar juros/multa por atraso
-          </label>
-          <div id="row-penalty-val" style="display:none;margin-top:4px">
-            <label style="font-size:11px;color:var(--text-muted)">Valor de Juros/Multa (R$)</label>
-            <input type="number" step="0.01" min="0" id="input-penalty-val" placeholder="0.00" style="width:100%;padding:6px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-surface);color:var(--text-primary);font-size:12.5px">
+        <div style="background: linear-gradient(135deg, rgba(16,185,129,0.12), rgba(6,182,212,0.08)); border: 1px solid rgba(16,185,129,0.35); border-radius: var(--radius-sm); padding: 12px; text-align: center;">
+          <div style="display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: 800; font-size: 13.5px; color: var(--accent-light); margin-bottom: 6px;">
+            <span>🏷️</span> Desconto Obtido: -${fmt.currency(absDiff)} (-${discPct}%)
+          </div>
+          <div style="font-size: 12px; color: var(--text-secondary);">
+            ${daysEarly > 0 ? `📅 Pago com <strong>${daysEarly} ${daysEarly === 1 ? 'dia' : 'dias'} de antecedência</strong>` : `🏷️ Desconto concedido no vencimento`}
           </div>
         </div>
       `;
     } else {
-      html = `<div style="font-size:12px;color:var(--text-muted);text-align:center">Pagamento na data exata de vencimento (${fmt.date(compDate)})</div>`;
+      html = `
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px; text-align: center; font-size: 12px; color: var(--text-muted);">
+          ✅ Pagamento no valor original exato (sem juros nem descontos)
+        </div>
+      `;
     }
-    optContainer.innerHTML = html;
 
-    const chkDiscount = document.getElementById('chk-discount');
-    const chkPenalty = document.getElementById('chk-penalty');
-    const inputDiscount = document.getElementById('input-discount-val');
-    const inputPenalty = document.getElementById('input-penalty-val');
-
-    if (chkDiscount) {
-      chkDiscount.onchange = () => {
-        document.getElementById('row-discount-val').style.display = chkDiscount.checked ? 'block' : 'none';
-        recalcTotal();
-      };
-    }
-    if (chkPenalty) {
-      chkPenalty.onchange = () => {
-        document.getElementById('row-penalty-val').style.display = chkPenalty.checked ? 'block' : 'none';
-        recalcTotal();
-      };
-    }
-    if (inputDiscount) inputDiscount.oninput = recalcTotal;
-    if (inputPenalty) inputPenalty.oninput = recalcTotal;
-
-    recalcTotal();
+    calcCard.innerHTML = html;
+    totalPreview.innerText = fmt.currency(paidVal);
   }
 
-  function recalcTotal() {
-    let penaltyVal = 0;
-    let discountVal = 0;
-    const chkDiscount = document.getElementById('chk-discount');
-    const chkPenalty = document.getElementById('chk-penalty');
-    const inputDiscount = document.getElementById('input-discount-val');
-    const inputPenalty = document.getElementById('input-penalty-val');
-
-    if (chkDiscount && chkDiscount.checked && inputDiscount) {
-      discountVal = parseFloat(inputDiscount.value) || 0;
-    }
-    if (chkPenalty && chkPenalty.checked && inputPenalty) {
-      penaltyVal = parseFloat(inputPenalty.value) || 0;
-    }
-    const finalNet = baseAmount + penaltyVal - discountVal;
-    totalPreview.innerText = fmt.currency(finalNet);
-  }
-
-  dateInput.onchange = updatePaymentOptionsUI;
-  updatePaymentOptionsUI();
+  recalcPaymentUI();
 
   // Render QR Code PIX se existente
   if (pixCode) {
@@ -5682,7 +6627,8 @@ async function openPaymentDateModal(txId, currentDate, onComplete) {
         toast('✅ QR Code PIX gerado com sucesso!', 'success');
         if (tx && tx.id) {
           try {
-            await window.api.transactions.update(tx.id, {
+            await window.api.transactions.update({
+              id: tx.id,
               notes: (tx.notes ? tx.notes + '\n' : '') + `PIX Copia e Cola: ${rawPix}`
             });
           } catch(e) {}
@@ -5717,29 +6663,28 @@ async function openPaymentDateModal(txId, currentDate, onComplete) {
   document.getElementById('btn-pay-cancel').onclick = Modal.close;
   document.getElementById('btn-pay-confirm').onclick = async () => {
     const selectedDate = dateInput.value;
+    const paidVal = parseFloat(amountInput.value);
     if (!selectedDate) {
       toast('Selecione uma data válida', 'error');
       return;
     }
+    if (isNaN(paidVal) || paidVal < 0) {
+      toast('Informe um valor de pagamento válido', 'error');
+      return;
+    }
 
-    let penalty_amount = 0;
-    let discount_amount = 0;
-    const chkDiscount = document.getElementById('chk-discount');
-    const chkPenalty = document.getElementById('chk-penalty');
-    const inputDiscount = document.getElementById('input-discount-val');
-    const inputPenalty = document.getElementById('input-penalty-val');
-
-    if (chkDiscount && chkDiscount.checked && inputDiscount) discount_amount = parseFloat(inputDiscount.value) || 0;
-    if (chkPenalty && chkPenalty.checked && inputPenalty) penalty_amount = parseFloat(inputPenalty.value) || 0;
+    const diff = Math.round((paidVal - baseAmount) * 100) / 100;
+    const penalty_amount = diff > 0 ? diff : 0;
+    const discount_amount = diff < 0 ? Math.abs(diff) : 0;
 
     try {
       await window.api.transactions.togglePaidWithDate(txId, selectedDate, { penalty_amount, discount_amount });
-      toast('Pagamento confirmado com sucesso!');
+      toast('Pagamento confirmado com sucesso!', 'success');
       Modal.close();
       if (onComplete) onComplete();
     } catch (err) {
       console.error(err);
-      toast('Erro ao atualizar status', 'error');
+      toast('Erro ao atualizar status: ' + err.message, 'error');
     }
   };
 }
@@ -6036,7 +6981,7 @@ async function renderAccounts() {
                 
                 <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
                   <div>
-                    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600;letter-spacing:0.02em;">Fatura / Usado</div>
+                    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600;letter-spacing:0.02em;" title="Soma das faturas abertas + todas as parcelas futuras que consom o limite">Comprometido Total</div>
                     <div style="font-size:16px;font-weight:700;color:#f87171;">${fmt.currency(spent)}</div>
                   </div>
                   <div style="text-align: right;">
@@ -7149,16 +8094,29 @@ function openGoalDepositModal(goalId, goals) {
 async function renderReports() {
   const page = document.getElementById('page-reports');
   page.innerHTML = `
-    <div class="page-header"><div><h2 class="page-title">Relatórios</h2></div><div id="report-period"></div></div>
+    <div class="page-header">
+      <div><h2 class="page-title">Relatórios</h2></div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="btn btn-secondary btn-sm" id="btn-print-report" style="display:flex;align-items:center;gap:6px" title="Imprimir Relatório ou Salvar em PDF">
+          <span>🖨️</span> Imprimir / PDF
+        </button>
+        <div id="report-period"></div>
+      </div>
+    </div>
     <div class="report-tabs">
       <button class="report-tab active" data-tab="cashflow">Fluxo de Caixa</button>
       <button class="report-tab" data-tab="categories">Por Categoria</button>
       <button class="report-tab" data-tab="patrimony">Patrimônio</button>
+      <button class="report-tab" data-tab="interest">Auditoria de Juros</button>
     </div>
     <div id="report-content"></div>`;
 
   document.getElementById('report-period').appendChild(buildPeriodSelector(() => loadTab(currentTab)));
   let currentTab = 'cashflow';
+
+  document.getElementById('btn-print-report')?.addEventListener('click', () => {
+    window.print();
+  });
 
   document.querySelectorAll('.report-tab').forEach(btn => {
     btn.onclick = () => { document.querySelectorAll('.report-tab').forEach(b => b.classList.remove('active')); btn.classList.add('active'); currentTab = btn.dataset.tab; loadTab(currentTab); };
@@ -7168,8 +8126,8 @@ async function renderReports() {
     const content = document.getElementById('report-content');
     if (tab === 'cashflow') {
       const txs = await window.api.reports.getCashflow({ userId: State.user.id, month: State.currentMonth, year: State.currentYear });
-      const inc = txs.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-      const exp = txs.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+      const inc = txs.filter(t => t.type === 'income').reduce((s, t) => s + (t.amount || 0) + (t.penalty_amount || 0) - (t.discount_amount || 0), 0);
+      const exp = txs.filter(t => t.type === 'expense').reduce((s, t) => s + (t.amount || 0) + (t.penalty_amount || 0) - (t.discount_amount || 0), 0);
       content.innerHTML = `
         <p style="font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 20px; background: rgba(255,255,255,0.02); padding: 12px 16px; border-left: 3px solid #10b981; border-radius: var(--radius-sm);">
           💡 <strong>Fluxo de Caixa:</strong> Este relatório apresenta a listagem completa de todas as receitas e despesas realizadas na competência selecionada, junto com o balanço consolidado do período. É a ferramenta ideal para você auditar a entrada e saída de recursos e verificar o saldo líquido exato de cada lançamento.
@@ -7180,16 +8138,23 @@ async function renderReports() {
           <div class="card" style="flex:1;text-align:center"><div style="color:var(--text-muted);font-size:12px;margin-bottom:6px">Saldo</div><div style="font-size:20px;font-weight:800;color:${inc-exp>=0?'var(--accent-light)':'#f87171'}">${fmt.currency(inc-exp)}</div></div>
         </div>
         <div class="card"><div class="table-wrapper"><table>
-          <thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Conta</th><th>Tipo</th><th class="text-right">Valor</th></tr></thead>
+          <thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Conta</th><th>Tipo</th><th class="text-right">Valor Líquido</th></tr></thead>
           <tbody>${txs.length === 0 ? '<tr><td colspan="6" class="no-data">Sem lançamentos</td></tr>' :
-            txs.map(t => `<tr>
-              <td style="color:var(--text-muted)">${fmt.date(t.date)}</td>
-              <td>${t.description || '—'}</td>
-              <td>${t.category_icon || ''} ${t.category_name || '—'}</td>
-              <td>${t.account_name || '—'}</td>
-              <td><span class="badge ${t.type === 'income' ? 'badge-green' : 'badge-red'}">${t.type === 'income' ? 'Receita' : 'Despesa'}</span></td>
-              <td class="text-right" style="font-weight:600;color:${t.type === 'income' ? 'var(--accent-light)' : '#f87171'}">${t.type === 'income' ? '+' : '-'}${fmt.currency(t.amount)}</td>
-            </tr>`).join('')}
+            txs.map(t => {
+              const net = (t.amount || 0) + (t.is_paid ? ((t.penalty_amount || 0) - (t.discount_amount || 0)) : 0);
+              const hasAdjustment = t.is_paid && (t.penalty_amount > 0 || t.discount_amount > 0);
+              return `<tr>
+                <td style="color:var(--text-muted)">${fmt.date(t.date)}</td>
+                <td>
+                  ${t.description || '—'}
+                  ${hasAdjustment ? `<div style="font-size:10.5px;color:var(--text-muted)">Base: ${fmt.currency(t.amount)}${t.penalty_amount > 0 ? ` (+${fmt.currency(t.penalty_amount)} juros)` : ''}${t.discount_amount > 0 ? ` (-${fmt.currency(t.discount_amount)} desc)` : ''}</div>` : ''}
+                </td>
+                <td>${t.category_icon || ''} ${t.category_name || '—'}</td>
+                <td>${t.account_name || '—'}</td>
+                <td><span class="badge ${t.type === 'income' ? 'badge-green' : 'badge-red'}">${t.type === 'income' ? 'Receita' : 'Despesa'}</span></td>
+                <td class="text-right" style="font-weight:600;color:${t.type === 'income' ? 'var(--accent-light)' : '#f87171'}">${t.type === 'income' ? '+' : '-'}${fmt.currency(net)}</td>
+              </tr>`;
+            }).join('')}
           </tbody></table></div></div>`;
     } else if (tab === 'categories') {
       const txs = await window.api.reports.getCashflow({ userId: State.user.id, month: State.currentMonth, year: State.currentYear });
@@ -7200,7 +8165,7 @@ async function renderReports() {
         <div class="card" id="categories-report-interactive-wrapper"></div>
       `;
       setupCategoryInteractiveChart('categories-report-interactive-wrapper', 'repCat', txs);
-    } else {
+    } else if (tab === 'patrimony') {
       const data = await window.api.reports.getPatrimony({ userId: State.user.id });
       content.innerHTML = `
         <p style="font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 20px; background: rgba(255,255,255,0.02); padding: 12px 16px; border-left: 3px solid #3b82f6; border-radius: var(--radius-sm);">
@@ -7210,6 +8175,178 @@ async function renderReports() {
       if (State.charts.patrimony) State.charts.patrimony.destroy();
       const vals = data.map(d => d.net);
       State.charts.patrimony = new Chart(document.getElementById('chart-patrimony'), { type: 'line', data: { labels: data.map(d => d.month), datasets: [{ label: 'Patrimônio', data: vals, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', fill: true, tension: 0.4, pointBackgroundColor: '#10b981', pointRadius: 4 }] }, options: chartOptions('bar') });
+    } else if (tab === 'interest') {
+      const audit = await window.api.reports.getInterestAudit({ userId: State.user.id, month: State.currentMonth, year: State.currentYear });
+      const summary = audit.summary || { totalPenalty: 0, totalDiscount: 0, penaltyCount: 0, discountCount: 0, avgDaysLate: 0, avgDailyRate: 0 };
+      const byCat = audit.byCategory || [];
+      const bySup = audit.bySupplier || [];
+      const byAcc = audit.byAccount || [];
+      const txs = audit.transactions || [];
+
+      content.innerHTML = `
+        <p style="font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 20px; background: rgba(255,255,255,0.02); padding: 12px 16px; border-left: 3px solid #f59e0b; border-radius: var(--radius-sm);">
+          💡 <strong>Auditoria de Juros e Encargos:</strong> Monitore todos os valores pagos em atraso, multas, taxa média de juros ao dia (% a.d.) e economias com descontos obtidos. Identifique onde você mais gasta com juros por categoria, fornecedor ou conta bancária.
+        </p>
+
+        <!-- KPI CARDS -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px;">
+          <div class="card" style="text-align: center; border-top: 3px solid #ef4444;">
+            <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">⚠️ Total Pago em Juros / Multas</div>
+            <div style="font-size: 22px; font-weight: 800; color: #f87171;">${fmt.currency(summary.totalPenalty)}</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">${summary.penaltyCount} pagamento(s) com acréscimo</div>
+          </div>
+          <div class="card" style="text-align: center; border-top: 3px solid #10b981;">
+            <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">🏷️ Total de Descontos Obtidos</div>
+            <div style="font-size: 22px; font-weight: 800; color: var(--accent-light);">${fmt.currency(summary.totalDiscount)}</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">${summary.discountCount} pagamento(s) com desconto</div>
+          </div>
+          <div class="card" style="text-align: center; border-top: 3px solid #f59e0b;">
+            <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">📅 Média de Dias de Atraso</div>
+            <div style="font-size: 22px; font-weight: 800; color: #fbbf24;">${summary.avgDaysLate.toFixed(1)} <span style="font-size: 13px; font-weight: 600;">dias</span></div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Tempo médio de atraso pago</div>
+          </div>
+          <div class="card" style="text-align: center; border-top: 3px solid #06b6d4;">
+            <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">📈 Taxa Média de Juros Diária</div>
+            <div style="font-size: 22px; font-weight: 800; color: #38bdf8;">${summary.avgDailyRate.toFixed(3)}% <span style="font-size: 13px; font-weight: 600;">a.d.</span></div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Custo médio diário do atraso</div>
+          </div>
+        </div>
+
+        <!-- BREAKDOWN GRIDS: CATEGORIA, FORNECEDOR E CONTA -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px;">
+          <!-- POR CATEGORIA -->
+          <div class="card">
+            <h3 style="font-size: 14px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+              <span>📂 Juros por Categoria</span>
+              <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">${byCat.length} categorias</span>
+            </h3>
+            ${byCat.length === 0 ? '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:16px">Nenhum juro registrado no período.</div>' : `
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                ${byCat.map(c => {
+                  const pct = summary.totalPenalty > 0 ? ((c.total_penalty / summary.totalPenalty) * 100).toFixed(1) : 0;
+                  return `
+                    <div>
+                      <div style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px;">
+                        <span>${c.category_icon || '📁'} <strong>${c.category_name}</strong> <span style="color:var(--text-muted);font-size:11px">(${c.count}x)</span></span>
+                        <span style="font-weight: 700; color: #f87171;">${fmt.currency(c.total_penalty)} <span style="font-size:11px;color:var(--text-muted)">(${pct}%)</span></span>
+                      </div>
+                      <div style="height: 6px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden;">
+                        <div style="height: 100%; width: ${pct}%; background: ${c.category_color || '#ef4444'}; border-radius: 4px;"></div>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `}
+          </div>
+
+          <!-- POR FORNECEDOR / CREDOR -->
+          <div class="card">
+            <h3 style="font-size: 14px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+              <span>🏢 Juros por Fornecedor / Credor</span>
+              <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">Top credores</span>
+            </h3>
+            ${bySup.length === 0 ? '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:16px">Nenhum juro registrado no período.</div>' : `
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                ${bySup.slice(0, 6).map((s, idx) => {
+                  const pct = summary.totalPenalty > 0 ? ((s.total_penalty / summary.totalPenalty) * 100).toFixed(1) : 0;
+                  return `
+                    <div>
+                      <div style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px;">
+                        <span><strong style="color:var(--text-primary)">${idx + 1}. ${s.supplier}</strong> <span style="color:var(--text-muted);font-size:11px">(${s.count}x)</span></span>
+                        <span style="font-weight: 700; color: #f87171;">${fmt.currency(s.total_penalty)}</span>
+                      </div>
+                      <div style="height: 6px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden;">
+                        <div style="height: 100%; width: ${pct}%; background: #f59e0b; border-radius: 4px;"></div>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `}
+          </div>
+
+          <!-- POR CONTA BANCÁRIA -->
+          <div class="card">
+            <h3 style="font-size: 14px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+              <span>🏦 Juros por Conta Pagadora</span>
+              <span style="font-size: 11px; color: var(--text-muted); font-weight: normal;">Origem dos pagamentos</span>
+            </h3>
+            ${byAcc.length === 0 ? '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:16px">Nenhum juro registrado no período.</div>' : `
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                ${byAcc.map(a => {
+                  const pct = summary.totalPenalty > 0 ? ((a.total_penalty / summary.totalPenalty) * 100).toFixed(1) : 0;
+                  return `
+                    <div>
+                      <div style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px;">
+                        <span>💳 <strong>${a.account_name}</strong> <span style="color:var(--text-muted);font-size:11px">(${a.count}x)</span></span>
+                        <span style="font-weight: 700; color: #f87171;">${fmt.currency(a.total_penalty)}</span>
+                      </div>
+                      <div style="height: 6px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden;">
+                        <div style="height: 100%; width: ${pct}%; background: ${a.account_color || '#3b82f6'}; border-radius: 4px;"></div>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `}
+          </div>
+        </div>
+
+        <!-- TABELA DETALHADA DE AUDITORIA -->
+        <div class="card">
+          <h3 style="font-size: 14px; font-weight: 700; margin-bottom: 12px;">📋 Extrato Detalhado de Pagamentos com Ajuste (Juros ou Descontos)</h3>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Vencimento</th>
+                  <th>Pagamento</th>
+                  <th>Atraso / Ant.</th>
+                  <th>Descrição</th>
+                  <th>Categoria</th>
+                  <th>Conta</th>
+                  <th class="text-right">Valor Base</th>
+                  <th class="text-right">Ajuste (Juros/Desc.)</th>
+                  <th class="text-right">Taxa Diária</th>
+                  <th class="text-right">Total Pago</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${txs.length === 0 ? '<tr><td colspan="10" class="no-data" style="padding:24px;text-align:center">Nenhum pagamento com juros ou desconto registrado neste período. 🎉</td></tr>' :
+                  txs.map(t => {
+                    const isPenalty = t.penalty_amount > 0;
+                    const isDiscount = t.discount_amount > 0;
+                    const diffDays = t.days_late;
+                    let delayLabel = '—';
+                    if (diffDays > 0) delayLabel = `<span style="color:#f87171;font-weight:700">+${diffDays}d atraso</span>`;
+                    else if (diffDays < 0) delayLabel = `<span style="color:var(--accent-light);font-weight:700">${Math.abs(diffDays)}d antecip.</span>`;
+                    else delayLabel = `<span style="color:var(--text-muted)">no dia</span>`;
+
+                    return `
+                      <tr>
+                        <td style="color:var(--text-muted)">${fmt.date(t.due_date || t.date)}</td>
+                        <td style="font-weight:600;color:var(--text-primary)">${fmt.date(t.payment_date)}</td>
+                        <td>${delayLabel}</td>
+                        <td style="font-weight:600">${t.description || '—'}</td>
+                        <td>${t.category_icon || ''} ${t.category_name || '—'}</td>
+                        <td>${t.account_name || '—'}</td>
+                        <td class="text-right" style="color:var(--text-muted)">${fmt.currency(t.base_amount)}</td>
+                        <td class="text-right" style="font-weight:700;color:${isPenalty ? '#f87171' : (isDiscount ? 'var(--accent-light)' : 'var(--text-muted)')}">
+                          ${isPenalty ? `+${fmt.currency(t.penalty_amount)}` : (isDiscount ? `-${fmt.currency(t.discount_amount)}` : 'R$ 0,00')}
+                        </td>
+                        <td class="text-right" style="font-size:12px;color:${isPenalty ? '#fbbf24' : 'var(--text-muted)'}">
+                          ${isPenalty && t.daily_rate_pct ? `${t.daily_rate_pct.toFixed(3)}% a.d.` : '—'}
+                        </td>
+                        <td class="text-right" style="font-weight:800;color:var(--text-primary)">${fmt.currency(t.net_amount)}</td>
+                      </tr>
+                    `;
+                  }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
     }
   }
   await loadTab('cashflow');
@@ -7223,229 +8360,289 @@ async function renderReports() {
 /* manual-a.js - parte 1/2 */
 
 /**
- * Retorna o HTML do menu em árvore (Sidebar) do Manual do Usuário
+ * Retorna o HTML do menu em árvore (Sidebar) do Manual do Usuário com os 13 Capítulos
  */
 function getManualSidebarHtml() {
   return `
-    <!-- MENU EM ÁRVORE DE ASSUNTOS E SUBMENUS -->
-    <div id="manual-tree-sidebar" style="width: 270px; min-width: 270px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; scrollbar-width: thin;">
+    <!-- MENU EM ÁRVORE DE ASSUNTOS E SUBMENUS (13 CAPÍTULOS) -->
+    <div id="manual-tree-sidebar" style="width: 285px; min-width: 285px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-md); overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 6px; scrollbar-width: thin;">
       
-      <!-- GRUPO 1: CARTÕES DE CRÉDITO -->
+      <!-- CAPÍTULO 1: PRIMEIROS PASSOS & ACESSO -->
       <div class="wiki-tree-group">
-        <div class="wiki-tree-header" data-cat="cartoes" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #60a5fa; background: rgba(59,130,246,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-          <span>💳 Cartões de Crédito</span>
+        <div class="wiki-tree-header" data-cat="primeiros" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #60a5fa; background: rgba(59,130,246,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>🌟 1. Primeiros Passos & Acesso</span>
           <span class="wiki-tree-arrow">▾</span>
         </div>
         <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
-          <div class="wiki-tree-item active" data-cat="cartoes" data-topic="cartao-competencia" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-primary); cursor: pointer; border-left: 2px solid var(--accent); background: var(--bg-raised);">
-            • Competência vs Vencimento
+          <div class="wiki-tree-item active" data-cat="primeiros" data-topic="primeiros-familia" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-primary); cursor: pointer; border-left: 2px solid var(--accent); background: var(--bg-raised);">
+            • 1.1 Criando Família e Usuário
           </div>
+          <div class="wiki-tree-item" data-cat="primeiros" data-topic="primeiros-perfis" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 1.2 Perfis & Permissões Granulares
+          </div>
+          <div class="wiki-tree-item" data-cat="primeiros" data-topic="primeiros-recuperacao" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 1.3 Recuperação de Senha Segura
+          </div>
+          <div class="wiki-tree-item" data-cat="primeiros" data-topic="primeiros-temas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 1.4 Temas & Personalização Visual
+          </div>
+        </div>
+      </div>
+
+      <!-- CAPÍTULO 2: CONTAS, CARTEIRAS & BENEFÍCIOS -->
+      <div class="wiki-tree-group">
+        <div class="wiki-tree-header" data-cat="contas" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #06b6d4; background: rgba(6,182,212,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>🏦 2. Contas & Benefícios</span>
+          <span class="wiki-tree-arrow">▾</span>
+        </div>
+        <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+          <div class="wiki-tree-item" data-cat="contas" data-topic="contas-cadastro" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 2.1 Contas, Poupanças & Dinheiro
+          </div>
+          <div class="wiki-tree-item" data-cat="contas" data-topic="contas-beneficios" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 2.2 Cartões Benefício (*Flash, Caju*)
+          </div>
+          <div class="wiki-tree-item" data-cat="contas" data-topic="contas-transferencias" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 2.3 Transferências Sem Duplicação
+          </div>
+          <div class="wiki-tree-item" data-cat="contas" data-topic="contas-limites" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 2.4 Cheque Especial & LIS
+          </div>
+        </div>
+      </div>
+
+      <!-- CAPÍTULO 3: CARTÕES DE CRÉDITO & FATURAS -->
+      <div class="wiki-tree-group">
+        <div class="wiki-tree-header" data-cat="cartoes" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #a855f7; background: rgba(168,85,247,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>💳 3. Cartões de Crédito</span>
+          <span class="wiki-tree-arrow">▾</span>
+        </div>
+        <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
           <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-ciclo" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Ciclo & Melhor Dia de Compra
+            • 3.1 Ciclo & Melhor Dia de Compra
           </div>
           <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-limite" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Limite Total vs Comprometido
+            • 3.2 Limite Total vs Comprometido
           </div>
           <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-pagamento" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Pagamento & Baixa Atômica
+            • 3.3 Pagamento Integral da Fatura
           </div>
-          <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-destaque" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #38bdf8; font-weight: 600; cursor: pointer; border-left: 2px solid transparent;">
-            • ✨ Destaque Cromático de Parcelas (Novo)
+          <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-rotativo" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 3.4 Pagamento Parcial & Rotativo
+          </div>
+          <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-antecipacao" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 3.5 Antecipação com Desconto
           </div>
           <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-acordo" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Renegociação & Acordo de Faturas
+            • 3.6 Renegociação & Acordos
           </div>
-          <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-reabertura" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Reabertura & Desfazer Quitação
-          </div>
-        </div>
-      </div>
-
-      <!-- GRUPO 2: DASHBOARD & PAINEL DE CONTROLE -->
-      <div class="wiki-tree-group">
-        <div class="wiki-tree-header" data-cat="dashboard" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #fb923c; background: rgba(249,115,22,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-          <span>📊 Dashboard & Painel</span>
-          <span class="wiki-tree-arrow">▾</span>
-        </div>
-        <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
-          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-modos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #fb923c; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
-            • 🎛️ 3 Modos de Dashboard (Novo)
-          </div>
-          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-filtros-membros" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #60a5fa; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
-            • 👥 Filtros de Membros & Titularidade
-          </div>
-          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-kpis" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 📊 Indicadores Principais (KPIs & Sincronia)
-          </div>
-          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-pendencias-anteriores" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #fbbf24; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
-            • ⚠️ Pendências de Meses Anteriores (Novo)
-          </div>
-          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-alertas-coloridos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #34d399; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
-            • 🚦 Alertas Diferenciados (Receitas vs Despesas)
-          </div>
-          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-cards-limites" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #fb923c; font-weight: 600; cursor: pointer; border-left: 2px solid transparent;">
-            • 💳 Cartões, Faturas & Limites Reais
-          </div>
-          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-contas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 🏦 Contas Bancárias & Cheque Especial
-          </div>
-          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-links" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 🚨 Faixa de Avisos & Links Diretos
-          </div>
-          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-prioridades" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • ⭐ Prioritários, A Pagar & Pagas
-          </div>
-          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-graficos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 📈 Gráficos de Fluxo & Categorias
-          </div>
-          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-consolidado" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 🌐 Visão Geral, Metas & Patrimônio
-          </div>
-          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-contraste" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 🎨 Modos de Contraste & Usabilidade
+          <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-estorno" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 3.7 Estorno em 1 Clique
           </div>
         </div>
       </div>
 
-      <!-- GRUPO 3: DESPESAS & RECEITAS -->
+      <!-- CAPÍTULO 4: LANÇAMENTOS & NOTAS FISCAIS -->
       <div class="wiki-tree-group">
-        <div class="wiki-tree-header" data-cat="lancamentos" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #34d399; background: rgba(16,185,129,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-          <span>📌 Despesas & Receitas</span>
+        <div class="wiki-tree-header" data-cat="lancamentos" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #10b981; background: rgba(16,185,129,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>📝 4. Lançamentos & NF-e</span>
           <span class="wiki-tree-arrow">▾</span>
         </div>
         <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+          <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-despesas-receitas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 4.1 Despesas e Receitas
+          </div>
           <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-competencia" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Competência (Ref: MM/AAAA)
+            • 4.2 Mês de Competência
           </div>
-          <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-fixas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Despesas Fixas & Prioridade ⭐
+          <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-nfce-qr" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 4.3 Leitor de Nota Fiscal (QR Code)
           </div>
-          <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-avulsos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Despesas Variáveis (Avulsas)
+          <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-duplicados" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 4.4 Alerta de Duplicidades
           </div>
-          <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-nfce-qr" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #10b981; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
-            • 📷 Leitor de Nota Fiscal (QR Code) (Novo)
-          </div>
-          <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-similares" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #fbbf24; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
-            • 🔔 Alerta de Similar em Tempo Real (Novo)
-          </div>
-          <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-juros" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Juros, Multas e Descontos
+          <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-popup-detalhes" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #38bdf8; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+            • 4.5 Pop-up de Detalhes & 3 Ações
           </div>
         </div>
       </div>
 
-      <!-- GRUPO 4: CONTAS & CARTEIRAS -->
+      <!-- CAPÍTULO 5: JUROS, MULTAS & FERIADOS -->
       <div class="wiki-tree-group">
-        <div class="wiki-tree-header" data-cat="contas" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #06b6d4; background: rgba(6,182,212,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-          <span>🏦 Contas, Vouchers & Bancos</span>
+        <div class="wiki-tree-header" data-cat="juros" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #f59e0b; background: rgba(245,158,11,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>⚖️ 5. Juros, Multas & Feriados</span>
           <span class="wiki-tree-arrow">▾</span>
         </div>
         <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
-          <div class="wiki-tree-item" data-cat="contas" data-topic="contas-tipos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Tipos de Contas Bancárias
+          <div class="wiki-tree-item" data-cat="juros" data-topic="juros-prorrogacao" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 5.1 Prorrogação em Feriados
           </div>
-          <div class="wiki-tree-item" data-cat="contas" data-topic="contas-beneficio" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #06b6d4; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
-            • 🎟️ Cartões Benefício & Vouchers (Novo)
+          <div class="wiki-tree-item" data-cat="juros" data-topic="juros-calculo" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 5.2 Cálculo de Juros & Multas
           </div>
-          <div class="wiki-tree-item" data-cat="contas" data-topic="contas-transf" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Transferências sem Duplicação
+          <div class="wiki-tree-item" data-cat="juros" data-topic="juros-projecao" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 5.3 Projeção para Pagamento Hoje
           </div>
-          <div class="wiki-tree-item" data-cat="contas" data-topic="contas-produtos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Produtos da Conta & Limites
+          <div class="wiki-tree-item" data-cat="juros" data-topic="juros-pagamento" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 5.4 Pagamento com Acréscimo/Desconto
           </div>
         </div>
       </div>
 
-      <!-- GRUPO 5: FAMÍLIA & PERMISSÕES -->
+      <!-- CAPÍTULO 6: PLANEJAMENTO & RECORRÊNCIAS -->
       <div class="wiki-tree-group">
-        <div class="wiki-tree-header" data-cat="familia" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #a78bfa; background: rgba(167,139,250,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-          <span>👨‍👩‍👧 Família & Permissões</span>
+        <div class="wiki-tree-header" data-cat="planejamento" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #ec4899; background: rgba(236,72,153,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>🔄 6. Planejamento Mensal</span>
           <span class="wiki-tree-arrow">▾</span>
         </div>
         <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
-          <div class="wiki-tree-item" data-cat="familia" data-topic="fam-perfis" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Papéis de Usuário (ADM, etc)
+          <div class="wiki-tree-item" data-cat="planejamento" data-topic="plan-fixas-parceladas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 6.1 Despesas Fixas & Parceladas
           </div>
-          <div class="wiki-tree-item" data-cat="familia" data-topic="fam-permissoes" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Permissões Granulares por Menu
+          <div class="wiki-tree-item" data-cat="planejamento" data-topic="plan-prioritarias" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 6.2 Despesas Prioritárias ⭐
+          </div>
+          <div class="wiki-tree-item" data-cat="planejamento" data-topic="plan-adiar" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 6.3 Adiar Parcela para o Mês
+          </div>
+          <div class="wiki-tree-item" data-cat="planejamento" data-topic="plan-kanban" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 6.4 Kanban com Drag & Drop
+          </div>
+          <div class="wiki-tree-item" data-cat="planejamento" data-topic="plan-decisao-cards" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #a78bfa; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+            • 6.5 Cards de Decisão de Recorrência
           </div>
         </div>
       </div>
 
-      <!-- GRUPO 6: SINCRONIZAÇÃO & ANTI-DUPLICIDADE -->
+      <!-- CAPÍTULO 7: ORÇAMENTOS & METAS -->
       <div class="wiki-tree-group">
-        <div class="wiki-tree-header" data-cat="sync" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #38bdf8; background: rgba(56,189,248,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-          <span>🛡️ Sincronização & Anti-Duplicidade</span>
+        <div class="wiki-tree-header" data-cat="orcamento" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #f43f5e; background: rgba(244,63,94,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>🎯 7. Orçamentos & Metas</span>
           <span class="wiki-tree-arrow">▾</span>
         </div>
         <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
-          <div class="wiki-tree-item" data-cat="sync" data-topic="sync-uuid" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #38bdf8; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
-            • 🔑 UUIDs & Multi-Aparelho
+          <div class="wiki-tree-item" data-cat="orcamento" data-topic="orc-tetos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 7.1 Tetos de Orçamento
           </div>
-          <div class="wiki-tree-item" data-cat="sync" data-topic="sync-receitas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #34d399; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
-            • 💰 Regra de Receitas & Mesma Conta (Novo)
+          <div class="wiki-tree-item" data-cat="orcamento" data-topic="orc-barras" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 7.2 Barras de Limite Coloridas
           </div>
-          <div class="wiki-tree-item" data-cat="sync" data-topic="sync-dedup" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 🧠 Motor Heurístico & Dívidas
-          </div>
-          <div class="wiki-tree-item" data-cat="sync" data-topic="sync-conciliacao" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • ⚖️ Central de Conciliação & Ações em Lote
+          <div class="wiki-tree-item" data-cat="orcamento" data-topic="orc-metas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 7.3 Metas de Economia & Aportes
           </div>
         </div>
       </div>
 
-      <!-- GRUPO 7: ORÇAMENTOS & METAS -->
+      <!-- CAPÍTULO 8: DASHBOARD & KANBAN -->
       <div class="wiki-tree-group">
-        <div class="wiki-tree-header" data-cat="orcamentos" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #f43f5e; background: rgba(244,63,94,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-          <span>🎯 Orçamentos & Metas</span>
+        <div class="wiki-tree-header" data-cat="dashboard" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #fb923c; background: rgba(249,115,22,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>📊 8. Dashboard & Painel</span>
           <span class="wiki-tree-arrow">▾</span>
         </div>
         <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
-          <div class="wiki-tree-item" data-cat="orcamentos" data-topic="orc-budgets" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Tetos de Gastos por Categoria
+          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-modos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 8.1 Os 3 Modos de Visualização
           </div>
-          <div class="wiki-tree-item" data-cat="orcamentos" data-topic="orc-metas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Metas Financeiras & Aportes
+          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-filtros" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 8.2 Filtros por Membro e Conta
           </div>
-        </div>
-      </div>
-
-      <!-- GRUPO 8: METODOLOGIA 50-30-20 -->
-      <div class="wiki-tree-group">
-        <div class="wiki-tree-header" data-cat="metodologia" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #c084fc; background: rgba(192,132,252,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-          <span>💡 Metodologia 50-30-20</span>
-          <span class="wiki-tree-arrow">▾</span>
-        </div>
-        <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
-          <div class="wiki-tree-item" data-cat="metodologia" data-topic="met-regra" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Como Dividir o Orçamento Familiar
+          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-kanban" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 8.3 Kanban em 3 Colunas
+          </div>
+          <div class="wiki-tree-item" data-cat="dashboard" data-topic="dash-pendencias" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 8.4 Pendências de Meses Anteriores
           </div>
         </div>
       </div>
 
-      <!-- GRUPO 9: ARQUITETURA MODULAR & DESENVOLVIMENTO -->
+      <!-- CAPÍTULO 9: RELATÓRIOS, AUDITORIA & PDF -->
       <div class="wiki-tree-group">
-        <div class="wiki-tree-header" data-cat="arquitetura" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #eab308; background: rgba(234,179,8,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-          <span>🏗️ Arquitetura & Manutenção</span>
+        <div class="wiki-tree-header" data-cat="relatorios" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #818cf8; background: rgba(129,140,248,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>📈 9. Relatórios & Auditoria</span>
           <span class="wiki-tree-arrow">▾</span>
         </div>
         <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
-          <div class="wiki-tree-item" data-cat="arquitetura" data-topic="arq-modular" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #eab308; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
-            • ⚡ Modularização (< 1000 Linhas) & Build
+          <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-fluxo" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 9.1 Relatório de Fluxo de Caixa
+          </div>
+          <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-graficos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 9.2 Gráficos Interativos
+          </div>
+          <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-patrimonio" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 9.3 Evolução Patrimonial Anual
+          </div>
+          <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-auditoria-juros" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 9.4 Auditoria de Juros & Encargos
+          </div>
+          <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-impressao-pdf" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 9.5 Impressão & Exportação PDF
           </div>
         </div>
       </div>
 
-      <!-- GRUPO 10: FAQ INTERATIVO -->
+      <!-- CAPÍTULO 10: AUDITORIA, SEGURANÇA & LGPD -->
       <div class="wiki-tree-group">
-        <div class="wiki-tree-header" data-cat="faq" style="padding: 9px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #f87171; background: rgba(248,113,113,0.08); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-          <span>❓ FAQ (Perguntas)</span>
+        <div class="wiki-tree-header" data-cat="seguranca" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #14b8a6; background: rgba(20,184,166,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>🛡️ 10. Auditoria & LGPD</span>
           <span class="wiki-tree-arrow">▾</span>
         </div>
         <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
-          <div class="wiki-tree-item" data-cat="faq" data-topic="faq-interativo" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • Dúvidas Frequentes (Clique e Veja)
+          <div class="wiki-tree-item" data-cat="seguranca" data-topic="seg-trilha-auditoria" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 10.1 Histórico de Modificações
+          </div>
+          <div class="wiki-tree-item" data-cat="seguranca" data-topic="seg-lgpd" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 10.2 Direitos LGPD & Privacidade
+          </div>
+        </div>
+      </div>
+
+      <!-- CAPÍTULO 11: BACKUPS & INTEGRIDADE -->
+      <div class="wiki-tree-group">
+        <div class="wiki-tree-header" data-cat="backup" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #eab308; background: rgba(234,179,8,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>💾 11. Backups & Restauração</span>
+          <span class="wiki-tree-arrow">▾</span>
+        </div>
+        <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+          <div class="wiki-tree-item" data-cat="backup" data-topic="bak-exportacao" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 11.1 Exportação Excel, CSV, DB
+          </div>
+          <div class="wiki-tree-item" data-cat="backup" data-topic="bak-teste-integridade" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 11.2 Testar Integridade (.db)
+          </div>
+          <div class="wiki-tree-item" data-cat="backup" data-topic="bak-restauracao" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 11.3 Restaurando um Backup
+          </div>
+          <div class="wiki-tree-item" data-cat="backup" data-topic="bak-saude-metricas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 11.4 Saúde & Métricas SQLite
+          </div>
+        </div>
+      </div>
+
+      <!-- CAPÍTULO 12: CELULAR & RESPONSIVIDADE -->
+      <div class="wiki-tree-group">
+        <div class="wiki-tree-header" data-cat="mobile" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #38bdf8; background: rgba(56,189,248,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>📱 12. Acesso Celular & Mobile</span>
+          <span class="wiki-tree-arrow">▾</span>
+        </div>
+        <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+          <div class="wiki-tree-item" data-cat="mobile" data-topic="mob-conexao-wifi" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 12.1 Conexão Wi-Fi / QR Code
+          </div>
+          <div class="wiki-tree-item" data-cat="mobile" data-topic="mob-layout-touch" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 12.2 Layout Touch & Header
+          </div>
+        </div>
+      </div>
+
+      <!-- CAPÍTULO 13: FAQ INTERATIVO -->
+      <div class="wiki-tree-group">
+        <div class="wiki-tree-header" data-cat="faq" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #f87171; background: rgba(248,113,113,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
+          <span>❓ 13. FAQ & Dúvidas Frequentes</span>
+          <span class="wiki-tree-arrow">▾</span>
+        </div>
+        <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
+          <div class="wiki-tree-item" data-cat="faq" data-topic="faq-duvidas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • 13.1 Dúvidas Mais Frequentes
           </div>
         </div>
       </div>
@@ -7455,500 +8652,479 @@ function getManualSidebarHtml() {
 }
 
 /**
- * Retorna o HTML dos tópicos 1 a 5 do painel de conteúdo
+ * Retorna o HTML dos tópicos dos Capítulos 1 a 6 do painel de leitura
  */
 function getManualTopicsPart1Html() {
   return `
-    <!-- TÓPICO 1.1: CARTÕES > COMPETÊNCIA VS VENCIMENTO -->
-    <div class="manual-topic-content" id="topic-cartao-competencia" style="display: block;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #60a5fa; font-weight: 700;">
-        📅 Competência da Fatura vs Data de Vencimento
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(59,130,246,0.08); border-left: 4px solid var(--blue); padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Conceito Fundamental:</strong> A <em>competência</em> é o mês em que a despesa ou o ciclo da fatura ocorreu (ex: compras feitas até 25/02 pertencem à competência <code>Ref: 02/2026</code>). O <em>vencimento</em> é o dia limite para pagar o boleto do banco (ex: <code>05/03/2026</code>).
-        </div>
-        <p style="margin-bottom: 10px;">No FinançasFamília, as faturas e compras são organizadas por <strong>Mês de Referência</strong> para que você saiba exatamente o quanto consumiu no período, mantendo o controle do fluxo de caixa e o cumprimento do orçamento.</p>
-      </div>
-    </div>
-
-    <!-- TÓPICO 1.2: CARTÕES > CICLO & MELHOR DIA -->
-    <div class="manual-topic-content" id="topic-cartao-ciclo" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #60a5fa; font-weight: 700;">
-        🛒 Ciclo de Fechamento & Melhor Dia de Compra
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(59,130,246,0.08); border-left: 4px solid var(--blue); padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Como Funciona o Fechamento:</strong> Todo cartão possui um <em>Dia de Fechamento (Corte)</em> e um <em>Dia de Vencimento</em>.
-        </div>
-        <p style="margin-bottom: 8px;">• <strong>Antes do Fechamento:</strong> Compras feitas até o dia de corte entram na fatura do mês atual.</p>
-        <p style="margin-bottom: 8px;">• <strong>Melhor Dia de Compra (Após o Fechamento):</strong> Compras realizadas a partir do dia seguinte ao corte caem automaticamente na fatura do mês subsequente, dando até 40 dias para pagar!</p>
-        <p style="margin: 0;">• <strong>Cálculo Automático:</strong> O aplicativo calcula e projeta cada parcela no mês exato da fatura de acordo com o dia da compra.</p>
-      </div>
-    </div>
-
-    <!-- TÓPICO 1.3: CARTÕES > LIMITE TOTAL VS COMPROMETIDO -->
-    <div class="manual-topic-content" id="topic-cartao-limite" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #60a5fa; font-weight: 700;">
-        📊 Limite Total vs Limite Comprometido
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">O limite do cartão é gerenciado de forma contínua:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
-          <li><strong>Limite Total:</strong> Valor máximo liberado pelo banco (ex: R$ 5.000,00).</li>
-          <li><strong>Limite Comprometido:</strong> Soma de todas as compras parceladas futuras e faturas abertas que ainda não foram pagas.</li>
-          <li><strong>Limite Disponível:</strong> <code>Limite Total - Limite Comprometido</code>. Conforme as faturas são pagas, o limite é liberado proporcionalmente.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- TÓPICO 1.4: CARTÕES > PAGAMENTO DA FATURA -->
-    <div class="manual-topic-content" id="topic-cartao-pagamento" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #60a5fa; font-weight: 700;">
-        💳 Pagamento & Baixa Atômica da Fatura
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">Ao quitar uma fatura de cartão de crédito:</p>
-        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
-          <li>Clique no botão verde <strong>"Pagar Fatura"</strong> no card do cartão.</li>
-          <li>Selecione a <strong>Conta Bancária Pagadora</strong> de onde o dinheiro sairá.</li>
-          <li>Confirme a data de pagamento e o valor (total ou parcial).</li>
-        </ol>
-        <p style="margin: 0;">O sistema baixa a fatura, debita da sua conta bancária e <strong>marca atomicamente todas as compras e parcelas atreladas àquela fatura como pagas</strong>!</p>
-      </div>
-    </div>
-
-    <!-- TÓPICO 1.5: CARTÕES > DESTAQUE CROMÁTICO DE PARCELAS (NOVO) -->
-    <div class="manual-topic-content" id="topic-cartao-destaque" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #38bdf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>✨ Destaque Cromático Inteligente de Parcelas</span>
-        <span class="badge badge-blue">Novo</span>
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(56,189,248,0.08); border-left: 4px solid var(--accent); padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Auditoria Visual Instantânea:</strong> Chega de perder tempo procurando quais compras pertencem a qual fatura!
-        </div>
-        <p style="margin-bottom: 10px;">Ao clicar sobre qualquer card de fatura na tela de Planejamento:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
-          <li>🎨 <strong>Realce de Cor Oficial:</strong> Todas as despesas e compras parceladas vinculadas àquela fatura são imediatamente iluminadas com a <strong>cor tema e borda personalizada do cartão/banco</strong>.</li>
-          <li>🔍 <strong>Foco Automático:</strong> Os lançamentos que não pertencem ao cartão são atenuados suavemente, e a tela rola automaticamente até a primeira parcela da fatura.</li>
-          <li>🏷️ <strong>Badge Explicativa:</strong> Um selo visual exibe <code>📍 Parcela desta Fatura</code> ao lado de cada item destacado.</li>
-          <li>↩️ <strong>Desativar:</strong> Basta clicar novamente no card da fatura para retornar à visualização normal.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- TÓPICO 1.6: CARTÕES > RENEGOCIAÇÃO E ACORDO -->
-    <div class="manual-topic-content" id="topic-cartao-acordo" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a78bfa; font-weight: 700;">
-        🤝 Renegociação & Acordo de Faturas
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">Se você precisou parcelar a fatura com o banco ou fazer um acordo:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
-          <li>Clique no botão roxo <strong>"Renegociar / Acordo"</strong> no card da fatura.</li>
-          <li>Informe o valor de entrada (se houver) e o número de parcelas acordadas com os juros.</li>
-          <li>A fatura atual é liquidada como <span class="badge badge-purple">Acordo / Renegociada</span> e o sistema <strong>injeta automaticamente as parcelas do acordo nos meses futuros</strong> como despesas recorrentes transparentes.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- TÓPICO 1.7: CARTÕES > REABERTURA DE FATURA -->
-    <div class="manual-topic-content" id="topic-cartao-reabertura" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #60a5fa; font-weight: 700;">
-        🔓 Reabertura de Fatura & Estorno Seguro
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">Se você deu baixa ou renegociou uma fatura por engano:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
-          <li>Clique em <strong>"Reabrir Fatura"</strong>.</li>
-          <li>O valor pago é <strong>estornado de volta para o saldo da sua conta bancária</strong>.</li>
-          <li>Se houve renegociação, as parcelas futuras geradas pelo acordo são canceladas e removidas.</li>
-          <li>A fatura volta para o estado <span class="badge badge-yellow">⏳ Aberta</span> e recalcula seu valor total automaticamente.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- TÓPICO 2.0A: DASHBOARD > 3 MODOS DE LAYOUT (NOVO) -->
-    <div class="manual-topic-content" id="topic-dash-modos" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>🎛️ 3 Modos de Visualização do Dashboard</span>
-        <span class="badge badge-yellow">Novo Recurso</span>
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(249,115,22,0.08); border-left: 4px solid #fb923c; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Personalize a Experiência Visual Conforme sua Preferência:</strong>
-        </div>
-        <p style="margin-bottom: 10px;">Você pode alternar o layout do Dashboard a qualquer momento pelo menu <strong>Configurações ⚙️ &gt; Geral</strong> ou pelo seletor rápido no topo da tela:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🌟 <strong>1. Executivo por Zonas (Padrão):</strong> Visão 360° com KPIs consolidados, pílulas de ação rápida, previsão de cartões e contas com filtro de membros e o Painel Kanban 3 colunas.</li>
-          <li>📑 <strong>2. Sub-Abas Operacionais:</strong> Reduz a rolagem vertical agrupando os dados em 3 abas temáticas focadas (<em>📋 Operação</em>, <em>💳 Cartões & Bancos</em> e <em>📈 Gráficos</em>).</li>
-          <li>🎛️ <strong>3. Cockpit Integrado:</strong> Layout otimizado com barra de filtros no topo em linha, quadro de Cartões e Contas logo abaixo em largura total, KPIs sincronizados, Painel Kanban 3 colunas em 100% de largura e Gráficos no rodapé.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- TÓPICO 2.0B: DASHBOARD > FILTROS DE MEMBROS E TITULARIDADE (NOVO) -->
-    <div class="manual-topic-content" id="topic-dash-filtros-membros" style="display: none;">
+    <!-- CAPÍTULO 1.1: PRIMEIROS PASSOS > FAMÍLIA & USUÁRIO -->
+    <div class="manual-topic-content" id="topic-primeiros-familia" style="display: block;">
       <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #60a5fa; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>👥 Barra Superior de Filtros por Membro & Titularidade Efetiva</span>
-        <span class="badge badge-blue">Recurso Novo</span>
+        <span>🌟 1.1 Criando sua Família e Primeiro Usuário Master</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(59, 130, 246, 0.08); border-left: 4px solid #3b82f6; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Visão Familiar e Individual com 1 Clique:</strong>
+        <div style="background: rgba(59,130,246,0.08); border-left: 4px solid #3b82f6; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>Passo a Passo de Inicialização do Ambiente Familiar:</strong>
         </div>
-        <p style="margin-bottom: 10px;">A barra superior em linha (<code>dash-top-filter-bar</code>) permite filtrar instantaneamente todos os índices, cartões, alertas e contas do mês:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>👨‍👩‍👧 <strong>Toda a Família:</strong> Consolida a soma global de todos os familiares do grupo.</li>
-          <li>👤 <strong>Filtro por Membro Individual:</strong> Ao clicar no chip de um membro (ex: <em>William, Jennifer, etc.</em>), todos os KPIs, gráficos, alertas de vencimento e colunas do Kanban se ajustam para exibir apenas os lançamentos daquele titular.</li>
-          <li>🛡️ <strong>Titularidade Inteligente de Contas & Extratos:</strong> Mesmo que um extrato bancário (OFX/CSV) seja importado pelo Administrador da família, o sistema atribui as transações ao proprietário efetivo da conta bancária/cartão, garantindo que os filtros mostrem os dados perfeitamente.</li>
-          <li>💳 <strong>Filtro por Tipo de Produto:</strong> Alterne rapidamente entre <em>Tudo</em>, <em>Cartões de Crédito</em> ou <em>Contas Correntes/Poupanças</em>.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- TÓPICO 2.1: DASHBOARD > KPIS PRINCIPAIS -->
-    <div class="manual-topic-content" id="topic-dash-kpis" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>📊 Indicadores Principais de Fluxo de Caixa (KPIs & Sincronia)</span>
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(249,115,22,0.08); border-left: 4px solid #fb923c; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Sincronização Matemática 100% Precisa com o Painel Kanban:</strong>
+        <p style="margin-bottom: 10px;">Ao abrir o FinançasFamília pela primeira vez, o assistente inicial solicita:</p>
+        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li><strong>Nome do Grupo Familiar:</strong> Digite o nome da sua casa (ex: <em>Família Silva</em> ou <em>Família Oliveira</em>).</li>
+          <li><strong>Perfil do Administrador Master (ADM):</strong> Crie o login principal (usuário <code>adm</code>) com senha forte.</li>
+          <li><strong>Personalização Cromática:</strong> Escolha a cor oficial do titular (ex: <em>Verde Esmeralda</em>) e um avatar.</li>
+        </ol>
+        <div style="background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2); padding: 12px 16px; border-radius: 8px; margin-bottom: 14px;">
+          💡 <strong>Exemplo Prático:</strong> O casal Carlos e Mariana cria a "Família Silva". Carlos cadastra o usuário master e em seguida convida Mariana criando o perfil secundário em <a href="javascript:void(0)" onclick="openManualTopic('primeiros-perfis')" style="color: #60a5fa; text-decoration: underline; font-weight: 700;">1.2 Perfis & Permissões Granulares</a>.
         </div>
-        <p style="margin-bottom: 10px;">Os 4 cards de topo do Dashboard resumem com exatidão a competência financeira selecionada, sincronizados com as colunas operacionais:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🟢 <strong>Receitas (Pagas):</strong> Soma de todas as entradas e rendimentos recebidos no mês.</li>
-          <li>🔴 <strong>Despesas (Pagas):</strong> Soma das contas já quitadas no mês, correspondendo exatamente ao total da coluna <em>✅ Contas Pagas</em> do Kanban.</li>
-          <li>⏳ <strong>À Pagar (Pendentes):</strong> Montante total das contas em aberto do mês, correspondendo exatamente à coluna <em>⏳ A Pagar</em> do Kanban.</li>
-          <li>⚖️ <strong>Saldo do Mês:</strong> Diferença matemática direta <code>Receitas Pagas - Despesas Pagas</code>.</li>
-        </ul>
-        <p style="margin: 0;">📊 <strong>Barra de Progresso de Contas:</strong> Indica a proporção exata de despesas quitadas em relação ao total de despesas do mês (ex: <em>8 de 20 pagas • 40%</em>).</p>
       </div>
     </div>
 
-    <!-- TÓPICO 2.2: DASHBOARD > PENDÊNCIAS DE MESES ANTERIORES (NOVO) -->
-    <div class="manual-topic-content" id="topic-dash-pendencias-anteriores" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fbbf24; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>⚠️ Container de Pendências de Meses Anteriores Não Pagas</span>
-        <span class="badge badge-yellow">Novo Recurso</span>
+    <!-- CAPÍTULO 1.2: PERFIS & PERMISSÕES -->
+    <div class="manual-topic-content" id="topic-primeiros-perfis" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #60a5fa; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>👥 1.2 Perfis de Membros da Família & Permissões Granulares</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(245, 158, 11, 0.08); border-left: 4px solid #f59e0b; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Rastreamento Ativo de Dívidas e Contas Esquecidas do Passado:</strong>
+        <p style="margin-bottom: 10px;">Em <strong>⚙️ Configurações › Membros da Família</strong>, você pode cadastrar e gerenciar o acesso de cada integrante:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>👑 <strong>Administrador (ADM):</strong> Acesso total às configurações, contas bancárias, cartões, backups e gerenciamento de membros.</li>
+          <li>👔 <strong>Membro Operacional:</strong> Pode lançar despesas, receitas, dar baixa em contas e visualizar o planejamento do mês.</li>
+          <li>👀 <strong>Visualizador:</strong> Acesso somente-leitura aos relatórios e gráficos, ideal para acompanhamento sem permissão de alteração.</li>
+          <li>🧸 <strong>Perfil Caçula:</strong> Interface simplificada e amigável para educação financeira de filhos e dependentes.</li>
+        </ul>
+        <div style="background: rgba(59,130,246,0.08); border-left: 4px solid #3b82f6; padding: 12px 16px; border-radius: 0 8px 8px 0;">
+          🔗 <strong>Tópico Relacionado:</strong> Veja como configurar as contas bancárias de cada familiar em <a href="javascript:void(0)" onclick="openManualTopic('contas-cadastro')" style="color: #60a5fa; font-weight: 700; text-decoration: underline;">2.1 Cadastrando Contas Correntes e Poupanças</a>.
         </div>
-        <p style="margin-bottom: 10px;">Sempre que você estiver visualizando o Dashboard de um mês (ex: <em>Agosto/2026</em>) e existirem lançamentos de meses anteriores (ex: <em>Julho, Junho ou Janeiro</em>) que ainda não foram pagos (<code>is_paid = 0</code>), o sistema exibe automaticamente um container temático de alerta:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🔢 <strong>Contador de Pendências & Total Acumulado:</strong> Informa a quantidade exata de itens em atraso e a soma monetária total das dívidas passadas em aberto.</li>
-          <li>📅 <strong>Identificação de Origem:</strong> Cada item exibe uma badge colorida com o mês/ano de competência original (ex: <code>📅 Julho/2026</code>), a descrição, o titular e o banco.</li>
-          <li>🎯 <strong>Navegação Direta com 1 Clique:</strong> Ao clicar em qualquer pendência, o aplicativo altera o seletor do mês para a data de origem, abre o Planejamento na aba correta e aplica um <strong>pulso de luz (*glow flash*)</strong> sobre o lançamento para você localizá-lo e dar baixa imediatamente!</li>
-        </ul>
       </div>
     </div>
 
-    <!-- TÓPICO 2.3: DASHBOARD > ALERTAS CROMÁTICOS (NOVO) -->
-    <div class="manual-topic-content" id="topic-dash-alertas-coloridos" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #34d399; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>🚦 Diferenciação Cromática Inteligente na Faixa de Avisos</span>
-        <span class="badge badge-green">Novo Recurso</span>
+    <!-- CAPÍTULO 1.3: RECUPERAÇÃO DE SENHA -->
+    <div class="manual-topic-content" id="topic-primeiros-recuperacao" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #60a5fa; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🔑 1.3 Recuperação de Senha Segura com Pergunta Secreta</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Separação Visual Clara entre o que Entra e o que Sai:</strong>
+        <div style="background: rgba(16,185,129,0.08); border-left: 4px solid #10b981; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>Privacidade Total Sem Depender de Servidores Externos:</strong>
         </div>
-        <p style="margin-bottom: 10px;">Para evitar confusão visual entre contas a pagar e receitas a receber:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🟢 <strong style="color: var(--accent-light);">💰 Faixa Verde (Recebimentos Próximos):</strong> Destaca exclusivamente salários, aluguéis, pro-labores e rendimentos previstos para os próximos dias, com chips verdes clicáveis.</li>
-          <li>🔴 <strong style="color: #f87171;">🚨 Faixa Vermelha (Vencimentos Próximos):</strong> Alerta sobre contas fixas, faturas e parcelas prestes a vencer para evitar atrasos e juros.</li>
-        </ul>
+        <p style="margin-bottom: 10px;">Como o FinançasFamília opera 100% local no seu computador, a recuperação de senha é realizada com pergunta e resposta secreta:</p>
+        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Acesse <strong>⚙️ Configurações › Minha Conta</strong> e defina sua pergunta de segurança (ex: <em>"Qual o modelo do meu primeiro carro?"</em>).</li>
+          <li>Digite a resposta que apenas você conhece.</li>
+          <li>Se esquecer a senha, na tela de login clique em <code>Esqueci minha senha</code>, responda corretamente e crie a nova chave na hora.</li>
+        </ol>
       </div>
     </div>
 
-    <!-- TÓPICO 2.4: DASHBOARD > CARTÕES, FATURAS E LIMITES (NOVO) -->
-    <div class="manual-topic-content" id="topic-dash-cards-limites" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>💳 Previsibilidade de Cartões, Faturas & Limites Reais</span>
-        <span class="badge badge-blue">Recurso Aprimorado</span>
+    <!-- CAPÍTULO 1.4: TEMAS & PERSONALIZAÇÃO -->
+    <div class="manual-topic-content" id="topic-primeiros-temas" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #60a5fa; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🎨 1.4 Personalização Visual, Temas & Layouts do Dashboard</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(249,115,22,0.08); border-left: 4px solid #fb923c; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Auditoria e Previsibilidade de Limites Bancários:</strong>
+        <p style="margin-bottom: 10px;">Personalize a estética e o modo de visualização do aplicativo em <strong>⚙️ Configurações › Aparência</strong>:</p>
+        
+        <div style="background: rgba(59,130,246,0.06); border: 1px solid rgba(59,130,246,0.15); border-radius: 8px; padding: 14px; margin-bottom: 14px;">
+          <strong style="color: var(--text-primary); font-size: 14px;">🎨 Modos de Aparência Disponíveis:</strong>
+          <ul style="padding-left: 20px; line-height: 1.8; margin-top: 8px; margin-bottom: 0;">
+            <li>🌙 <strong>Tema Escuro (Dark Emerald):</strong> Visual escuro moderno e sofisticado, com acentos em verde esmeralda relaxantes para os olhos, ideal para uso diário e noturno.</li>
+            <li>☀️ <strong>Tema Claro (Light Clean):</strong> Visual branco limpo, descansado e profissional com alto contraste, excelente para ambientes bem iluminados.</li>
+            <li>🌓 <strong>Botão Rápido de Alternância:</strong> Clique no ícone de lua/sol no topo superior direito da tela (ou no cabeçalho mobile) para alternar instantaneamente entre Claro e Escuro com apenas 1 clique.</li>
+          </ul>
         </div>
-        <p style="margin-bottom: 10px;">Cada cartão de crédito exibido no quadro <strong>"🏦 Previsibilidade de Contas e Cartões"</strong> traz informações vitais e transparentes:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>💳 <strong>Limite Total:</strong> O limite de crédito contratado e cadastrado no banco (ex: <code>R$ 5.000,00</code>).</li>
-          <li>🔴 <strong>Fatura do Mês:</strong> O valor exato das compras e parcelas que vencem na fatura do mês selecionado (ex: <code>R$ 1.004,05</code>).</li>
-          <li>🟠 <strong>Comprometido Total:</strong> A soma global de <strong>todas as compras e parcelas futuras em aberto</strong> que já consom o limite do seu cartão (ex: <code>R$ 5.824,30</code>).</li>
-          <li>🟢/🔴 <strong>Disponível / Excedido:</strong> Saldo livre real calculado como <code>Limite Total - Comprometido Total</code>. Se você realizou compras parceladas superiores ao limite, o saldo é exibido em <strong>vermelho com valor negativo</strong> (ex: <code>-R$ 824,30</code>) e badge <span class="badge badge-danger">⚠️ LIMITE EXCEDIDO</span>.</li>
-          <li>🍩 <strong>Spinner / Donut SVG Interativo:</strong> O gráfico de rosca exibe o percentual real de utilização do cartão (inclusive valores como <code>116% ULTRAPASSADO</code> ou <code>126% ULTRAPASSADO</code> envolto por anel tracejado de perigo).</li>
-          <li>🔒 <strong>Fechamento & Vencimento:</strong> Exibe os dias exatos de corte da fatura e data de débito.</li>
-          <li>✨ <strong>Clique no Card:</strong> Ao clicar sobre qualquer card de cartão no Dashboard, o aplicativo abre o Planejamento e <strong>destaca todas as parcelas da fatura com a cor oficial do banco</strong>!</li>
-        </ul>
-      </div>
-    </div>
 
-    <!-- TÓPICO 2.3: DASHBOARD > CONTAS BANCÁRIAS E CHEQUE ESPECIAL -->
-    <div class="manual-topic-content" id="topic-dash-contas" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700;">
-        <span>🏦 Previsibilidade de Contas Correntes, Poupanças & Cheque Especial</span>
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">Os widgets de contas correntes, contas de pagamento e carteiras exibem:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>💰 <strong>Saldo Atual em Conta:</strong> O saldo líquido real conciliado no banco.</li>
-          <li>🛡️ <strong>Limite de Cheque Especial (LIS):</strong> Limite de crédito rotativo configurado para a conta.</li>
-          <li>⚡ <strong>Saldo Disponível Operacional:</strong> Total utilizável imediatamente <code>(Saldo em Conta + Cheque Especial)</code>.</li>
-          <li>👤 <strong>Identificação de Titularidade:</strong> Cada conta traz o badge cromático do membro da família responsável (ex: <em>William, Jennifer, Isabel</em>).</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- TÓPICO 2.4: DASHBOARD > AVISOS & LINKS DIRETOS (NOVO) -->
-    <div class="manual-topic-content" id="topic-dash-links" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>🚨 Faixa de Avisos & Links Diretos para Lançamentos</span>
-        <span class="badge badge-blue">Recurso Novo</span>
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(249,115,22,0.08); border-left: 4px solid #fb923c; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Diferenciação Cromática de Alertas & Navegação Instantânea:</strong>
+        <div style="background: rgba(16,185,129,0.06); border: 1px solid rgba(16,185,129,0.15); border-radius: 8px; padding: 14px;">
+          <strong style="color: var(--text-primary); font-size: 14px;">🎛️ Modos de Layout do Dashboard (Configurações › Aparência):</strong>
+          <ul style="padding-left: 20px; line-height: 1.8; margin-top: 8px; margin-bottom: 0;">
+            <li>🌟 <strong>Executivo por Zonas (Padrão):</strong> Visão consolidada 360° com KPIs, cartões de contas e painel Kanban em 3 colunas.</li>
+            <li>📑 <strong>Sub-Abas Operacionais:</strong> Navegação setorizada por abas (*Resumo, Faturas, Contas e Gráficos*).</li>
+            <li>🚀 <strong>Cockpit Integrado:</strong> Painel panorâmico de alta densidade reunindo todas as métricas em uma tela.</li>
+          </ul>
         </div>
-        <p style="margin-bottom: 10px;">Os avisos de proximidade (próximos 3 dias) são separados visualmente por tipo de fluxo financeiro:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🟢 <strong>Recebimentos Próximos (Faixa Verde 💰):</strong> Salários, pró-labore, pensões e receitas a receber nos próximos dias aparecem em <strong>chips verdes esmeralda</strong>, transmitindo tranquilidade e previsão de caixa positivo.</li>
-          <li>🔴 <strong>Vencimentos Próximos (Faixa Vermelha 🚨):</strong> Boletos, contas fixas, faturas e despesas a pagar nos próximos dias aparecem em <strong>chips vermelhos de alerta</strong> para evitar atrasos e juros.</li>
-          <li>⚡ <strong>Navegação Instantânea:</strong> Cada chip é um link direto clicável. Ao clicar, o aplicativo abre o <strong>Planejamento</strong>, faz rolagem suave e aplica um <strong>efeito pulsante (*glow flash*)</strong> sobre a conta!</li>
-        </ul>
       </div>
     </div>
 
-    <!-- TÓPICO 2.5: DASHBOARD > PRIORIDADES, A PAGAR E PAGAS -->
-    <div class="manual-topic-content" id="topic-dash-prioridades" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700;">
-        <span>⭐ Quadros de Prioridades, Contas a Pagar e Contas Pagas</span>
+    <!-- CAPÍTULO 2.1: CONTAS & CADASTRO -->
+    <div class="manual-topic-content" id="topic-contas-cadastro" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #06b6d4; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🏦 2.1 Cadastrando Contas Correntes, Poupanças e Carteiras de Dinheiro</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">No centro do Dashboard, três colunas organizam a rotina operacional do mês:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>⭐ <strong>Prioritários:</strong> Reúne todas as contas marcadas com estrela de prioridade indispensável no mês, facilitando que você não deixe passar compromissos críticos.</li>
-          <li>⏳ <strong>Contas a Pagar:</strong> Todas as despesas pendentes do mês ordenadas cronologicamente por proximidade da data de vencimento.</li>
-          <li>✓ <strong>Contas Pagas:</strong> Histórico de despesas já quitadas com indicação da conta bancária de onde o recurso saiu.</li>
-        </ul>
+        <p style="margin-bottom: 10px;">Na aba <strong>🏦 Contas</strong>, clique em <code>+ Nova Conta</code> para registrar onde o dinheiro da casa está guardado:</p>
+        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li><strong>Instituição / Banco:</strong> Selecione o banco (ex: <em>Itaú, Bradesco, Nubank, Banrisul, Inter, Caixa, Banco do Brasil</em>).</li>
+          <li><strong>Tipo da Conta:</strong> Escolha entre <em>Conta Corrente</em>, <em>Conta Pagamento/Digital</em>, <em>Poupança/Investimento</em> ou <em>Dinheiro em Espécie (Carteira)</em>.</li>
+          <li><strong>Titular Responsável:</strong> Vincule ao membro da família proprietário da conta.</li>
+          <li><strong>Saldo Inicial Conciliado:</strong> Digite o saldo real exato que consta no extrato bancário hoje.</li>
+        </ol>
       </div>
     </div>
 
-    <!-- TÓPICO 2.6: DASHBOARD > GRÁFICOS INTERATIVOS -->
-    <div class="manual-topic-content" id="topic-dash-graficos" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700;">
-        <span>📈 Gráficos de Fluxo de Caixa & Distribuição por Categoria</span>
+    <!-- CAPÍTULO 2.2: CARTÕES BENEFÍCIO -->
+    <div class="manual-topic-content" id="topic-contas-beneficios" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #06b6d4; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🎟️ 2.2 Cartões Benefício (*Flash, Caju, Alelo, Sodexo, Swile, Banricard*)</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">O Dashboard conta com gráficos interativos que facilitam a tomada de decisão:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>📊 <strong>Evolução Mensal (Barras):</strong> Compara visualmente as Receitas vs. Despesas ao longo dos últimos meses, permitindo enxergar tendências de economia ou aperto financeiro.</li>
-          <li>🍩 <strong>Despesas por Categoria (Rosca):</strong> Aponta visualmente em que áreas o dinheiro da família está sendo alocado (ex: <em>Moradia, Alimentação, Educação, Transporte, Saúde, Lazer</em>), com valores e percentuais.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- TÓPICO 2.7: DASHBOARD > VISÃO GERAL, METAS E PATRIMÔNIO -->
-    <div class="manual-topic-content" id="topic-dash-consolidado" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700;">
-        <span>🌐 Aba Visão Geral, Metas & Patrimônio Líquido</span>
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(249,115,22,0.08); border-left: 4px solid #fb923c; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Consolidação Patrimonial e Objetivos de Poupança:</strong>
+        <div style="background: rgba(6,182,212,0.08); border-left: 4px solid #06b6d4; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>Gestão Inteligente de Vouchers de Alimentação e Refeição:</strong>
         </div>
-        <p style="margin-bottom: 10px;">Na aba <strong>"🌐 Visão Geral"</strong> no topo do Dashboard:</p>
+        <p style="margin-bottom: 10px;">Cartões como <strong>Flash, Caju, Alelo, Sodexo, Swile e Banricard</strong> funcionam como contas pré-pagas corporativas:</p>
         <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🏛️ <strong>Patrimônio Líquido Consolidado:</strong> Soma o saldo real de todas as contas correntes, poupanças e investimentos, deduzindo os compromissos em aberto nos cartões de crédito e cheques especiais.</li>
-          <li>🎯 <strong>Objetivos & Cofrinhos:</strong> Acompanhamento do progresso percentual e financeiro de cada meta de poupança (ex: <em>Reserva de Emergência, Viagem em Família, Reforma</em>).</li>
-          <li>🏦 <strong>Saldos e Faturas Reais Atuais:</strong> Exibição do estado patrimonial de cada conta do grupo familiar.</li>
+          <li>Cadastre o cartão na tela de <strong>🏦 Contas</strong> escolhendo o tipo <em>Cartão Benefício / Voucher</em>.</li>
+          <li>Ao lançar uma compra de supermercado ou restaurante, selecione o cartão benefício como pagador. O saldo é debitado exclusivamente do benefício, sem mexer no saldo da conta corrente!</li>
         </ul>
       </div>
     </div>
 
-    <!-- TÓPICO 2.8: DASHBOARD > CONTRASTE & ACESSIBILIDADE -->
-    <div class="manual-topic-content" id="topic-dash-contraste" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>🎨 Modos de Visualização & Alto Contraste</span>
-        <span class="badge badge-blue">Recurso Novo</span>
+    <!-- CAPÍTULO 2.3: TRANSFERÊNCIAS -->
+    <div class="manual-topic-content" id="topic-contas-transferencias" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #06b6d4; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🔄 2.3 Transferências Entre Contas Sem Duplicar Gastos</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">O Dashboard e todos os controles foram projetados para alta legibilidade:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
-          <li><strong>Modo Claro:</strong> Contornos nítidos (<code>border: 1.5px solid #94a3b8</code>), fundo sólido branco e tipografia em alto contraste sem desbotamento.</li>
-          <li><strong>Modo Escuro:</strong> Elementos em tons escuros refinados com brilho esmeralda e contrastes calibrados para não cansar a vista.</li>
-          <li><strong>Controles de Busca e Filtro:</strong> Bordas com feedback luminoso (*focus ring*) ao clicar para digitação ou ordenação.</li>
+        <p style="margin-bottom: 10px;">Ao mover recursos financeiros entre familiares ou contas (ex: PIX da Conta Itaú para a Carteira de Dinheiro):</p>
+        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Clique no botão <code>🔄 Transferência</code> na tela de Contas ou Planejamento.</li>
+          <li>Selecione a <strong>Conta de Origem</strong>, a <strong>Conta de Destino</strong>, a data e o valor (R$).</li>
+          <li>O sistema realiza o débito e o crédito atomicamente.</li>
+        </ol>
+        <div style="background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2); padding: 12px 16px; border-radius: 8px;">
+          🛡️ <strong>Regra Contábil:</strong> Transferências internas não são computadas como despesa nem como receita, mantendo seus gráficos e relatórios de fluxo de caixa 100% corretos!
+        </div>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 2.4: LIMITES ESPECIAIS -->
+    <div class="manual-topic-content" id="topic-contas-limites" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #06b6d4; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🛡️ 2.4 Limites Especiais (*Cheque Especial, Banricompras, Crédito Minuto*)</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Configure o limite de crédito rotativo contratado no seu banco para cada conta:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>💰 <strong>Saldo Atual:</strong> O dinheiro real disponível em conta (ex: <code>R$ 350,00</code>).</li>
+          <li>🛡️ <strong>Limite LIS / Cheque Especial:</strong> O limite concedido pelo banco (ex: <code>R$ 1.500,00</code>).</li>
+          <li>⚡ <strong>Saldo Operacional Total:</strong> Exibido como <code>R$ 1.850,00</code> (Saldo + Cheque Especial). Se o saldo ficar negativo, o card alerta o uso do rotativo para evitar encargos bancários.</li>
         </ul>
       </div>
     </div>
 
-    <!-- TÓPICO 3.1: LANÇAMENTOS > COMPETÊNCIA -->
+    <!-- CAPÍTULO 3.1: CARTÕES > CICLO -->
+    <div class="manual-topic-content" id="topic-cartao-ciclo" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a855f7; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>💳 3.1 Ciclo do Cartão: Fechamento vs Vencimento & Melhor Dia</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <div style="background: rgba(168,85,247,0.08); border-left: 4px solid #a855f7; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>Conceito Fundamental do Cartão de Crédito:</strong>
+        </div>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>🔒 <strong>Dia de Fechamento (Corte):</strong> Data em que a operadora encerra a fatura do mês. Compras realizadas até esse dia entram no boleto atual.</li>
+          <li>🛒 <strong>Melhor Dia de Compra:</strong> Compras feitas no dia seguinte ao fechamento entram automaticamente na fatura do mês posterior, proporcionando até 40 dias de prazo!</li>
+          <li>📅 <strong>Dia de Vencimento:</strong> Data limite para pagamento da fatura sem juros.</li>
+        </ul>
+        <div style="background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2); padding: 12px 16px; border-radius: 8px;">
+          💡 <strong>Exemplo:</strong> Cartão com Fechamento dia 25 e Vencimento dia 05. Uma compra feita em 24/08 vence em 05/09. Uma compra feita em 26/08 vencerá apenas em 05/10!
+        </div>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 3.2: CARTÕES > LIMITE TOTAL VS COMPROMETIDO -->
+    <div class="manual-topic-content" id="topic-cartao-limite" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a855f7; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📊 3.2 Limite Total vs Limite Comprometido em Tempo Real</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">No quadro <strong>"🏦 Previsibilidade de Contas e Cartões"</strong> do Dashboard:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>💳 <strong>Limite Total:</strong> Limite concedido pelo banco (ex: <code>R$ 5.000,00</code>).</li>
+          <li>🔴 <strong>Fatura do Mês:</strong> Gastos que vencem na competência selecionada (ex: <code>R$ 1.200,00</code>).</li>
+          <li>🟠 <strong>Comprometido Global:</strong> Soma de todas as faturas abertas e parcelas futuras a vencer (ex: <code>R$ 4.200,00</code>).</li>
+          <li>🟢/🔴 <strong>Disponível / Excedido:</strong> Saldo livre em tempo real <code>(Limite - Comprometido)</code>. Se as parcelas ultrapassarem o limite, surge o alerta <span class="badge badge-danger">⚠️ LIMITE EXCEDIDO</span>.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 3.3: CARTÕES > PAGAMENTO INTEGRAL -->
+    <div class="manual-topic-content" id="topic-cartao-pagamento" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a855f7; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>💳 3.3 Pagamento Integral da Fatura (Baixa Atômica)</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Para liquidar a fatura de cartão de crédito no final do ciclo:</p>
+        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>No card da fatura em <strong>🔄 Planejamento</strong>, clique no botão verde <code>💳 Pagar Fatura</code>.</li>
+          <li>Selecione a <strong>Conta Bancária Pagadora</strong> (ex: <em>Conta Itaú</em>) e a data de pagamento.</li>
+          <li>Confirme o valor total.</li>
+        </ol>
+        <p style="margin: 0;">O aplicativo debita o valor da conta bancária e <strong>marca todas as compras e parcelas atreladas àquela fatura como pagas em uma única transação segura</strong>.</p>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 3.4: CARTÕES > PAGAMENTO PARCIAL & ROTATIVO -->
+    <div class="manual-topic-content" id="topic-cartao-rotativo" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a855f7; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🔄 3.4 Pagamento Parcial & Saldo Rotativo Automático</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Se a família não puder quitar o valor integral do boleto do cartão:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Ao clicar em <code>💳 Pagar Fatura</code>, informe o valor parcial que foi pago.</li>
+          <li>O sistema dá baixa no montante pago e <strong>lança o saldo devedor restante na fatura do mês seguinte como Saldo Rotativo</strong>, aplicando automaticamente a taxa de juros cadastrada no cartão.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 3.5: CARTÕES > ANTECIPAÇÃO DE PARCELAS -->
+    <div class="manual-topic-content" id="topic-cartao-antecipacao" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a855f7; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>⚡ 3.5 Antecipação de Parcelas Futuras com Desconto</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Aproveite descontos antecipando parcelas de compras longas (ex: compras parceladas no Nubank/Inter):</p>
+        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Na fatura ou na lista de despesas, selecione as parcelas futuras que deseja adiantar.</li>
+          <li>Informe o desconto em reais (R$) ou percentual concedido pelo banco.</li>
+          <li>O sistema puxa as parcelas para a fatura atual com o valor abatido e libera o limite futuro imediatamente.</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 3.6: CARTÕES > RENEGOCIAÇÃO & ACORDO -->
+    <div class="manual-topic-content" id="topic-cartao-acordo" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a855f7; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🤝 3.6 Renegociação e Acordos de Fatura Parcelada</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Se você precisou negociar a fatura com o banco gerando um parcelamento de acordo:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Clique em <code>🤝 Parcelar / Acordo</code> no card da fatura.</li>
+          <li>Informe a entrada e o número de parcelas acordadas. A fatura original é marcada como <span class="badge badge-purple">Renegociada</span> e as novas parcelas são projetadas nos meses seguintes.</li>
+          <li>Caso tenha realizado a operação por engano, utilize o botão <code>↩️ Desfazer Acordo / Reabrir</code> para restaurar o estado original da fatura.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 3.7: CARTÕES > ESTORNO EM 1 CLIQUE -->
+    <div class="manual-topic-content" id="topic-cartao-estorno" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a855f7; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>↩️ 3.7 Estorno de Compras em 1 Clique</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Se uma compra foi devolvida ou cancelada pelo estabelecimento comercial:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Abra o pop-up de detalhes do lançamento clicando sobre a linha da compra.</li>
+          <li>Clique no botão de estorno. O valor é creditado de volta no limite do cartão e marcado com selo auditado de estorno.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 4.1: LANÇAMENTOS > DESPESAS & RECEITAS -->
+    <div class="manual-topic-content" id="topic-lanc-despesas-receitas" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #10b981; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📝 4.1 Lançamento de Despesas e Receitas</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Para lançar receitas e despesas no dia a dia:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>🟢 <strong>+ Nova Receita:</strong> Salários, comissões, pró-labore, aluguéis recebidos, dividendos e transferências recebidas.</li>
+          <li>🟣 <strong>+ Nova Variável:</strong> Gastos esporádicos do cotidiano (Supermercado, Farmácia, Combustível, Restaurante).</li>
+          <li>⭐ <strong>Despesa Fixa Recorrente:</strong> Contas mensais que se repetem todo mês (Aluguel, Luz, Condomínio, Internet).</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 4.2: LANÇAMENTOS > COMPETÊNCIA -->
     <div class="manual-topic-content" id="topic-lanc-competencia" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #34d399; font-weight: 700;">
-        📋 Mês de Referência (Competência: Ref: MM/AAAA)
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #10b981; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📋 4.2 Mês de Competência vs Data de Vencimento</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">O app permite controlar tanto a data de pagamento quanto o mês de competência:</p>
-        <div style="background: rgba(16,185,129,0.08); border-left: 4px solid #10b981; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 12px;">
-          <strong>Exemplo de Conta de Energia:</strong><br>
-          • Consumo do mês de <strong>Fevereiro</strong> (Competência: <code>Ref: 02/2026</code>).<br>
-          • Vencimento do boleto em <strong>10 de Março</strong> (Data de Pagamento: <code>10/03/2026</code>).
+        <div style="background: rgba(16,185,129,0.08); border-left: 4px solid #10b981; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>O que é o Mês de Referência (Competência)?</strong>
         </div>
-        <p style="margin: 0;">Isso garante que ao emitir relatórios de gastos mensais, o custo seja computado no mês em que o consumo realmente ocorreu.</p>
-      </div>
-    </div>
-
-    <!-- TÓPICO 3.2: LANÇAMENTOS > FIXAS -->
-    <div class="manual-topic-content" id="topic-lanc-fixas" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #34d399; font-weight: 700;">
-        ⭐ Despesas Fixas (Recorrentes) & Prioridades
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">Despesas fixas são aquelas que se repetem todo mês (Aluguel, Internet, Mensalidade Escolar, Financiamento):</p>
-        <p style="margin-bottom: 8px;">• <strong>Estrela de Prioridade ⭐:</strong> Marque despesas essenciais com estrela para que fiquem no topo da lista.</p>
-        <p style="margin: 0;">• <strong>Adiar Vencimento:</strong> Permite empurrar o vencimento de uma conta para frente se o orçamento do mês estiver apertado.</p>
-      </div>
-    </div>
-
-    <!-- TÓPICO 3.3: LANÇAMENTOS > AVULSOS -->
-    <div class="manual-topic-content" id="topic-lanc-avulsos" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #34d399; font-weight: 700;">
-        🛍️ Despesas Variáveis do Mês (Avulsas)
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">Gastos esporádicos do dia a dia (Supermercado, Farmácia, Restaurante, Combustível):</p>
-        <p style="margin: 0;">Clique no botão roxo <code>+ Nova Variável</code> em qualquer momento para registrar uma compra rápida, escolhendo a categoria, conta/cartão e quem realizou o gasto.</p>
-      </div>
-    </div>
-
-    <!-- TÓPICO 3.3B: LANÇAMENTOS > ALERTA DE SIMILARES EM TEMPO REAL -->
-    <div class="manual-topic-content" id="topic-lanc-similares" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fbbf24; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>🔔 Alerta Inteligente de Lançamento Similar em Tempo Real</span>
-        <span class="badge badge-yellow">Novo Recurso</span>
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(245, 158, 11, 0.08); border-left: 4px solid #f59e0b; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Prevenção Ativa Contra Cadastros Duplicados Acidentais:</strong>
-        </div>
-        <p style="margin-bottom: 10px;">Ao preencher os formulários de <strong>Novo Lançamento Avulso</strong> ou <strong>Despesa Fixa Recorrente</strong>, o sistema analisa instantaneamente os dados digitados:</p>
+        <p style="margin-bottom: 10px;">A competência é o mês em que o consumo realmente aconteceu, enquanto a data de vencimento é quando o boleto deve ser pago:</p>
         <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>⚡ <strong>Verificação Automática:</strong> Conforme você digita o valor, a data, a conta e a descrição, o motor busca se já existe um lançamento com características idênticas ou muito próximas.</li>
-          <li>⚠️ <strong>Aviso Visual em Destaque:</strong> Se houver similaridade, surge um banner amarelo no formulário informando: <em>"Atenção: Já existe um lançamento similar [Descrição] no valor de R$ X,XX na conta [Banco]..."</em>.</li>
-          <li>🔒 <strong>Segurança e Liberdade:</strong> O aviso não impede você de salvar caso seja uma compra legítima repetida, mas evita que você lance duas vezes a mesma conta por engano.</li>
+          <li>💡 <strong>Exemplo:</strong> Sua conta de energia de <strong>Fevereiro</strong> (Competência: <code>Ref: 02/2026</code>) que vence no dia <strong>10 de Março</strong> (Vencimento: <code>10/03/2026</code>).</li>
+          <li>📊 O app permite computar o gasto no orçamento de Fevereiro, garantindo relatórios de consumo 100% fieis à realidade.</li>
         </ul>
       </div>
     </div>
 
-    <!-- TÓPICO 3.3C: LANÇAMENTOS > LEITOR DE NOTA FISCAL (QR CODE) -->
+    <!-- CAPÍTULO 4.3: LANÇAMENTOS > LEITOR DE NOTA FISCAL (QR CODE) -->
     <div class="manual-topic-content" id="topic-lanc-nfce-qr" style="display: none;">
       <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #10b981; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>📷 Leitura de Notas Fiscais (NFC-e / SAT / Pix) via Câmera</span>
-        <span class="badge badge-green">Recurso Inovador</span>
+        <span>📷 4.3 Leitor de Nota Fiscal por Câmera & QR Code (NFC-e)</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Cadastro Instantâneo de Despesas Apontando a Câmera para o Cupom Fiscal:</strong>
+        <div style="background: rgba(16,185,129,0.08); border-left: 4px solid #10b981; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>Cadastro Instantâneo de Compras Sem Digitação Manual:</strong>
         </div>
-        <p style="margin-bottom: 10px;">Para lançar gastos de supermercado, farmácia, restaurantes e postos de combustível sem precisar digitar nada manualmente:</p>
+        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Clique no botão <code>📷 Ler Nota Fiscal</code> no Dashboard, Planejamento ou formulário.</li>
+          <li>Aponte a câmera do seu celular ou webcam para o QR Code quadrado impresso no final do seu cupom fiscal (NFC-e ou SAT).</li>
+          <li>O aplicativo consulta a SEFAZ e preenche automaticamente o <strong>Valor Total (R$)</strong>, a <strong>Data</strong>, o <strong>Nome do Mercado/Farmácia</strong> e sugere a <strong>Categoria</strong>!</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 4.4: LANÇAMENTOS > ALERTA DE DUPLICADOS -->
+    <div class="manual-topic-content" id="topic-lanc-duplicados" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #10b981; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🔔 4.4 Identificação & Alerta Automático de Gastos Duplicados</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Enquanto você digita o valor, data e descrição de um lançamento, o motor inteligente verifica se já existe uma transação similar cadastrada:</p>
         <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🎯 <strong>Como Usar:</strong> Clique no botão <code>📷 Ler Nota Fiscal</code> no Dashboard, no Planejamento ou dentro do formulário de Novo Lançamento.</li>
-          <li>📱 <strong>Câmera ao Vivo:</strong> Aponte o celular ou webcam para o QR Code quadrado impresso no final da sua Nota Fiscal de Consumidor (NFC-e) ou cupom SAT.</li>
-          <li>⚡ <strong>Preenchimento Automático:</strong> O app decodifica a nota junto à SEFAZ e preenche instantaneamente o <strong>Valor Total (R$)</strong>, a <strong>Data de Emissão</strong>, o <strong>Nome do Estabelecimento</strong>, a <strong>Categoria Sugerida</strong> e o <strong>Número da Nota Fiscal</strong>.</li>
-          <li>📁 <strong>Foto da Nota ou Chave de 44 Dígitos:</strong> Se preferir, você também pode carregar uma foto da galeria/arquivo ou colar o link/chave da nota.</li>
-          <li>🛡️ <strong>Anti-Duplicidade Ativa:</strong> O sistema confere em tempo real se aquele cupom fiscal já foi lido antes para proteger contra lançamentos repetidos.</li>
+          <li>⚠️ Se houver similaridade, surge um banner amarelo no formulário informando a existência de lançamento parecido, prevenindo lançamentos repetidos por engano.</li>
+          <li>Na barra lateral, o botão <code>🛡️</code> abre a <strong>Central de Conciliação</strong> para mesclar duplicidades com 1 clique.</li>
         </ul>
       </div>
     </div>
 
-    <!-- TÓPICO 3.4: LANÇAMENTOS > JUROS & DESCONTOS -->
-    <div class="manual-topic-content" id="topic-lanc-juros" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #34d399; font-weight: 700;">
-        🏷️ Juros, Multas e Descontos Antecipados
+    <!-- CAPÍTULO 4.5: POP-UP DE DETALHES & 3 AÇÕES RÁPIDAS -->
+    <div class="manual-topic-content" id="topic-lanc-popup-detalhes" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #38bdf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🔍 4.5 Pop-up de Detalhes Completo & 3 Ações Rápidas</span>
+        <span class="badge badge-blue">Recurso Novo</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 8px;">• <strong>Desconto:</strong> Ao pagar antecipado com desconto, o sistema debita do saldo da conta apenas o valor líquido real.</p>
-        <p style="margin: 0;">• <strong>Juros / Multa:</strong> Ao pagar em atraso, registre o acréscimo para que o valor real debitado corresponda exatamente ao extrato do banco.</p>
-      </div>
-    </div>
-
-    <!-- TÓPICO 4.1: CONTAS > TIPOS -->
-    <div class="manual-topic-content" id="topic-contas-tipos" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #06b6d4; font-weight: 700;">
-        🏦 Tipos de Contas Bancárias & Carteiras
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 8px;">• <span class="badge badge-blue">Conta Corrente</span>: Banco do Brasil, Itaú, Nubank, etc.</p>
-        <p style="margin-bottom: 8px;">• <span class="badge badge-green">Poupança / Investimentos</span>: Reserva de emergência e aplicações.</p>
-        <p style="margin-bottom: 8px;">• <span class="badge badge-yellow">Carteira Física</span>: Dinheiro em espécie na mão.</p>
-        <p style="margin: 0;">• <span class="badge badge-cyan">Voucher</span>: Vale Refeição / Alimentação (Alelo, Ticket, Sodexo).</p>
-      </div>
-    </div>
-
-    <!-- TÓPICO 4.2: CONTAS > CARTÕES BENEFÍCIO & VOUCHERS (NOVO) -->
-    <div class="manual-topic-content" id="topic-contas-beneficio" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #06b6d4; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>🎟️ Cartões Benefício, Vouchers e Alimentação</span>
-        <span class="badge badge-cyan">Novo Recurso</span>
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(6, 182, 212, 0.08); border-left: 4px solid #06b6d4; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Controle Completo de Saldos e Recargas Mensais de Benefícios:</strong>
+        <div style="background: rgba(56, 189, 248, 0.08); border-left: 4px solid #38bdf8; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>Visão Executiva do Lançamento com 1 Toque:</strong>
         </div>
-        <p style="margin-bottom: 10px;">O FinançasFamília possui suporte nativo para operadoras de benefícios corporativos e flexíveis:</p>
+        <p style="margin-bottom: 10px;">Ao clicar ou tocar em qualquer linha de transação na tela de <strong>Planejamento</strong>, abre-se uma janela com todas as informações e 3 botões ergonômicos:</p>
         <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🏷️ <strong>Operadoras Suportadas:</strong> Flash, Caju, Alelo, Banricard, Swile, Ticket, Sodexo, VR, Ben Visa Vale, etc.</li>
-          <li>🍴 <strong>Modalidades Específicas:</strong> Alimentação (VA), Refeição (VR), Transporte (VT), Flexível / Multibenefícios, Combustível, Saúde/Farmácia e Educação.</li>
-          <li>💵 <strong>Recarga Mensal Automática:</strong> Defina o valor previsto da recarga (ex: <code>R$ 800,00</code>) e o dia do crédito (ex: <code>Dia 10</code>) para previsibilidade orçamentária.</li>
-          <li>💳 <strong>Final do Cartão:</strong> Identificação rápida pelos 4 últimos dígitos (ex: <code>Final 4920</code>).</li>
+          <li>📑 <strong>Ficha Completa:</strong> Descrição, categoria com ícone, titular responsável, conta/cartão pagador, vencimento e status.</li>
+          <li>💰 <strong>Memória de Cálculo:</strong> Valor original, juros/multas acumulados, descontos obtidos e valor líquido final.</li>
+          <li>🔴 <strong>[ 🗑️ Excluir Lançamento ]:</strong> Remove o lançamento com restauração automática do saldo bancário.</li>
+          <li>🟡 <strong>[ ✏️ Editar Lançamento ]:</strong> Abre o formulário de edição para ajustar datas, valores ou categoria.</li>
+          <li>🟢 <strong>[ 💳 Pagar / Baixar ]:</strong> Permite quitar a conta na hora escolhendo a data e conta pagadora (ou <code>↩️ Desfazer Pagamento</code> para reverter).</li>
         </ul>
       </div>
     </div>
 
-    <!-- TÓPICO 4.3: CONTAS > TRANSFERÊNCIAS -->
-    <div class="manual-topic-content" id="topic-contas-transf" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #06b6d4; font-weight: 700;">
-        🔁 Transferências entre Contas sem Duplicação
+    <!-- CAPÍTULO 5.1: JUROS & FERIADOS -->
+    <div class="manual-topic-content" id="topic-juros-prorrogacao" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f59e0b; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📅 5.1 Prorrogação Automática para Dias Úteis & Feriados Nacionais</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin: 0;">Ao usar o botão <strong>"Nova Transferência"</strong> na tela de Contas, o saldo é transferido da conta de origem para a de destino sem gerar receitas ou despesas artificiais no balanço familiar.</p>
+        <div style="background: rgba(245,158,11,0.08); border-left: 4px solid #f59e0b; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>Conformidade com a Legislação Bancária Nacional (Febraban):</strong>
+        </div>
+        <p style="margin-bottom: 10px;">Contas cujo vencimento cai em sábados, domingos ou feriados nacionais (incluindo feriados móveis como Páscoa, Carnaval e Corpus Christi) são automaticamente prorrogadas para o <strong>próximo dia útil</strong>:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>🏷️ O card da conta exibe o selo <code>📅 Prorroga: DD/MM</code> informando a data limite sem juros.</li>
+          <li>Os juros por atraso só começam a ser calculados se o pagamento ocorrer após o dia útil prorrogado.</li>
+        </ul>
       </div>
     </div>
 
-    <!-- TÓPICO 4.4: CONTAS > PRODUTOS -->
-    <div class="manual-topic-content" id="topic-contas-produtos" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #06b6d4; font-weight: 700;">
-        💳 Produtos da Conta (Banricompras, Cheque Especial)
+    <!-- CAPÍTULO 5.2: JUROS > CÁLCULO -->
+    <div class="manual-topic-content" id="topic-juros-calculo" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f59e0b; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>⚖️ 5.2 Cálculo de Juros Diários (% a.d.), Mensais (% a.m.) e Multas Fixas</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin: 0;">O aplicativo suporta produtos acoplados à conta corrente, permitindo parcelar despesas em débito pré-datado ou controlar o uso do cheque especial com visibilidade total.</p>
+        <p style="margin-bottom: 10px;">Você pode configurar parâmetros financeiros específicos para cada despesa fixa:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>🔢 <strong>Multa Moratória (%):</strong> Percentual fixo cobrado pelo atraso (ex: <code>2,00%</code>).</li>
+          <li>📈 <strong>Juros de Mora (% a.m. ou % a.d.):</strong> Taxa de juros mensal ou diária calculada proporcionalmente aos dias de atraso (pro-rata die).</li>
+        </ul>
       </div>
     </div>
 
-    <!-- TÓPICO 5.1: FAMÍLIA > PERFIS -->
-    <div class="manual-topic-content" id="topic-fam-perfis" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a78bfa; font-weight: 700;">
-        👑 Papéis de Usuário (ADM, Responsável, Colaborador, Caçula)
+    <!-- CAPÍTULO 5.3: JUROS > PROJEÇÃO -->
+    <div class="manual-topic-content" id="topic-juros-projecao" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f59e0b; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📈 5.3 Projeção do Valor Atualizado para Pagamento Hoje</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 8px;">• 👑 <strong>ADM Geral:</strong> Gestão técnica, auditoria e backups globais.</p>
-        <p style="margin-bottom: 8px;">• ⭐ <strong>Responsável:</strong> Gestão financeira da casa, membros e permissões.</p>
-        <p style="margin-bottom: 8px;">• 👤 <strong>Colaborador:</strong> Membro adulto com acesso às suas finanças e menus autorizados.</p>
-        <p style="margin: 0;">• 🧸 <strong>Caçula:</strong> Interface especial para crianças e controle de mesada.</p>
+        <p style="margin-bottom: 10px;">Ao consultar contas vencidas no Dashboard ou Planejamento, o sistema calcula e exibe em tempo real o <strong>Valor Atualizado para Pagamento Hoje</strong>, somando o valor original aos juros e multas acumulados até a data de hoje.</p>
       </div>
     </div>
 
-    <!-- TÓPICO 5.2: FAMÍLIA > PERMISSÕES -->
-    <div class="manual-topic-content" id="topic-fam-permissoes" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a78bfa; font-weight: 700;">
-        🛡️ Permissões Granulares por Módulo
+    <!-- CAPÍTULO 5.4: JUROS > PAGAMENTO COM ACRÉSCIMO/DESCONTO -->
+    <div class="manual-topic-content" id="topic-juros-pagamento" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f59e0b; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🏷️ 5.4 Pagamento com Acréscimo ou Desconto</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin: 0;">Defina exatamente quem pode visualizar ou editar lançamentos fixos, avulsos, contas bancárias, cartões de crédito e relatórios gerais.</p>
+        <p style="margin-bottom: 10px;">No modal de liquidação, você pode ajustar com total flexibilidade:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>🟢 <strong>Desconto Obtido:</strong> Se você pagou antecipadamente ou via PIX com desconto, informe o abatimento para registrar o valor líquido real debitado da conta.</li>
+          <li>🔴 <strong>Acréscimo Pago:</strong> Registre eventuais tarifas bancárias ou juros cobrados na quitação do boleto.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 6.1: PLANEJAMENTO > FIXAS & PARCELADAS -->
+    <div class="manual-topic-content" id="topic-plan-fixas-parceladas" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #ec4899; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🔄 6.1 Criando Despesas Fixas e Parcelamentos</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Na tela <strong>🔄 Planejamento</strong>, organize as contas recorrentes e compras em parcelas:</p>
+        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Clique em <code>⭐ + Nova Despesa Fixa</code>.</li>
+          <li>Defina se a conta é <strong>Recorrente Contínua</strong> (sem fim previsto, ex: <em>Aluguel, Internet</em>) ou <strong>Parcelada</strong> (ex: <em>10x de R$ 150</em>).</li>
+          <li>O sistema projeta cada parcela no mês correspondente com contagem automática (1/10, 2/10, etc.).</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 6.2: PLANEJAMENTO > PRIORITÁRIAS -->
+    <div class="manual-topic-content" id="topic-plan-prioritarias" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #ec4899; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>⭐ 6.2 Despesas Prioritárias ⭐</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Marque contas indispensáveis (Aluguel, Luz, Mensalidade Escolar) com a <strong>Estrela de Prioridade ⭐</strong>:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>As contas prioritárias ganham moldura dourada e aparecem no topo do quadro operacional do mês no Dashboard.</li>
+          <li>Facilita para que você saiba exatamente o montante mínimo necessário para honrar compromissos vitais.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 6.3: PLANEJAMENTO > ADIAR PARCELA -->
+    <div class="manual-topic-content" id="topic-plan-adiar" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #ec4899; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>⏩ 6.3 Adiar Parcela para o Mês Seguinte</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Se o orçamento do mês atual estiver apertado e você combinou de postergar um pagamento:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>No card da despesa, clique na opção de adiar.</li>
+          <li>A parcela é transferida para o mês seguinte sem afetar as demais parcelas futuras do parcelamento.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 6.4: PLANEJAMENTO > KANBAN DRAG & DROP -->
+    <div class="manual-topic-content" id="topic-plan-kanban" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #ec4899; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📋 6.4 Kanban de Planejamento com Arrastar e Soltar</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Você pode reordenar a sequência de pagamento das contas no Planejamento simplesmente <strong>arrastando os cards</strong> para cima ou para baixo, organizando sua esteira financeira na ordem de pagamento desejada.</p>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 6.5: CARDS DE DECISÃO DE RECORRÊNCIA -->
+    <div class="manual-topic-content" id="topic-plan-decisao-cards" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a78bfa; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🎛️ 6.5 Cards de Decisão de Recorrência (*Apenas este mês vs Todos*)</span>
+        <span class="badge badge-purple">Segurança Operacional</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <div style="background: rgba(167,139,250,0.08); border-left: 4px solid #a78bfa; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>Decisões Claras ao Editar ou Excluir Lançamentos Fixos:</strong>
+        </div>
+        <p style="margin-bottom: 10px;">Ao alterar o valor de uma despesa fixa ou cancelá-la, o sistema exibe dois cards visuais:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>🗓️ <strong>Opção 1 — Apenas este Mês:</strong> Ajusta unicamente a fatura/parcela da competência atual (ex: conta de água ou luz que varia todo mês). Na tela de edição, você pode clicar no botão <strong><code>📷 Escanear Fatura / QR Code / Pix</code></strong> para capturar com a câmera ou importar o PDF da fatura, preenchendo valor exato, vencimento e chave PIX em 1 segundo.</li>
+          <li>♾️ <strong>Opção 2 — Este e Todos os Futuros:</strong> Propaga o novo valor para todos os meses seguintes (ex: aumento definitivo da mensalidade do plano de internet).</li>
+        </ul>
       </div>
     </div>
   `;
@@ -7958,158 +9134,288 @@ function getManualTopicsPart1Html() {
 /* manual-b.js - parte 2/2 */
 
 /**
- * Retorna o HTML dos tópicos 6 a 10 (incluindo FAQ) do painel de conteúdo
+ * Retorna o HTML dos tópicos dos Capítulos 7 a 13 do painel de leitura
  */
 function getManualTopicsPart2Html() {
   return `
-    <!-- TÓPICO 6.1: SYNC > UUIDS & MULTI-APARELHO -->
-    <div class="manual-topic-content" id="topic-sync-uuid" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #38bdf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>🔑 Identificadores Globais Universais (UUID v4) & Multi-Dispositivo</span>
-        <span class="badge badge-blue">Smart Sync</span>
+    <!-- CAPÍTULO 7.1: ORÇAMENTOS > TETOS -->
+    <div class="manual-topic-content" id="topic-orc-tetos" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f43f5e; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🎯 7.1 Definindo Tetos de Orçamento por Categoria</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(56, 189, 248, 0.08); border-left: 4px solid #38bdf8; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Arquitetura Resiliente para Sincronização Desktop e Web:</strong>
+        <div style="background: rgba(244,63,94,0.08); border-left: 4px solid #f43f5e; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>Disciplina e Previsibilidade Financeira Familiar:</strong>
         </div>
-        <p style="margin-bottom: 10px;">Para permitir que membros da família usem o app no notebook (Desktop) e no celular (Web) simultaneamente sem conflitos:</p>
+        <p style="margin-bottom: 10px;">Na aba <strong>📋 Orçamento</strong>, você estabelece o teto máximo de gastos da família para cada categoria do mês:</p>
+        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Clique no campo de valor ao lado de cada categoria (ex: <em>Alimentação: R$ 2.500,00, Moradia: R$ 3.000,00, Lazer: R$ 800,00</em>).</li>
+          <li>Conforme as despesas do mês são lançadas, o sistema calcula a porcentagem consumida em tempo real.</li>
+        </ol>
+        <div style="background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2); padding: 12px 16px; border-radius: 8px;">
+          💡 <strong>Dica de Ouro:</strong> Acompanhe o consumo visual nas barras de progresso descritas em <a href="javascript:void(0)" onclick="openManualTopic('orc-barras')" style="color: #f43f5e; font-weight: 700; text-decoration: underline;">7.2 Barras de Limite Coloridas</a>.
+        </div>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 7.2: ORÇAMENTOS > BARRAS COLORIDAS -->
+    <div class="manual-topic-content" id="topic-orc-barras" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f43f5e; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📊 7.2 Acompanhamento Visual das Barras de Limite</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">As barras de progresso mudam de cor dinamicamente para alertar a saúde do orçamento:</p>
         <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🌐 <strong>UUID Global (128 bits):</strong> Todo lançamento ganha um identificador único universal (<code>sync_id</code>). Isso impede colisões de ID numérico (ex: Desktop e Web criando o ID #1506).</li>
-          <li>⏱️ <strong>Last-Write-Wins:</strong> Atualizações em um mesmo lançamento são resolvidas automaticamente com base no carimbo de data/hora mais recente (<code>updated_at</code>).</li>
-          <li>🗑️ <strong>Soft-Delete:</strong> Exclusões são sincronizadas de forma limpa sem deixar registros fantasmas em outros aparelhos.</li>
+          <li>🟢 <strong>Verde Esmeralda (0% a 70%):</strong> Gastos confortáveis dentro da margem de segurança.</li>
+          <li>🟡 <strong>Amarelo Atenção (71% a 90%):</strong> Categoria próxima do limite planejado para o mês.</li>
+          <li>🔴 <strong>Vermelho Perigo (> 90% ou Estourado):</strong> Orçamento esgotado ou ultrapassado, sinalizando que a família deve segurar compras não essenciais.</li>
         </ul>
       </div>
     </div>
 
-    <!-- TÓPICO 6.2: SYNC > REGRA DE RECEITAS (NOVO) -->
-    <div class="manual-topic-content" id="topic-sync-receitas" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #34d399; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>💰 Regra de Ouro para Receitas & Mesma Titularidade</span>
-        <span class="badge badge-green">Recurso Novo</span>
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(16, 185, 129, 0.08); border-left: 4px solid #10b981; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Como o sistema analisa o recebimento de receitas e salários:</strong>
-        </div>
-        <p style="margin-bottom: 10px;">Nas <strong>Receitas</strong> (salários, pró-labore, aluguéis recebidos, PIX recebidos), aplicam-se filtros completos de valor, data e título, respeitando as contas:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🟢 <strong>Contas Diferentes de Membros Distintos = 100% Ignoradas:</strong> Se William recebe R$ 4.000 no Itaú e Jennifer recebe R$ 4.000 no Nubank, o motor <strong>ignora totalmente</strong> e não gera alerta, pois são rendas legítimas e independentes de cada familiar.</li>
-          <li>🚨 <strong>Mesma Conta Bancária:</strong> Se uma receita de mesmo valor e data for cadastrada duas vezes na <strong>mesma conta</strong>, o motor acusa duplicidade com Altíssima Certeza (95-100%).</li>
-          <li>⚠️ <strong>Contas Diferentes do MESMO Titular:</strong> Se o próprio usuário lançar a mesma receita no Itaú e depois no Nubank por engano, o sistema identifica que ambas as contas pertencem ao mesmo usuário e acusa duplicidade com banco trocado (85-90%).</li>
-          <li>⚡ <strong>Aviso em Tempo Real no Formulário:</strong> Ao preencher uma receita no modal, surge um alerta instantâneo: <em>"Atenção: Já existe uma receita similar de William em 20/08 na conta Itaú no valor de R$ 4.000,00..."</em>.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- TÓPICO 6.3: SYNC > MOTOR HEURÍSTICO & HIERARQUIA DE DÍVIDAS -->
-    <div class="manual-topic-content" id="topic-sync-dedup" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #38bdf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>🧠 Motor Heurístico Anti-Duplicidade & Hierarquia de Dívidas</span>
-        <span class="badge badge-purple">Inteligência Familiar</span>
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(139, 92, 246, 0.08); border-left: 4px solid #8b5cf6; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Hierarquia de Análise para Dívidas e Despesas:</strong>
-        </div>
-        <p style="margin-bottom: 10px;">Para despesas e pagamentos da casa, o motor segue uma rigorosa escala de critérios:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li><strong>Nível 1 (Valor Exato + Datas Próximas):</strong> Compara valores idênticos com tolerância de até ±2 dias e compensações bancárias de fim de semana (sexta/sábado/domingo compensados na segunda/terça).</li>
-          <li><strong>Nível 2 (Data Exata + Valores Aproximados):</strong> Detecta despesas no mesmo dia com pequenas variações de centavos, taxas ou gorjetas (até 2% a 5%).</li>
-          <li><strong>Nível 3 (Títulos e NLP Bancário):</strong> Limpa ruídos e stopwords bancárias (<code>PIX</code>, <code>TED</code>, <code>PAGTO</code>, <code>COMPRA</code>, <code>DÉBITO</code>, <code>CRÉDITO</code>) e compara os estabelecimentos com busca inteligente por prefixos (ex: <em>"Zaffari Ipiranga"</em> vs <em>"Cia Zaffari"</em>).</li>
-          <li><strong>Contas Diferentes com Lojas Diferentes = 0% Duplicata:</strong> Se o valor for R$ 50 no Itaú (Farmácia) e R$ 50 no Nubank (Padaria), é <strong>100% ignorado</strong>.</li>
-          <li>🔢 <strong>Parcelamento Inteligente:</strong> Se o Lançamento A diz <em>"Sofá (2/10)"</em> e o B diz <em>"Sofá (3/10)"</em>, o motor sabe que <strong>NÃO é duplicata</strong>. Se ambos disserem <em>"2/10"</em> e <em>"2 de 10"</em>, acusa duplicata de 100%!</li>
-          <li>🏷️ <strong>Mesma Conta Fixa Recorrente:</strong> Lançamentos que apontam para o mesmo item fixo do mês (ex: <em>Aluguel, Luz, Internet</em>) são detectados automaticamente com 100% de confiança.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- TÓPICO 6.4: SYNC > CONCILIAÇÃO VISUAL E AÇÕES EM LOTE -->
-    <div class="manual-topic-content" id="topic-sync-conciliacao" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #38bdf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>⚖️ Central Avançada de Conciliação, Filtros e Ações em Lote</span>
-        <span class="badge badge-cyan">Painel Completo</span>
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(56, 189, 248, 0.08); border-left: 4px solid #38bdf8; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Painel Dedicado de Auditoria & Conciliação Familiar:</strong>
-        </div>
-        <p style="margin-bottom: 10px;">Ao clicar no botão <code>🛡️</code> na barra lateral ou no banner de alerta do Dashboard, você acessa a central:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🎯 <strong>Classificação por Nível de Certeza:</strong> Badges cromáticos informam o grau de confiança: <span class="badge badge-success">🟢 Altíssima Certeza (95-100%)</span>, <span class="badge badge-danger">🟡 Provável (80-94%)</span> e <span class="badge badge-warning">🔵 Suspeito (65-79%)</span>.</li>
-          <li>🎛️ <strong>Filtros Interativos:</strong> Filtre a lista por membro da família, nível de certeza ou conta bancária pagadora.</li>
-          <li>⚡ <strong>Ações em Lote:</strong> Botão <code>[ ⚡ Mesclar Certezas (100%) ]</code> e <code>[ 🔗 Mesclar Selecionados ]</code> para resolver dezenas de duplicidades com 1 único clique.</li>
-          <li>📜 <strong>Aba de Histórico:</strong> Registra todas as conciliações e desfechos anteriores para prestação de contas e auditoria.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- TÓPICO 7.1: ORÇAMENTOS > BUDGETS -->
-    <div class="manual-topic-content" id="topic-orc-budgets" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f43f5e; font-weight: 700;">
-        🎯 Tetos de Gastos por Categoria (Orçamento)
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin: 0;">Estabeleça um limite mensal máximo para categorias como Alimentação, Lazer e Transporte. A barra de progresso avisa com cores quando o teto estiver próximo de ser atingido.</p>
-      </div>
-    </div>
-
-    <!-- TÓPICO 7.2: ORÇAMENTOS > METAS -->
+    <!-- CAPÍTULO 7.3: ORÇAMENTOS > METAS -->
     <div class="manual-topic-content" id="topic-orc-metas" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f43f5e; font-weight: 700;">
-        🏆 Metas Financeiras & Cofrinhos de Economia
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f43f5e; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🎯 7.3 Criando Metas de Economia & Aportes Financeiros</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin: 0;">Crie objetivos como Viagem de Férias, Reserva de Emergência ou Troca de Carro, registrando aportes mensais com cálculo automático da data estimada de conclusão.</p>
+        <p style="margin-bottom: 10px;">Na tela <strong>🎯 Metas</strong>, acompanhe cofrinhos e objetivos de poupança (ex: <em>Reserva de Emergência, Férias em Família, Troca de Carro</em>):</p>
+        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Clique em <code>+ Nova Meta</code>, informe o nome do objetivo, valor alvo (R$) e data desejada.</li>
+          <li>Para adicionar dinheiro economizado, clique em <code>+ Fazer Aporte</code> escolhendo a conta bancária de onde o recurso saiu.</li>
+          <li>O sistema atualiza a barra de porcentagem e projeta quantos meses faltam para atingir o objetivo familiar.</li>
+        </ol>
       </div>
     </div>
 
-    <!-- TÓPICO 8.1: METODOLOGIA 50-30-20 -->
-    <div class="manual-topic-content" id="topic-met-regra" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #c084fc; font-weight: 700;">
-        💡 A Metodologia 50-30-20 Aplicada à Família
+    <!-- CAPÍTULO 8.1: DASHBOARD > 3 MODOS -->
+    <div class="manual-topic-content" id="topic-dash-modos" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🎛️ 8.1 Os 3 Modos de Visualização do Dashboard</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px;">
-          <div style="flex: 1; min-width: 150px; background: rgba(59,130,246,0.1); border-left: 4px solid var(--blue); padding: 12px; border-radius: 6px;">
-            <div style="font-weight: 700; color: #60a5fa;">50% — Necessidades</div>
-            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Aluguel, condomínio, luz, água, alimentação básica e saúde.</div>
-          </div>
-          <div style="flex: 1; min-width: 150px; background: rgba(16,185,129,0.1); border-left: 4px solid var(--green); padding: 12px; border-radius: 6px;">
-            <div style="font-weight: 700; color: #34d399;">30% — Desejos / Lazer</div>
-            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Restaurantes, assinaturas, passeios, compras e hobbies.</div>
-          </div>
-          <div style="flex: 1; min-width: 150px; background: rgba(139,92,246,0.1); border-left: 4px solid var(--purple); padding: 12px; border-radius: 6px;">
-            <div style="font-weight: 700; color: #c084fc;">20% — Futuro & Metas</div>
-            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Reserva de emergência, investimentos e quitação antecipada.</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- TÓPICO 9.1: ARQUITETURA MODULAR & BUILD -->
-    <div class="manual-topic-content" id="topic-arq-modular" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #eab308; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>🏗️ Nova Arquitetura Modular & Manutenção Ágil</span>
-        <span class="badge badge-yellow">Engenharia v2</span>
-      </h4>
-      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <div style="background: rgba(234, 179, 8, 0.08); border-left: 4px solid #eab308; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
-          <strong>Código 100% Desacoplado (Arquivos com no máximo 900 linhas):</strong>
-        </div>
-        <p style="margin-bottom: 10px;">Para garantir alta velocidade de carregamento, facilidade de manutenção e eliminar arquivos monolíticos:</p>
+        <p style="margin-bottom: 10px;">Alterne a disposição do Dashboard no seletor de modos no canto superior direito:</p>
         <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🧩 <strong>Frontend Modularizado (21 Módulos em <code>src/renderer/js/modules/</code>):</strong> Dashboard, Planejamento, Contas, Configurações, Modais, Autenticação e Deduplicação separados em submódulos concisos.</li>
-          <li>💾 <strong>Banco SQLite Modular (8 Módulos em <code>src/database/</code>):</strong> Camadas de Transações, Contas, Usuários/LGPD, Faturas, Relatórios e Anti-Duplicidade desacopladas em mixins limpos.</li>
-          <li>🎨 <strong>Folhas de Estilo (4 Folhas em <code>src/renderer/css/</code>):</strong> <code>base.css</code>, <code>components.css</code>, <code>views.css</code> e <code>responsive-features.css</code> agregadas via <code>@import</code>.</li>
-          <li>⚡ <strong>Scripts de Build:</strong> Execute <code>npm run build:renderer</code> para compilar alterações ou <code>npm run watch:renderer</code> para compilação instantânea em segundo plano.</li>
+          <li>🏛️ <strong>Modo Executivo:</strong> Visão consolidada por blocos com widgets de saldos em conta, faturas de cartão e patrimônio líquido.</li>
+          <li>📑 <strong>Modo Sub-Abas:</strong> Navegação setorizada por abas operacionais (*Resumo, Faturas, Contas e Gráficos*).</li>
+          <li>🚀 <strong>Modo Cockpit Integrado:</strong> Painel de alta densidade reunindo todas as métricas financeiras em uma única tela panorâmica.</li>
         </ul>
       </div>
     </div>
 
-    <!-- TÓPICO 10.1: FAQ INTERATIVO -->
-    <div class="manual-topic-content" id="topic-faq-interativo" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f87171; font-weight: 700;">
-        ❓ Perguntas Frequentes (FAQ Interativo — Clique para abrir a resposta)
+    <!-- CAPÍTULO 8.2: DASHBOARD > FILTROS -->
+    <div class="manual-topic-content" id="topic-dash-filtros" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>👥 8.2 Filtros Rápidos por Membro da Família e Tipo de Conta</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">No topo do Dashboard, você pode filtrar instantaneamente os dados exibidos:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>👤 <strong>Filtro por Membro:</strong> Clique no nome de um familiar para enxergar apenas os gastos, receitas e cartões daquela pessoa.</li>
+          <li>🏦 <strong>Filtro por Tipo de Conta:</strong> Isole contas correntes, carteiras de dinheiro ou cartões benefício com 1 clique.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 8.3: DASHBOARD > KANBAN EM 3 COLUNAS -->
+    <div class="manual-topic-content" id="topic-dash-kanban" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📋 8.3 Kanban Operacional em 3 Colunas (*Prioritários, A Pagar e Pagas*)</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">No centro do Dashboard, três colunas organizam as tarefas do mês:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>⭐ <strong>Prioritários:</strong> Reúne todas as contas marcadas com estrela de prioridade indispensável no mês.</li>
+          <li>⏳ <strong>Contas a Pagar:</strong> Despesas pendentes ordenadas cronologicamente por proximidade da data de vencimento.</li>
+          <li>✓ <strong>Contas Pagas:</strong> Histórico de despesas já quitadas no mês com indicação da conta de pagamento.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 8.4: DASHBOARD > PENDÊNCIAS ANTERIORES -->
+    <div class="manual-topic-content" id="topic-dash-pendencias" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #fb923c; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🚨 8.4 Alerta de Pendências de Meses Anteriores</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Se você tiver deixado contas em aberto nos meses passados, surge um <strong>banner vermelho de alerta no topo do Dashboard</strong> informando a quantidade e o valor total acumulado, com link direto para regularização instantânea.</p>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 9.1: RELATÓRIOS > FLUXO DE CAIXA -->
+    <div class="manual-topic-content" id="topic-rep-fluxo" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #818cf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📈 9.1 Relatório de Fluxo de Caixa</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Na tela <strong>📈 Relatórios</strong>, visualize a saúde financeira consolidada do grupo familiar:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>🟢 <strong>Total de Receitas do Mês:</strong> Entradas salariais e rendimentos.</li>
+          <li>🔴 <strong>Total de Despesas do Mês:</strong> Somatório de gastos fixos, variáveis e faturas.</li>
+          <li>💰 <strong>Saldo Líquido Operacional:</strong> Diferença real entre entradas e saídas.</li>
+          <li>📊 <strong>Taxa de Poupança Familiar (%):</strong> Percentual da renda que a família conseguiu guardar no período.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 9.2: RELATÓRIOS > GRÁFICOS INTERATIVOS -->
+    <div class="manual-topic-content" id="topic-rep-graficos" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #818cf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🍩 9.2 Gráficos Interativos por Categoria (*Pizza, Barras, Radar, Polar*)</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Analise para onde seu dinheiro está indo em diferentes perspectivas visuais interativas:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>🍩 <strong>Gráfico em Rosca (Donut):</strong> Mostra a fatia percentual de cada categoria no orçamento da família.</li>
+          <li>📊 <strong>Gráfico de Barras:</strong> Compara a evolução de gastos mês a mês.</li>
+          <li>🕸️ <strong>Gráfico Radar / Polar:</strong> Identifica anomalias e picos de gastos sazonais.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 9.3: RELATÓRIOS > PATRIMÔNIO -->
+    <div class="manual-topic-content" id="topic-rep-patrimonio" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #818cf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🏛️ 9.3 Evolução Patrimonial Anual</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Acompanhe o crescimento do <strong>Patrimônio Líquido Familiar</strong> ao longo dos 12 meses do ano:</p>
+        <p style="margin: 0;">O cálculo soma todos os saldos em contas bancárias, poupanças e investimentos, deduzindo dívidas pendentes em cartões de crédito e faturas abertas.</p>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 9.4: RELATÓRIOS > AUDITORIA DE JUROS -->
+    <div class="manual-topic-content" id="topic-rep-auditoria-juros" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #818cf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>⚖️ 9.4 Relatório de Auditoria de Juros e Descontos</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Descubra exatamente quanto a família pagou de encargos por atraso de boletos e quanto economizou aproveitando descontos antecipados via PIX.</p>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 9.5: RELATÓRIOS > IMPRESSÃO / PDF -->
+    <div class="manual-topic-content" id="topic-rep-impressao-pdf" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #818cf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🖨️ 9.5 Impressão & Exportação em PDF (*🖨️ Imprimir / PDF*)</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Clique no botão <code>🖨️ Imprimir / PDF</code> no topo da página de relatórios para gerar um arquivo PDF formatado com cabeçalho da família, tabelas detalhadas e gráficos em alta resolução.</p>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 10.1: SEGURANÇA > TRILHA DE AUDITORIA -->
+    <div class="manual-topic-content" id="topic-seg-trilha-auditoria" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #14b8a6; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🛡️ 10.1 Histórico Visual de Modificações (*Trilha de Auditoria*)</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Em <strong>⚙️ Configurações › Segurança</strong>, consulte a auditoria operacional completa:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Registro com data, hora, nome do familiar e ação realizada (criação, edição, exclusão ou quitação de contas).</li>
+          <li>Exibição detalhada dos valores anteriores e dos novos valores alterados para total transparência entre os membros da casa.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 10.2: SEGURANÇA > LGPD -->
+    <div class="manual-topic-content" id="topic-seg-lgpd" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #14b8a6; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🔒 10.2 Direitos LGPD (*Exportação dos Meus Dados e Exclusão Segura*)</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Em total conformidade com a Lei Geral de Proteção de Dados:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>📦 <strong>Exportar Meus Dados:</strong> Baixe todo o histórico financeiro da família em arquivo aberto JSON.</li>
+          <li>🗑️ <strong>Exclusão Definitiva:</strong> Permite ao Administrador expurgar com segurança os registros locais quando desejar.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 11.1: BACKUP > EXPORTAÇÃO -->
+    <div class="manual-topic-content" id="topic-bak-exportacao" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #eab308; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>💾 11.1 Exportando Backups em Excel, CSV, JSON e Banco <code>.db</code></span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Em <strong>⚙️ Configurações › Backup & Restauração</strong>, gere cópias de segurança:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>📊 <strong>Planilha Excel / CSV:</strong> Para conferência e manipulação externa de dados.</li>
+          <li>🗄️ <strong>Backup Completo SQLite (.db):</strong> Cópia integral e criptografada de todo o banco de dados.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 11.2: BACKUP > TESTAR .DB -->
+    <div class="manual-topic-content" id="topic-bak-teste-integridade" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #eab308; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🔍 11.2 Testando a Integridade do Arquivo de Backup (*🔍 Testar .db*)</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Antes de restaurar um arquivo de backup no seu computador, clique em <code>🔍 Testar .db</code>. O motor analisa a consistência estrutural, chaves estrangeiras e integridade de tabelas para garantir que o arquivo não está corrompido.</p>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 11.3: BACKUP > RESTAURAÇÃO -->
+    <div class="manual-topic-content" id="topic-bak-restauracao" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #eab308; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>♻️ 11.3 Restaurando um Backup com Segurança</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Selecione o arquivo de backup <code>.db</code> ou <code>.json</code> prévio.</li>
+          <li>Confirme a restauração com sua senha de administrador.</li>
+          <li>O sistema restaura todas as tabelas e atualiza a interface imediatamente.</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 11.4: BACKUP > SAÚDE & MÉTRICAS -->
+    <div class="manual-topic-content" id="topic-bak-saude-metricas" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #eab308; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📊 11.4 Painel de Saúde e Métricas do Sistema</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Acompanhe o tamanho físico do arquivo do banco de dados no disco, quantidade total de transações registradas, status do modo WAL e integridade dos índices.</p>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 12.1: MOBILE > CONEXÃO LOCAL / WI-FI -->
+    <div class="manual-topic-content" id="topic-mob-conexao-wifi" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #38bdf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📱 12.1 Conexão Local / Wi-Fi via QR Code</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <div style="background: rgba(56, 189, 248, 0.08); border-left: 4px solid #38bdf8; padding: 14px 18px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          <strong>Acesso Direto pelo Celular Sem Precisar Baixar Nada da Loja de Aplicativos:</strong>
+        </div>
+        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>Certifique-se de que o seu celular e o seu computador estão conectados na <strong>mesma rede Wi-Fi</strong>.</li>
+          <li>No computador, clique no botão <code>📱 Conectar Aparelho</code> no menu lateral.</li>
+          <li>Aponte a câmera do celular para o QR Code na tela. O app abrirá no navegador do celular conectado diretamente ao seu computador!</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 12.2: MOBILE > LAYOUT TOUCH & HEADER -->
+    <div class="manual-topic-content" id="topic-mob-layout-touch" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #38bdf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📱 12.2 Layout Mobile, Header Centralizado & Grids Touch-Friendly</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">A interface foi calibrada para navegação confortável com o polegar em smartphones:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>🔝 <strong>Header em 3 Colunas:</strong> Menu hamburguer à esquerda, logo centralizado e alternador de tema à direita.</li>
+          <li>📊 <strong>Lançamentos em 2 Linhas:</strong> Descrição, categoria, valor e status sem sobreposição.</li>
+          <li>💳 <strong>Faturas Verticais:</strong> Cards de fatura com botões largos de 42px para toque fácil.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 13.1: FAQ INTERATIVO -->
+    <div class="manual-topic-content" id="topic-faq-duvidas" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f87171; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>❓ 13.1 Perguntas Frequentes (FAQ Interativo — Clique para ver a resposta)</span>
       </h4>
       <div style="display: flex; flex-direction: column; gap: 10px;">
         
@@ -8119,57 +9425,27 @@ function getManualTopicsPart2Html() {
             <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
           </div>
           <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
-            Pela <strong>Regra de Ouro de Receitas</strong>, salários e recebíveis lançados em contas de familiares diferentes (ex: marido no Itaú e esposa no Nubank) são <strong>100% ignorados pelo motor de duplicidades</strong>, pois são rendas reais independentes. O sistema só alerta se a receita for na mesma conta bancária ou se o mesmo titular cadastrar em bancos diferentes por engano.
+            Salários e rendas de membros diferentes da família (ex: marido no Itaú e esposa no Nubank) são reconhecidos como rendas legítimas independentes e <strong>nunca são bloqueados pelo motor de duplicidade</strong>.
           </div>
         </div>
 
         <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
           <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
-            <span>🛡️ O que acontece se dois membros da família lançarem a mesma despesa (Web e Desktop)?</span>
+            <span>💳 O que acontece quando clico em 'Pagar Fatura' de um cartão?</span>
             <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
           </div>
           <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
-            O <strong>Motor Anti-Duplicidade</strong> cruza valor, data (com compensação de fins de semana) e o nome do estabelecimento (NLP). Se o mesmo local for detectado, o sistema alerta e você pode abrir a <strong>Central de Conciliação</strong> para mesclar em 1 único lançamento com 1 clique.
+            O valor total da fatura é debitado da conta bancária pagadora escolhida e todas as despesas e parcelas atreladas àquela fatura são marcadas como pagas simultaneamente em uma única operação segura.
           </div>
         </div>
 
         <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
           <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
-            <span>🔢 O motor de duplicidade confunde compras parceladas (ex: 2/10 com 3/10)?</span>
+            <span>🔒 Meus dados e informações financeiras ficam salvos na nuvem?</span>
             <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
           </div>
           <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
-            Não! O motor extrai o número da parcela automaticamente. Se os números forem diferentes (ex: <em>2/10</em> vs <em>3/10</em>), a duplicidade é <strong>zerada (0%)</strong> porque são parcelas de meses distintos. Já parcelas idênticas (ex: <em>2/10</em> vs <em>2 de 10</em>) recebem pontuação máxima de duplicidade (100%).
-          </div>
-        </div>
-
-        <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
-          <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
-            <span>💳 Como funciona o destaque de parcelas ao clicar na fatura?</span>
-            <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
-          </div>
-          <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
-            Ao clicar no card de qualquer fatura na tela de Planejamento (ex: <code>FATURA CARTÃO CARREFOUR</code>), todas as compras e parcelas correspondentes na lista de Despesas são imediatamente destacadas com a cor oficial do cartão/banco. Os itens de outros cartões são atenuados, facilitando a conferência.
-          </div>
-        </div>
-
-        <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
-          <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
-            <span>🤝 O que acontece quando clico em 'Renegociar / Acordo' em uma fatura?</span>
-            <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
-          </div>
-          <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
-            A fatura é marcada como <span class="badge badge-purple">Renegociada</span>, a entrada é debitada da conta bancária e o sistema gera automaticamente as parcelas do acordo como despesas nos meses subsequentes. Caso tenha feito por engano, você pode clicar em "Desfazer Acordo / Reabrir" para restaurar a fatura original.
-          </div>
-        </div>
-
-        <div class="wiki-faq-accordion" style="border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-surface);">
-          <div class="wiki-faq-q" style="padding: 14px 16px; font-weight: 700; font-size: 13.5px; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: space-between; background: var(--bg-raised);">
-            <span>🔒 Meus dados financeiros ficam salvos na nuvem ou são compartilhados?</span>
-            <span class="faq-chevron" style="transition: transform 0.2s;">➕</span>
-          </div>
-          <div class="wiki-faq-a" style="display: none; padding: 14px 16px; font-size: 13px; color: var(--text-muted); line-height: 1.7; border-top: 1px solid var(--border); background: var(--bg-surface);">
-            Não! Todos os dados são gravados exclusivamente no banco de dados local SQLite no seu computador com criptografia AES-256 e conformidade integral com a LGPD. Nenhuma informação financeira sai da sua rede local.
+            Não! Todos os dados são salvos exclusivamente no banco de dados local SQLite no seu computador com criptografia AES-256 e conformidade integral com a LGPD. Nenhuma informação financeira sai da sua máquina.
           </div>
         </div>
 
@@ -8177,6 +9453,28 @@ function getManualTopicsPart2Html() {
     </div>
   `;
 }
+
+/**
+ * Função global para navegação por hiperlinks internos no manual
+ */
+window.openManualTopic = function(topicId) {
+  const container = document.getElementById('page-manual');
+  if (!container) return;
+
+  const targetItem = container.querySelector(`.wiki-tree-item[data-topic="${topicId}"]`);
+  if (!targetItem) return;
+
+  // Abrir o acordeão do grupo pai caso esteja fechado
+  const subs = targetItem.closest('.wiki-tree-subs');
+  const header = subs?.previousElementSibling;
+  const arrow = header?.querySelector('.wiki-tree-arrow');
+  if (subs && subs.style.display === 'none') {
+    subs.style.display = 'flex';
+    if (arrow) arrow.textContent = '▾';
+  }
+
+  targetItem.click();
+};
 
 /**
  * Renderiza a página do Manual do Usuário
@@ -8192,7 +9490,7 @@ async function renderManual() {
           <span>📖</span> Manual do Usuário & Central de Conhecimento
         </h2>
         <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
-          Guia completo de operações, cartões de crédito, fluxo de caixa e metodologia financeira
+          Guia completo de operações, cartões de crédito, fluxo de caixa e metodologia financeira (13 Capítulos)
         </div>
       </div>
       <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
@@ -8204,16 +9502,16 @@ async function renderManual() {
 
     <!-- BREADCRUMB / TRILHA DE NAVEGAÇÃO -->
     <div id="manual-breadcrumb" style="display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-muted); margin-bottom: 14px; background: var(--bg-surface); padding: 10px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border); flex-wrap: wrap;">
-      <span style="font-weight: 700; color: var(--text-muted); cursor: pointer;" id="manual-crumb-root">📚 MANUAL</span>
+      <span style="font-weight: 700; color: var(--text-muted); cursor: pointer;" id="manual-crumb-root" onclick="openManualTopic('primeiros-familia')">📚 MANUAL</span>
       <span style="opacity: 0.4;">›</span>
-      <span id="manual-crumb-cat" style="color: #60a5fa; font-weight: 600;">💳 Cartões de Crédito</span>
+      <span id="manual-crumb-cat" style="color: #60a5fa; font-weight: 600;">🌟 1. Primeiros Passos & Acesso</span>
       <span style="opacity: 0.4;">›</span>
-      <span id="manual-crumb-sub" style="color: var(--accent-light); font-weight: 700;">Competência vs Vencimento</span>
+      <span id="manual-crumb-sub" style="color: var(--accent-light); font-weight: 700;">1.1 Criando Família e Usuário</span>
     </div>
 
     <!-- BUSCA GLOBAL NO MANUAL -->
     <div style="margin-bottom: 14px; position: relative;">
-      <input type="text" id="manual-search-input" placeholder="🔍 Pesquisar em todos os tópicos, operações, termos e perguntas do manual..."
+      <input type="text" id="manual-search-input" placeholder="🔍 Pesquisar em todos os 13 capítulos, termos e dúvidas do manual..."
              style="width: 100%; padding: 10px 16px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-primary); font-size: 13px; outline: none; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
     </div>
 
@@ -8319,48 +9617,20 @@ function setupManualEvents(container) {
           const matches = text.includes(q);
           tc.style.display = matches ? 'block' : 'none';
         });
-        container.querySelectorAll('.wiki-faq-accordion').forEach(acc => {
-          const text = acc.textContent.toLowerCase();
-          const aEl = acc.querySelector('.wiki-faq-a');
-          const chevron = acc.querySelector('.faq-chevron');
-          if (text.includes(q)) {
-            acc.style.display = 'block';
-            if (aEl) aEl.style.display = 'block';
-            if (chevron) chevron.textContent = '➖';
-          } else {
-            acc.style.display = 'none';
-          }
-        });
       } else {
         const activeItem = container.querySelector('.wiki-tree-item.active');
-        if (activeItem) activeItem.click();
-        container.querySelectorAll('.wiki-faq-accordion').forEach(acc => {
-          acc.style.display = 'block';
-          const aEl = acc.querySelector('.wiki-faq-a');
-          const chevron = acc.querySelector('.faq-chevron');
-          if (aEl) aEl.style.display = 'none';
-          if (chevron) chevron.textContent = '➕';
-        });
+        if (activeItem) {
+          activeItem.click();
+        }
       }
     };
   }
 
-  // Download PDF button
-  const downloadBtn = container.querySelector('#btn-download-manual-pdf');
-  if (downloadBtn) {
-    downloadBtn.onclick = () => {
-      try {
-        const link = document.createElement('a');
-        link.href = 'Manual_do_Usuario.pdf';
-        link.download = 'Manual_do_Usuario_FinancasFamilia.pdf';
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        toast('📥 Abrindo download do Manual do Usuário em PDF...');
-      } catch (err) {
-        window.open('Manual_do_Usuario.pdf', '_blank');
-      }
+  // Export PDF Button
+  const btnPdf = container.querySelector('#btn-download-manual-pdf');
+  if (btnPdf) {
+    btnPdf.onclick = () => {
+      window.print();
     };
   }
 }
@@ -8438,6 +9708,9 @@ async function openSettingsModal(activeTab = 'profile') {
             </button>
             <button class="settings-modal-tab-btn ${activeTab === 'backups' ? 'active' : ''}" data-tab="backups">
               <span>💾</span> Backups & Dados
+            </button>
+            <button class="settings-modal-tab-btn ${activeTab === 'audit' ? 'active' : ''}" data-tab="audit">
+              <span>🛡️</span> Trilha de Auditoria
             </button>
           </div>
         </div>
@@ -8856,6 +10129,10 @@ async function openSettingsModal(activeTab = 'profile') {
                 💾 Exportar .db
               </button>
               ${(State.user.profile_type === 1 || State.user.is_system_admin === 1) ? `
+              <button class="btn btn-secondary btn-sm" id="btn-test-backup" style="flex: 1; min-width: 110px; font-size: 12px; border: 1px dashed var(--accent);">
+                🔍 Testar .db
+              </button>
+              <input type="file" id="input-test-backup" accept=".db" style="display:none">
               <button class="btn btn-secondary btn-sm" id="btn-restore-backup" style="flex: 1; min-width: 110px; font-size: 12px; border: 1px dashed var(--border);">
                 📂 Restaurar .db
               </button>
@@ -8931,6 +10208,19 @@ async function openSettingsModal(activeTab = 'profile') {
           </div>
 
         </div>
+
+        <!-- PAINEL DE OBSERVABILIDADE & MÉTRICAS SQLITE (FASE 17) -->
+        <div style="margin-top: 24px; padding: 18px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-surface);">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+            <div style="font-weight: 700; font-size: 14px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
+              <span>📊 Saúde do Banco de Dados & Observabilidade</span>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="btn-refresh-metrics" style="font-size: 11px; padding: 4px 10px;">🔄 Atualizar</button>
+          </div>
+          <div id="sqlite-metrics-content" style="font-size: 12px; color: var(--text-muted);">
+            Carregando métricas do SQLite...
+          </div>
+        </div>
       `;
 
       bindBackupTabEvents(capitalizedMonth);
@@ -8939,6 +10229,8 @@ async function openSettingsModal(activeTab = 'profile') {
       renderSettingsWikiTab(bodyEl);
     } else if (tab === 'lgpd') {
       renderSettingsLgpdTab(bodyEl);
+    } else if (tab === 'audit') {
+      await renderSettingsAuditTab(bodyEl);
     }
   };
 
@@ -8980,6 +10272,12 @@ function getSettingsWikiSidebarHtml() {
           <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-pagamento" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
             • Pagamento & Baixa Atômica
           </div>
+          <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-antecipacao" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • Antecipação de Parcelas
+          </div>
+          <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-rotativo" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • Pagamento Parcial & Rotativo
+          </div>
           <div class="wiki-tree-item" data-cat="cartoes" data-topic="cartao-acordo" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
             • Renegociação & Acordos
           </div>
@@ -9007,6 +10305,9 @@ function getSettingsWikiSidebarHtml() {
           </div>
           <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-juros" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
             • Juros, Multas e Descontos
+          </div>
+          <div class="wiki-tree-item" data-cat="lancamentos" data-topic="lanc-feriados" style="padding: 6px 10px; border-radius: 6px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
+            • Feriados & Prorrogação Útil
           </div>
         </div>
       </div>
@@ -9176,6 +10477,36 @@ function getSettingsWikiTopicsHtml() {
       </div>
     </div>
 
+    <!-- TÓPICO: CARTÕES > ANTECIPAÇÃO -->
+    <div class="wiki-topic-content" id="topic-cartao-antecipacao" style="display: none;">
+      <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #60a5fa; font-weight: 700;">
+        ⚡ Antecipação de Parcelas Futuras com Desconto
+      </h4>
+      <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Deseja adiantar parcelas de compras parceladas e aproveitar descontos concedidos pela emissora do cartão?</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
+          <li>Abra a fatura do cartão e selecione <strong>"Antecipar Parcelas"</strong>.</li>
+          <li>Marque quais parcelas dos próximos meses deseja transferir para o mês atual.</li>
+          <li>Informe o valor do desconto (se houver). O sistema aplica o abatimento proporcional e recalcula as faturas futuras.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- TÓPICO: CARTÕES > ROTATIVO -->
+    <div class="wiki-topic-content" id="topic-cartao-rotativo" style="display: none;">
+      <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #60a5fa; font-weight: 700;">
+        🔄 Pagamento Parcial & Saldo Rotativo Automático
+      </h4>
+      <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Se no fechamento do mês você não puder pagar o valor total da fatura:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 12px;">
+          <li>No modal de quitação da fatura, informe o <strong>Valor Parcial</strong> pago.</li>
+          <li>O valor pago é debitado da conta corrente selecionada.</li>
+          <li>O saldo remanescente acrescido dos encargos do rotativo é <strong>lançado automaticamente na fatura do mês seguinte</strong>.</li>
+        </ul>
+      </div>
+    </div>
+
     <!-- TÓPICO: CARTÕES > REABERTURA & ESTORNO -->
     <div class="wiki-topic-content" id="topic-cartao-reabertura" style="display: none;">
       <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #60a5fa; font-weight: 700;">
@@ -9239,6 +10570,18 @@ function getSettingsWikiTopicsHtml() {
       <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
         <p style="margin-bottom: 8px;">• <strong>Desconto:</strong> Ao pagar antecipado com desconto, o sistema debita do saldo da conta apenas o valor líquido real.</p>
         <p style="margin: 0;">• <strong>Juros / Multa:</strong> Ao pagar em atraso, registre o acréscimo para que o valor real debitado corresponda exatamente ao extrato do banco.</p>
+      </div>
+    </div>
+
+    <!-- TÓPICO: LANÇAMENTOS > FERIADOS & PRORROGAÇÃO -->
+    <div class="wiki-topic-content" id="topic-lanc-feriados" style="display: none;">
+      <h4 style="margin: 0 0 12px 0; font-size: 15px; color: #34d399; font-weight: 700;">
+        📅 Feriados Nacionais & Prorrogação para Dia Útil
+      </h4>
+      <div style="font-size: 12.8px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 8px;">• <strong>Regra Bancária:</strong> Contas vencendo em fins de semana ou feriados nacionais brasileiros são prorrogadas para o 1º dia útil seguinte.</p>
+        <p style="margin-bottom: 8px;">• <strong>Tag Informativa:</strong> O app exibe a tag azul <code>📅 Prorroga: DD/MM</code> nos lançamentos com vencimento em feriado ou fim de semana.</p>
+        <p style="margin: 0;">• <strong>Isenção de Mora:</strong> Pagamentos efetuados até o dia útil prorrogado não sofrem cálculo de juros por atraso.</p>
       </div>
     </div>
 
@@ -9582,6 +10925,125 @@ function renderSettingsLgpdTab(bodyEl) {
   bindLgpdTabEvents();
 }
 
+/**
+ * Renderiza a aba de Trilha de Auditoria no Modal de Configurações
+ */
+async function renderSettingsAuditTab(bodyEl) {
+  bodyEl.innerHTML = `
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; border-bottom: 1px solid var(--border); padding-bottom: 10px;">
+      <div>
+        <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text-primary);">
+          🛡️ Trilha de Auditoria & Modificações
+        </h3>
+        <p style="margin: 3px 0 0 0; font-size: 12px; color: var(--text-muted);">
+          Rastreabilidade de alterações cadastrais e financeiras (Quem, Quando, O quê, Valores Anteriores e Novos)
+        </p>
+      </div>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <select id="audit-filter-entity" style="padding: 6px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-primary); font-size: 12px; outline: none; cursor: pointer;">
+          <option value="">Todas as Entidades</option>
+          <option value="transaction">Lançamentos</option>
+          <option value="account">Contas</option>
+          <option value="recurring_item">Planejamento</option>
+          <option value="invoice">Faturas de Cartão</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" id="btn-refresh-audit" style="font-size: 12px; padding: 6px 12px;">
+          🔄 Atualizar
+        </button>
+      </div>
+    </div>
+
+    <div id="audit-logs-container" style="height: 400px; overflow-y: auto; scrollbar-width: thin;">
+      <div style="text-align: center; padding: 30px; color: var(--text-muted); font-size: 13px;">
+        Carregando registros de auditoria...
+      </div>
+    </div>
+  `;
+
+  const loadAuditLogs = async () => {
+    const container = document.getElementById('audit-logs-container');
+    const entityFilter = document.getElementById('audit-filter-entity')?.value || null;
+
+    try {
+      const logs = await window.api.audit.getLogs({
+        familyId: State.user.family_id,
+        entityType: entityFilter,
+        limit: 100
+      });
+
+      if (!logs || logs.length === 0) {
+        container.innerHTML = `
+          <div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
+            <div style="font-size: 32px; margin-bottom: 8px;">🛡️</div>
+            <div style="font-weight: 600; font-size: 14px; color: var(--text-primary);">Nenhum registro de auditoria encontrado</div>
+            <div style="font-size: 12px; margin-top: 4px;">As próximas ações de criação, alteração ou exclusão serão registradas aqui automaticamente.</div>
+          </div>
+        `;
+        return;
+      }
+
+      const getActionBadge = (action) => {
+        if (action.includes('CREATE')) return '<span class="badge" style="background: rgba(16,185,129,0.15); color: #34d399; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">CRIOU</span>';
+        if (action.includes('UPDATE')) return '<span class="badge" style="background: rgba(59,130,246,0.15); color: #60a5fa; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">ALTEROU</span>';
+        if (action.includes('DELETE')) return '<span class="badge" style="background: rgba(239,68,68,0.15); color: #f87171; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">EXCLUIU</span>';
+        if (action.includes('PAY')) return '<span class="badge" style="background: rgba(245,158,11,0.15); color: #fbbf24; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">QUITOU</span>';
+        return `<span class="badge" style="background: var(--bg-raised); color: var(--text-muted); font-size: 10px; padding: 2px 6px; border-radius: 4px;">${action}</span>`;
+      };
+
+      container.innerHTML = `
+        <table class="data-table" style="width: 100%; font-size: 12px; border-collapse: collapse;">
+          <thead>
+            <tr style="border-bottom: 1px solid var(--border); text-align: left; color: var(--text-muted); font-size: 11px;">
+              <th style="padding: 8px 10px;">DATA/HORA</th>
+              <th style="padding: 8px 10px;">USUÁRIO</th>
+              <th style="padding: 8px 10px;">AÇÃO</th>
+              <th style="padding: 8px 10px;">ENTIDADE</th>
+              <th style="padding: 8px 10px;">DESCRIÇÃO / HISTÓRICO</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${logs.map(l => {
+              const dt = new Date(l.created_at);
+              const dateFormatted = !isNaN(dt) ? dt.toLocaleString('pt-BR') : l.created_at;
+              return `
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle;">
+                  <td style="padding: 8px 10px; color: var(--text-muted); font-family: monospace; white-space: nowrap; font-size: 11px;">
+                    ${dateFormatted}
+                  </td>
+                  <td style="padding: 8px 10px; font-weight: 600; color: var(--text-primary); white-space: nowrap;">
+                    👤 ${l.user_name || 'Sistema'}
+                  </td>
+                  <td style="padding: 8px 10px; white-space: nowrap;">
+                    ${getActionBadge(l.action)}
+                  </td>
+                  <td style="padding: 8px 10px; color: var(--text-muted); text-transform: capitalize; white-space: nowrap; font-size: 11px;">
+                    ${l.entity_type}
+                  </td>
+                  <td style="padding: 8px 10px; color: var(--text-primary); line-height: 1.4;">
+                    <div>${l.description || '—'}</div>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    } catch (err) {
+      container.innerHTML = `
+        <div style="padding: 20px; text-align: center; color: #f87171; font-size: 13px;">
+          Erro ao carregar trilha de auditoria: ${err.message}
+        </div>
+      `;
+    }
+  };
+
+  document.getElementById('audit-filter-entity')?.addEventListener('change', loadAuditLogs);
+  document.getElementById('btn-refresh-audit')?.addEventListener('click', loadAuditLogs);
+
+  await loadAuditLogs();
+}
+
+
 
 /* ==== settings-2.js ==== */
 /* ===
@@ -9791,6 +11253,43 @@ function bindBackupTabEvents(capitalizedMonth) {
     };
   }
 
+  if (document.getElementById('btn-test-backup')) {
+    document.getElementById('btn-test-backup').onclick = () => {
+      document.getElementById('input-test-backup').click();
+    };
+
+    document.getElementById('input-test-backup').onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      toast('Analisando integridade do arquivo SQLite...');
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64 = event.target.result.split(',')[1];
+        try {
+          // Salva temporariamente no backend para validar via PRAGMA
+          const res = await window.api.backup.testIntegrity({ fileData: base64, filename: file.name });
+          if (res && res.success) {
+            const counts = res.tableCounts || {};
+            const summaryStr = Object.entries(counts).map(([k, v]) => `• ${k}: ${v} registros`).join('\n');
+            alert(`🔍 DIAGNÓSTICO DE INTEGRIDADE SQLITE:\n\n` +
+                  `✅ Status: Arquivo 100% íntegro!\n` +
+                  `📦 Tamanho: ${res.sizeFormatted}\n` +
+                  `🛡️ PRAGMA integrity_check: ${res.integrityResult}\n\n` +
+                  `📊 Contagem de Registros:\n${summaryStr}\n\n` +
+                  `Este arquivo é seguro e válido para restauração.`);
+          } else {
+            alert('❌ Falha no teste de integridade: ' + (res?.error || 'Arquivo corrompido ou formato SQLite inválido.'));
+          }
+        } catch (err) {
+          alert('Erro ao testar integridade: ' + err.message);
+        }
+        e.target.value = '';
+      };
+      reader.readAsDataURL(file);
+    };
+  }
+
   if (document.getElementById('btn-restore-backup')) {
     document.getElementById('btn-restore-backup').onclick = () => {
       document.getElementById('input-restore-backup').click();
@@ -9821,6 +11320,57 @@ function bindBackupTabEvents(capitalizedMonth) {
       reader.readAsDataURL(file);
     };
   }
+
+  const loadSqliteMetrics = async () => {
+    const container = document.getElementById('sqlite-metrics-content');
+    if (!container) return;
+    try {
+      const res = await window.api.server.getMetrics();
+      if (!res || !res.success) {
+        container.innerHTML = `<span style="color:#f87171">Não foi possível obter métricas: ${res?.error || 'Erro'}</span>`;
+        return;
+      }
+      const { sqlite, tableCounts, process: proc } = res;
+      container.innerHTML = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 12px;">
+          <div style="padding: 10px; border-radius: var(--radius-sm); background: var(--bg-raised); border: 1px solid var(--border);">
+            <div style="font-size: 11px; color: var(--text-muted);">Tamanho Total (.db + WAL)</div>
+            <div style="font-size: 16px; font-weight: 700; color: #34d399; margin-top: 2px;">${sqlite.totalFormatted}</div>
+          </div>
+          <div style="padding: 10px; border-radius: var(--radius-sm); background: var(--bg-raised); border: 1px solid var(--border);">
+            <div style="font-size: 11px; color: var(--text-muted);">Modo de Journal & FK</div>
+            <div style="font-size: 14px; font-weight: 700; color: #60a5fa; margin-top: 2px;">${(sqlite.journalMode || 'wal').toUpperCase()} • FKs ${sqlite.foreignKeys ? 'Ativas' : 'Desat.'}</div>
+          </div>
+          <div style="padding: 10px; border-radius: var(--radius-sm); background: var(--bg-raised); border: 1px solid var(--border);">
+            <div style="font-size: 11px; color: var(--text-muted);">Memória do Processo</div>
+            <div style="font-size: 14px; font-weight: 700; color: #c084fc; margin-top: 2px;">${proc.memoryRssMb} (Heap: ${proc.memoryHeapUsedMb})</div>
+          </div>
+          <div style="padding: 10px; border-radius: var(--radius-sm); background: var(--bg-raised); border: 1px solid var(--border);">
+            <div style="font-size: 11px; color: var(--text-muted);">Uptime do Sistema</div>
+            <div style="font-size: 14px; font-weight: 700; color: var(--text-primary); margin-top: 2px;">${Math.floor(proc.uptimeSeconds / 60)} min (${proc.uptimeSeconds}s)</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; font-size: 11px; color: var(--text-muted); background: var(--bg-base); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+          <span>📊 <strong>Lançamentos:</strong> ${tableCounts.transactions || 0}</span>
+          <span>•</span>
+          <span>💳 <strong>Faturas:</strong> ${tableCounts.invoices || 0}</span>
+          <span>•</span>
+          <span>🏦 <strong>Contas:</strong> ${tableCounts.accounts || 0}</span>
+          <span>•</span>
+          <span>🔄 <strong>Recorrências:</strong> ${tableCounts.recurring_items || 0}</span>
+          <span>•</span>
+          <span>🛡️ <strong>Logs Auditoria:</strong> ${tableCounts.audit_logs || 0}</span>
+          <span>•</span>
+          <span>👥 <strong>Usuários:</strong> ${tableCounts.users || 0}</span>
+        </div>
+      `;
+    } catch (err) {
+      container.innerHTML = `<span style="color:#f87171">Erro ao carregar métricas: ${err.message}</span>`;
+    }
+  };
+
+  document.getElementById('btn-refresh-metrics')?.addEventListener('click', loadSqliteMetrics);
+  loadSqliteMetrics();
 
   if (document.getElementById('btn-export-month')) {
     document.getElementById('btn-export-month').onclick = async () => {
@@ -10279,22 +11829,25 @@ let signupFamilyId = null;
 
 function openSignUpWizard() {
   const overlay = document.getElementById('signup-wizard-overlay');
-  overlay.classList.add('active');
+  if (overlay) {
+    overlay.style.display = 'flex';
+    overlay.classList.add('active');
+  }
   currentSignUpStep = 1;
   signupFamilyId = null;
   updateSignUpWizardUI();
 
   // Clear inputs
-  document.getElementById('wiz-first-name').value = '';
-  document.getElementById('wiz-last-name').value = '';
-  document.getElementById('wiz-cpf').value = '';
-  document.getElementById('wiz-birth-date').value = '';
-  document.getElementById('wiz-email').value = '';
-  document.getElementById('wiz-phone').value = '';
-  document.getElementById('wiz-family-name').value = '';
-  document.getElementById('wiz-username').value = '';
-  document.getElementById('wiz-password').value = '';
-  document.getElementById('wiz-error-text').textContent = '';
+  const fn = document.getElementById('wiz-first-name'); if (fn) fn.value = '';
+  const ln = document.getElementById('wiz-last-name'); if (ln) ln.value = '';
+  const cpf = document.getElementById('wiz-cpf'); if (cpf) cpf.value = '';
+  const bd = document.getElementById('wiz-birth-date'); if (bd) bd.value = '';
+  const em = document.getElementById('wiz-email'); if (em) em.value = '';
+  const ph = document.getElementById('wiz-phone'); if (ph) ph.value = '';
+  const fam = document.getElementById('wiz-family-name'); if (fam) fam.value = '';
+  const un = document.getElementById('wiz-username'); if (un) un.value = '';
+  const pw = document.getElementById('wiz-password'); if (pw) pw.value = '';
+  const err = document.getElementById('wiz-error-text'); if (err) err.textContent = '';
 
   // Setup input listeners for sanitization & masks
   setupWizardMasksAndValidators();
@@ -10622,7 +12175,11 @@ setTimeout(() => {
         }
 
         toast('Família e conta criadas com sucesso!');
-        document.getElementById('signup-wizard-overlay').classList.remove('active');
+        const wizOverlay = document.getElementById('signup-wizard-overlay');
+        if (wizOverlay) {
+          wizOverlay.classList.remove('active');
+          setTimeout(() => { if (!wizOverlay.classList.contains('active')) wizOverlay.style.display = 'none'; }, 300);
+        }
         
         // Prefill login username
         document.getElementById('login-username').value = username;
@@ -11809,34 +13366,556 @@ async function openAdmEditFamilyModal(familyId) {
 initLoginScreen();
 
 // Sidebar Responsive Toggle Controls
-document.getElementById('titlebar-menu-btn').onclick = (e) => {
-  e.stopPropagation();
-  const sidebar = document.getElementById('sidebar');
-  sidebar.classList.toggle('open');
-};
+const menuBtn = document.getElementById('titlebar-menu-btn');
+if (menuBtn) {
+  menuBtn.onclick = (e) => {
+    e.stopPropagation();
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) sidebar.classList.toggle('open');
+  };
+}
 
 // Close sidebar when clicking any navigation link
 document.querySelectorAll('.nav-item').forEach(item => {
   item.addEventListener('click', () => {
     const sidebar = document.getElementById('sidebar');
-    sidebar.classList.remove('open');
+    if (sidebar) sidebar.classList.remove('open');
   });
 });
 
 // Close sidebar when clicking anywhere on the main content area
-document.getElementById('main-content').onclick = () => {
-  const sidebar = document.getElementById('sidebar');
-  if (sidebar.classList.contains('open')) {
-    sidebar.classList.remove('open');
+const mainContentEl = document.getElementById('main-content');
+if (mainContentEl) {
+  mainContentEl.onclick = () => {
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar && sidebar.classList.contains('open')) {
+      sidebar.classList.remove('open');
+    }
+  };
+}
+
+// Register PWA Service Worker only on HTTPS or unregister stale local workers
+if ('serviceWorker' in navigator && !window.api.isElectron) {
+  if (window.location.protocol === 'https:' && !window.location.hostname.includes('192.168.') && !window.location.hostname.includes('127.0.0.1') && window.location.hostname !== 'localhost') {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => console.log('Service Worker registrado:', reg.scope))
+        .catch(err => console.error('Falha ao registrar Service Worker:', err));
+    });
+  } else {
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      for (const reg of regs) reg.unregister();
+    }).catch(() => {});
+  }
+}
+
+
+/* ==== mobile-shell.js ==== */
+/**
+ * src/renderer/js/modules/mobile-shell.js
+ * Gerenciamento do Ambiente Operacional Mobile, Bottom Navigation Bar, FAB e Ações Rápidas.
+ */
+
+const MobileShell = {
+  isMobile: false,
+
+  init() {
+    this.detectDevice();
+    this.initBottomNav();
+    this.initFab();
+    this.initMoreDrawer();
+    this.hookPageChanges();
+
+    window.addEventListener('resize', () => this.detectDevice());
+    window.addEventListener('orientationchange', () => this.detectDevice());
+  },
+
+  detectDevice() {
+    const userAgentMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const screenMobile = window.matchMedia('(max-width: 768px)').matches;
+    const touchPointer = window.matchMedia('(pointer: coarse)').matches;
+
+    this.isMobile = userAgentMobile || screenMobile || (touchPointer && window.innerWidth <= 1024);
+
+    if (this.isMobile) {
+      document.body.classList.add('is-mobile-env');
+      document.documentElement.classList.add('is-mobile-env');
+    } else {
+      document.body.classList.remove('is-mobile-env');
+      document.documentElement.classList.remove('is-mobile-env');
+    }
+  },
+
+  initBottomNav() {
+    const navTabs = document.querySelectorAll('.mobile-nav-tab');
+    navTabs.forEach(tab => {
+      tab.addEventListener('click', (e) => {
+        const page = tab.dataset.page;
+        const action = tab.dataset.action;
+
+        if (action === 'more') {
+          this.toggleMoreDrawer(true);
+          return;
+        }
+
+        if (page) {
+          this.toggleMoreDrawer(false);
+          this.toggleFabMenu(false);
+
+          // Atualizar tabs visuais
+          navTabs.forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+
+          // Chamar a navegação nativa do app
+          if (typeof navigate === 'function') {
+            navigate(page);
+          } else {
+            const desktopNavBtn = document.getElementById(`nav-${page}`);
+            if (desktopNavBtn) desktopNavBtn.click();
+          }
+        }
+      });
+    });
+  },
+
+  initFab() {
+    const fabBtn = document.getElementById('mobile-quick-fab');
+    const fabMenu = document.getElementById('mobile-fab-menu');
+    const fabBackdrop = document.getElementById('mobile-fab-backdrop');
+
+    if (!fabBtn) return;
+
+    fabBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = fabMenu?.classList.contains('open');
+      this.toggleFabMenu(!isOpen);
+    });
+
+    fabBackdrop?.addEventListener('click', () => {
+      this.toggleFabMenu(false);
+    });
+
+    // Itens do Speed Dial FAB
+    document.querySelectorAll('.mobile-fab-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const action = item.dataset.action;
+        this.toggleFabMenu(false);
+
+        if (action === 'expense') {
+          if (typeof openAvulsoModal === 'function') {
+            openAvulsoModal('expense');
+          } else {
+            const btn = document.getElementById('btn-new-expense') || document.getElementById('btn-quick-expense');
+            btn?.click();
+          }
+        } else if (action === 'income') {
+          if (typeof openAvulsoModal === 'function') {
+            openAvulsoModal('income');
+          } else {
+            const btn = document.getElementById('btn-new-income') || document.getElementById('btn-quick-income');
+            btn?.click();
+          }
+        } else if (action === 'scanner') {
+          if (typeof openNfceScannerModal === 'function') {
+            openNfceScannerModal();
+          } else {
+            const btn = document.getElementById('btn-scan-nfce');
+            btn?.click();
+          }
+        } else if (action === 'recurring') {
+          if (typeof openRecurringModal === 'function') {
+            openRecurringModal();
+          } else {
+            const btn = document.getElementById('btn-new-recurring');
+            btn?.click();
+          }
+        }
+      });
+    });
+  },
+
+  toggleFabMenu(show) {
+    const fabMenu = document.getElementById('mobile-fab-menu');
+    const fabBackdrop = document.getElementById('mobile-fab-backdrop');
+    const fabBtn = document.getElementById('mobile-quick-fab');
+
+    if (show) {
+      fabMenu?.classList.add('open');
+      fabBackdrop?.classList.add('open');
+      if (fabBtn) fabBtn.style.transform = 'rotate(45deg) scale(0.95)';
+    } else {
+      fabMenu?.classList.remove('open');
+      fabBackdrop?.classList.remove('open');
+      if (fabBtn) fabBtn.style.transform = 'none';
+    }
+  },
+
+  initMoreDrawer() {
+    const backdrop = document.getElementById('mobile-more-backdrop');
+    backdrop?.addEventListener('click', () => this.toggleMoreDrawer(false));
+
+    document.querySelectorAll('.mobile-more-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const page = item.dataset.page;
+        const action = item.dataset.action;
+        this.toggleMoreDrawer(false);
+
+        if (page) {
+          if (typeof navigate === 'function') {
+            navigate(page);
+          } else {
+            const desktopNavBtn = document.getElementById(`nav-${page}`);
+            if (desktopNavBtn) desktopNavBtn.click();
+          }
+        } else if (action === 'theme') {
+          const themeBtn = document.getElementById('app-theme-toggle');
+          themeBtn?.click();
+        } else if (action === 'sync') {
+          const syncBtn = document.getElementById('sidebar-sync-btn');
+          syncBtn?.click();
+        } else if (action === 'logout') {
+          const logoutBtn = document.getElementById('sidebar-logout');
+          logoutBtn?.click();
+        }
+      });
+    });
+  },
+
+  toggleMoreDrawer(show) {
+    const drawer = document.getElementById('mobile-more-drawer');
+    const backdrop = document.getElementById('mobile-more-backdrop');
+
+    if (show) {
+      drawer?.classList.add('open');
+      backdrop?.classList.add('open');
+    } else {
+      drawer?.classList.remove('open');
+      backdrop?.classList.remove('open');
+    }
+  },
+
+  syncActiveTab(pageId) {
+    const navTabs = document.querySelectorAll('.mobile-nav-tab');
+    navTabs.forEach(t => {
+      if (t.dataset.page === pageId) {
+        t.classList.add('active');
+      } else {
+        t.classList.remove('active');
+      }
+    });
+  },
+
+  hookPageChanges() {
+    // Observar mudanças de classe na main-content ou interceptar cliques na sidebar
+    const observer = new MutationObserver(() => {
+      const activePage = document.querySelector('.page.active');
+      if (activePage) {
+        const pageId = activePage.id.replace('page-', '');
+        this.syncActiveTab(pageId);
+      }
+    });
+
+    const mainContent = document.getElementById('main-content');
+    if (mainContent) {
+      observer.observe(mainContent, { attributes: true, subtree: true, attributeFilter: ['class'] });
+    }
   }
 };
 
-// Register PWA Service Worker for web hosting compatibility
-if ('serviceWorker' in navigator && !window.api.isElectron) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then(reg => console.log('Service Worker registrado com sucesso no escopo:', reg.scope))
-      .catch(err => console.error('Falha ao registrar o Service Worker:', err));
+// Inicialização automática quando o DOM estiver pronto
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => MobileShell.init());
+} else {
+  MobileShell.init();
+}
+
+
+/* ==== mobile-dashboard.js ==== */
+/**
+ * src/renderer/js/modules/mobile-dashboard.js
+ * Dashboard Mobile Nativo — Versão Enxuta, Ultra-Rápida e Intuitiva.
+ * Foco total em:
+ * 1. Lançamentos com 1 toque (+ Despesa, + Receita, 📷 Scanner)
+ * 2. Visualização clara de Limites por Cartão de Crédito e Saldos em Conta
+ * 3. Extrato simples e ágil
+ */
+
+async function renderMobileAppDashboard(container) {
+  if (!container) container = document.getElementById('page-dashboard');
+  if (!container) return;
+
+  const currentMonth = State.currentMonth || (new Date().getMonth() + 1);
+  const currentYear = State.currentYear || new Date().getFullYear();
+  const userId = State.user?.id || 1;
+
+  // Carregar dados de resumo simultaneamente
+  const [summary, recurringItems] = await Promise.all([
+    window.api.dashboard.getSummary({ userId, month: currentMonth, year: currentYear }),
+    window.api.recurring.getAll({ userId, month: currentMonth, year: currentYear }).catch(() => [])
+  ]);
+
+  const accounts = summary.accounts || [];
+  const creditCards = accounts.filter(a => a.type === 'credit');
+  const bankAccounts = accounts.filter(a => a.type !== 'credit');
+
+  const totalIncome = summary.income || 0;
+  const totalExpense = summary.expense || 0;
+  const totalBalance = totalIncome - totalExpense;
+  const totalPatrimony = summary.patrimony || 0;
+
+  // Nomes dos meses curtos
+  const monthNames = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const monthShort = `${monthNames[currentMonth]} ${currentYear}`;
+
+  let html = `
+    <div class="mobile-lean-container">
+      
+      <!-- 1. Header Minimalista -->
+      <div class="mobile-lean-header">
+        <div class="user-pill" onclick="openSettingsModal('profile')">
+          ${renderAvatarHtml(State.user, 32)}
+          <div class="user-pill-texts">
+            <span class="user-greeting">Olá, ${(State.user?.name || 'Usuário').split(' ')[0]}</span>
+            <span class="user-family-badge">${State.familyName || 'Família'}</span>
+          </div>
+        </div>
+
+        <!-- Seletor de Mês Super Enxuto -->
+        <div class="mobile-compact-month">
+          <button class="btn-compact-month" id="m-prev-month" aria-label="Mês anterior">‹</button>
+          <span class="compact-month-text">${monthShort}</span>
+          <button class="btn-compact-month" id="m-next-month" aria-label="Próximo mês">›</button>
+        </div>
+      </div>
+
+      <!-- 2. Hero Card: Saldo Consolidado + Ações Rápidas em Destaque -->
+      <div class="mobile-hero-balance-card">
+        <div class="hero-balance-header">
+          <span class="hero-balance-label">Saldo do Mês</span>
+          <span class="hero-patrimony-badge" title="Patrimônio Líquido em Contas">Patrimônio: ${fmt.currency(totalPatrimony)}</span>
+        </div>
+
+        <div class="hero-balance-value" style="color: ${totalBalance >= 0 ? '#10b981' : '#ef4444'};">
+          ${fmt.currency(totalBalance)}
+        </div>
+
+        <div class="hero-inout-row">
+          <div class="hero-inout-item">
+            <span class="inout-label">💰 Receitas</span>
+            <span class="inout-val inout-inc">+${fmt.currency(totalIncome)}</span>
+          </div>
+          <div class="hero-inout-sep"></div>
+          <div class="hero-inout-item">
+            <span class="inout-label">💸 Despesas</span>
+            <span class="inout-val inout-exp">-${fmt.currency(totalExpense)}</span>
+          </div>
+        </div>
+
+        <!-- Botões de Lançamento Imediato em 1 Toque -->
+        <div class="mobile-hero-actions">
+          <button class="hero-btn hero-btn-expense" id="m-quick-expense">
+            <span class="hero-btn-icon">💸</span>
+            <span>+ Despesa</span>
+          </button>
+          <button class="hero-btn hero-btn-income" id="m-quick-income">
+            <span class="hero-btn-icon">💰</span>
+            <span>+ Receita</span>
+          </button>
+          <button class="hero-btn hero-btn-scanner" id="m-quick-scanner" title="Escanear Cupom / QR Code">
+            <span class="hero-btn-icon">📷</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 3. Cartões de Crédito & Limites (Carrossel Horizontal Deslizável) -->
+      <div class="mobile-block-header">
+        <div class="block-title-wrap">
+          <span class="block-title">💳 Meus Cartões</span>
+          <span class="block-badge">${creditCards.length}</span>
+        </div>
+        <button class="block-link" onclick="navigate('accounts')">Ver Faturas →</button>
+      </div>
+
+      <div class="mobile-cards-slider">
+        ${creditCards.length === 0 ? `
+          <div class="empty-slider-box">
+            <p>Nenhum cartão cadastrado.</p>
+            <button class="btn btn-secondary btn-sm" onclick="openAccountModal('credit')">+ Adicionar Cartão</button>
+          </div>
+        ` : creditCards.map(card => {
+          const limit = card.credit_limit || 0;
+          const invoiceAmount = Math.abs(card.current_invoice || 0);
+          const committed = Math.abs(card.credit_used || card.committed_limit || invoiceAmount);
+          const available = limit > 0 ? (limit - committed) : (card.available_limit || 0);
+          const pctUsed = limit > 0 ? Math.min(100, Math.max(0, Math.round((committed / limit) * 100))) : 0;
+          
+          let statusColor = '#10b981'; // verde
+          if (pctUsed > 85) statusColor = '#ef4444'; // vermelho
+          else if (pctUsed > 60) statusColor = '#f59e0b'; // laranja
+
+          // Gradiente personalizado por banco
+          let cardBg = 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)';
+          let bankTag = '💳 Cartão';
+          if (card.bank === 'nubank' || (card.name && card.name.toLowerCase().includes('nu'))) {
+            cardBg = 'linear-gradient(135deg, #5b21b6 0%, #1e1b4b 100%)';
+            bankTag = '💜 Nubank';
+          } else if (card.bank === 'banrisul' || (card.name && card.name.toLowerCase().includes('banri'))) {
+            cardBg = 'linear-gradient(135deg, #1e40af 0%, #0f172a 100%)';
+            bankTag = '💙 Banrisul';
+          } else if (card.bank === 'carrefour' || (card.name && card.name.toLowerCase().includes('carrefour'))) {
+            cardBg = 'linear-gradient(135deg, #991b1b 0%, #450a0a 100%)';
+            bankTag = '🔴 Carrefour';
+          } else if (card.bank === 'mercadopago' || (card.name && card.name.toLowerCase().includes('mercado'))) {
+            cardBg = 'linear-gradient(135deg, #065f46 0%, #022c22 100%)';
+            bankTag = '💛 Mercado Pago';
+          }
+
+          return `
+            <div class="slider-card-item" style="background: ${cardBg};">
+              <div class="slider-card-top">
+                <span class="slider-bank-tag">${bankTag}</span>
+                <span class="slider-holder">${card.user_name ? card.user_name.split(' ')[0] : 'Titular'}</span>
+              </div>
+
+              <div class="slider-card-name">${card.name}</div>
+
+              <!-- Destaque do Limite Disponível -->
+              <div class="slider-limit-highlight">
+                <span class="highlight-label">Limite Disponível</span>
+                <span class="highlight-val" style="color: ${available < 0 ? '#ef4444' : '#34d399'};">
+                  ${fmt.currency(available)}
+                </span>
+              </div>
+
+              <!-- Barra de Uso e Fatura -->
+              <div class="slider-bar-wrap">
+                <div class="slider-bar-bg">
+                  <div class="slider-bar-fill" style="width: ${pctUsed}%; background: ${statusColor};"></div>
+                </div>
+                <div class="slider-bar-legend">
+                  <span>Fatura: <strong>${fmt.currency(invoiceAmount)}</strong></span>
+                  <span style="color: ${statusColor}; font-weight: 700;">${pctUsed}% usado</span>
+                </div>
+              </div>
+
+              <!-- Ação Rápida no Cartão -->
+              <div class="slider-btn-row">
+                <button class="slider-btn" onclick="openAvulsoModal('expense', null, null, 'expense', { accountId: ${card.id} })">
+                  + Lançar no Cartão
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+
+      <!-- 4. Contas & Carteiras (Lista Compacta) -->
+      <div class="mobile-block-header" style="margin-top: 18px;">
+        <span class="block-title">🏦 Contas & Saldos</span>
+        <button class="block-link" onclick="navigate('accounts')">Gerenciar →</button>
+      </div>
+
+      <div class="mobile-lean-accounts">
+        ${bankAccounts.length === 0 ? `
+          <p style="font-size: 12px; color: var(--text-muted); text-align:center;">Nenhuma conta cadastrada.</p>
+        ` : bankAccounts.map(acc => {
+          const bal = acc.balance || 0;
+          let icon = '🏦';
+          if (acc.type === 'wallet') icon = '💵';
+          else if (acc.type === 'savings') icon = '🐖';
+
+          return `
+            <div class="lean-acc-row" onclick="navigate('accounts')">
+              <div class="lean-acc-left">
+                <div class="lean-acc-icon">${icon}</div>
+                <div>
+                  <div class="lean-acc-name">${acc.name}</div>
+                  <div class="lean-acc-owner">${acc.user_name ? acc.user_name.split(' ')[0] : 'Geral'}</div>
+                </div>
+              </div>
+              <div class="lean-acc-val" style="color: ${bal < 0 ? '#ef4444' : '#10b981'}; font-weight: 800;">
+                ${fmt.currency(bal)}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+
+      <!-- 5. Lançamentos Recentes do Mês -->
+      <div class="mobile-block-header" style="margin-top: 18px;">
+        <span class="block-title">📋 Lançamentos (${recurringItems.length})</span>
+        <button class="block-link" onclick="navigate('recurring')">Ver Todos →</button>
+      </div>
+
+      <div class="mobile-lean-tx-list">
+        ${recurringItems.length === 0 ? `
+          <div class="empty-tx-box">
+            <span>📑</span>
+            <p>Nenhum lançamento no mês de ${monthShort}.</p>
+            <button class="btn btn-primary btn-sm" onclick="openAvulsoModal('expense')">+ Novo Lançamento</button>
+          </div>
+        ` : recurringItems.slice(0, 8).map(item => {
+          const isPaid = item.is_paid === 1;
+          const isExpense = item.type === 'expense';
+          const amount = item.amount || 0;
+          const cat = State.categories?.find(c => c.id === item.category_id);
+          const catIcon = cat?.icon || (isExpense ? '💸' : '💰');
+
+          return `
+            <div class="lean-tx-item ${isPaid ? 'paid' : 'pending'}" onclick="goToTransaction({ recurringId: ${item.id}, type: '${item.type}', month: ${currentMonth}, year: ${currentYear} })">
+              <div class="lean-tx-left">
+                <div class="lean-tx-icon">${catIcon}</div>
+                <div>
+                  <div class="lean-tx-title">${item.name || item.description || 'Lançamento'}</div>
+                  <div class="lean-tx-sub">
+                    <span>Dia ${item.due_day || 1}</span>
+                    <span>•</span>
+                    <span class="status-tag ${isPaid ? 'tag-paid' : 'tag-pending'}">${isPaid ? '✓ Pago' : '⏳ Aberto'}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="lean-tx-right">
+                <div class="lean-tx-amount" style="color: ${isExpense ? '#ef4444' : '#10b981'}; font-weight: 800;">
+                  ${isExpense ? '-' : '+'}${fmt.currency(amount)}
+                </div>
+                ${!isPaid ? `
+                  <button class="lean-pay-btn" onclick="event.stopPropagation(); openPaymentModal(${item.id})">
+                    Pagar
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+
+    </div>
+  `;
+
+  container.innerHTML = html;
+
+  // Bind dos botões de ação rápida
+  document.getElementById('m-quick-expense')?.addEventListener('click', () => openAvulsoModal('expense'));
+  document.getElementById('m-quick-income')?.addEventListener('click', () => openAvulsoModal('income'));
+  document.getElementById('m-quick-scanner')?.addEventListener('click', () => openNfceScannerModal());
+
+  // Navegação de mês
+  document.getElementById('m-prev-month')?.addEventListener('click', () => {
+    let m = State.currentMonth - 1;
+    let y = State.currentYear;
+    if (m < 1) { m = 12; y--; }
+    State.currentMonth = m;
+    State.currentYear = y;
+    renderMobileAppDashboard(container);
+  });
+
+  document.getElementById('m-next-month')?.addEventListener('click', () => {
+    let m = State.currentMonth + 1;
+    let y = State.currentYear;
+    if (m > 12) { m = 1; y++; }
+    State.currentMonth = m;
+    State.currentYear = y;
+    renderMobileAppDashboard(container);
   });
 }
 
