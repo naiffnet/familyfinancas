@@ -80,6 +80,12 @@ class DbCore {
   }
 
   initialize() {
+    try {
+      const dir = path.dirname(this.dbPath);
+      if (dir && !fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+    } catch (e) {}
     this.db = new Database(this.dbPath);
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('foreign_keys = ON');
