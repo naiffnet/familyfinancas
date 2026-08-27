@@ -85,18 +85,18 @@ module.exports = (Base) => class extends Base {
             )
           `).get(acc.id, currentMonth, currentYear).total;
 
-          // 3. Saldo devedor pré-existente
-          const negativeBalance = acc.balance < 0 ? -acc.balance : 0;
-
-          credit_used = pendingTxTotal + pendingRecurringTotal + negativeBalance;
+          credit_used = pendingTxTotal + pendingRecurringTotal;
         } catch (err) {
-          credit_used = acc.balance < 0 ? -acc.balance : 0;
+          credit_used = 0;
         }
       }
+
+      const available_limit = acc.type === 'credit' ? ((acc.credit_limit || 0) - credit_used) : 0;
 
       return {
         ...acc,
         credit_used,
+        available_limit,
         banricompras_used,
         banricompras_available,
         available_balance

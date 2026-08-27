@@ -1,7 +1,7 @@
 /* ============================================
  * app.bundle.js — FamilyFinancas Renderer
  * Gerado por: npm run build:renderer
- * 2026-08-27T12:18:56.695Z
+ * 2026-08-27T20:32:35.689Z
  * Modulos: 24
  * ============================================ */
 
@@ -13744,13 +13744,20 @@ async function renderMobileAppDashboard(container) {
           </div>
         ` : creditCards.map(card => {
           const limit = card.credit_limit || 0;
-          const invoiceAmount = Math.abs(card.current_invoice || 0);
-          const committed = Math.abs(card.credit_used || card.committed_limit || invoiceAmount);
-          const available = limit > 0 ? (limit - committed) : (card.available_limit || 0);
+          const invoiceAmount = (summary.cardMonthlyInvoices && summary.cardMonthlyInvoices[card.id] !== undefined)
+            ? summary.cardMonthlyInvoices[card.id]
+            : (card.current_invoice || 0);
+
+          const committed = (summary.cardSpending && summary.cardSpending[card.id] !== undefined)
+            ? summary.cardSpending[card.id]
+            : (card.committed_limit || card.credit_used || invoiceAmount);
+
+          const available = limit - committed;
+          const isExceeded = limit > 0 && committed > limit;
           const pctUsed = limit > 0 ? Math.min(100, Math.max(0, Math.round((committed / limit) * 100))) : 0;
           
           let statusColor = '#10b981'; // verde
-          if (pctUsed > 85) statusColor = '#ef4444'; // vermelho
+          if (isExceeded || pctUsed > 85) statusColor = '#ef4444'; // vermelho
           else if (pctUsed > 60) statusColor = '#f59e0b'; // laranja
 
           // Gradiente personalizado por banco
@@ -13779,9 +13786,9 @@ async function renderMobileAppDashboard(container) {
 
               <div class="slider-card-name">${card.name}</div>
 
-              <!-- Destaque do Limite Disponível -->
+              <!-- Destaque do Limite Disponível / Excedido -->
               <div class="slider-limit-highlight">
-                <span class="highlight-label">Limite Disponível</span>
+                <span class="highlight-label">${isExceeded ? '⚠️ Limite Excedido' : 'Limite Disponível'}</span>
                 <span class="highlight-val" style="color: ${available < 0 ? '#ef4444' : '#34d399'};">
                   ${fmt.currency(available)}
                 </span>
@@ -13794,8 +13801,14 @@ async function renderMobileAppDashboard(container) {
                 </div>
                 <div class="slider-bar-legend">
                   <span>Fatura: <strong>${fmt.currency(invoiceAmount)}</strong></span>
-                  <span style="color: ${statusColor}; font-weight: 700;">${pctUsed}% usado</span>
+                  <span style="color: ${statusColor}; font-weight: 700;">${isExceeded ? 'Excedido' : `${pctUsed}% usado`}</span>
                 </div>
+              </div>
+
+              <!-- Valores detalhados de Limite e Comprometido -->
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;color:rgba(255,255,255,0.7);margin-bottom:8px;padding:0 2px;">
+                <span>Limite: ${fmt.currency(limit)}</span>
+                <span>Comprometido: ${fmt.currency(committed)}</span>
               </div>
 
               <!-- Ação Rápida no Cartão -->

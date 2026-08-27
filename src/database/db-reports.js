@@ -108,6 +108,10 @@ module.exports = (Base) => class extends Base {
 
         cardMonthlyInvoices[acc.id] = cycleSpent;
         cardSpending[acc.id] = totalCommitted;
+        acc.current_invoice = cycleSpent;
+        acc.committed_limit = totalCommitted;
+        acc.credit_used = totalCommitted;
+        acc.available_limit = (acc.credit_limit || 0) - totalCommitted;
       } else {
         // 1. Receitas Avulsas do Mês
         const avulsoIncome = this.db.prepare(`
