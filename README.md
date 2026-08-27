@@ -13,7 +13,7 @@
   - [3. Versão Mobile (PWA - Progressive Web App)](#3--versão-mobile-pwa---progressive-web-app)
 - [Sincronização em Rede Local (LAN Multi-Device)](#-sincronização-em-rede-local-lan-multi-device)
 - [Módulos e Regras de Negócio](#-módulos-e-regras-de-negócio)
-- [Diagrama de Arquitetura](#-diagrama-de-arquitetura)
+- [Arquitetura do Sistema](#-arquitetura-do-sistema)
 - [Guia de Instalação e Uso](#-guia-de-instalação-e-uso)
   - [Como Rodar no Desktop](#como-rodar-no-desktop)
   - [Como Acessar e Instalar o PWA no Celular](#como-acessar-e-instalar-o-pwa-no-celular)
@@ -159,46 +159,59 @@ O FinançasFamília resolve o problema do controle compartilhado sem cobrar mens
 
 ---
 
-## 🏗️ Diagrama de Arquitetura
+## 🏗️ Arquitetura do Sistema
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                    1. CAMADA DE APRESENTAÇÃO                                    │
+├───────────────────────────────┬─────────────────────────────────┬───────────────────────────────┤
+│    🖥️ DESKTOP (Electron)      │       📱 MOBILE (PWA / LAN)     │      🌐 WEB (Navegador SPA)   │
+│   • 100% Offline-First        │   • PWA Standalone Instalável   │   • Acesso Universal (PC/Tab) │
+│   • Frameless Dark Theme      │   • One-Handed Mobile UX        │   • Responsivo e Fluido       │
+│   • Diálogos do Windows       │   • Scanner de Câmera (NFC-e)   │   • Downloads em Excel/CSV    │
+└───────────────┬───────────────┴────────────────┬────────────────┴───────────────┬───────────────┘
+                │                                │                                │
+                │ (IPC Direto)                   │ (HTTP JSON-RPC)                │ (HTTP JSON-RPC)
+                ▼                                ▼                                ▼
+┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                 2. TRANSPORTE & SEGURANÇA                                       │
+│   • Electron IPC (ipcRenderer.invoke)         • Express LAN Server (POST /api/rpc)              │
+│   • Tokens de Sessão SHA-256                  • Helmet Security & CORS Guard                    │
+│   • Rate Limiter & Mitigação Brute-Force      • Ownership & Permission Verification             │
+└───────────────────────────────────────────────┬─────────────────────────────────────────────────┘
+                                                │
+                                                ▼
+┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                              3. NÚCLEO DE REGRAS DE NEGÓCIO                                     │
+│                           (82 Canais RPC Mapeados 1:1 no Core)                                  │
+├───────────────────┬───────────────────┬───────────────────┬───────────────────┬─────────────────┤
+│  Autenticação/LGPD│  Contas & Limites │   Planejamento    │  Faturas/Rotativo │    Relatórios   │
+│  db-family-users  │    db-accounts    │   db-recurring    │  db-card-invoices │    db-reports   │
+└───────────────────┴───────────────────┴─────────┬─────────┴───────────────────┴─────────────────┘
+                                                  │
+                                                  ▼
+┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                 4. PERSISTÊNCIA & BANCO DE DADOS                                │
+│                                 Engine SQLite (better-sqlite3)                                  │
+│   • Arquivo Central: AppData/Roaming/financeiro-familiar/financeiro.db                          │
+│   • Modo WAL (PRAGMA journal_mode = WAL): Leitura e gravação simultânea sem bloqueios           │
+│   • Integridade (PRAGMA foreign_keys = ON): Integridade relacional estrita                      │
+│   • Backup Diário Automático: Rotina automática de backup na inicialização                      │
+└─────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 📐 Fluxograma de Comunicação e Dados
 
 ```mermaid
-graph TD
-    subgraph ClientLayer ["Camada de Apresentação"]
-        DesktopApp["🖥️ Desktop (Electron Native)\n- Offline First\n- Windows Dialogs"]
-        MobilePWA["📱 Mobile PWA (Smartphones)\n- Standalone PWA\n- One-Handed UX\n- Camera Scanner"]
-        WebBrowser["🌐 Web Browser (PC/Tablet)\n- Chrome, Edge, Safari\n- Responsive SPA"]
-    end
+flowchart TD
+    Desktop["🖥️ Desktop (Electron Native)"] -->|IPC Invoke| Router["Core RPC Router (82 Canais)"]
+    Mobile["📱 Mobile PWA (Smartphones)"] -->|POST /api/rpc| Router
+    Web["🌐 Web Browser (Navegadores)"] -->|POST /api/rpc| Router
 
-    subgraph TransportLayer ["Camada de Transporte & Segurança"]
-        IPC["Electron IPC Bridge\n(ipcRenderer.invoke)"]
-        RPC_HTTP["JSON-RPC Bridge\n(POST /api/rpc)\n- Helmet & CORS\n- Rate Limiting\n- Bearer Tokens"]
-    end
-
-    subgraph CoreLayer ["Camada de Regras de Negócio (Node.js)"]
-        CoreRouter["Core Handlers (82 Canais RPC)\n- Ownership & Permission Guards\n- Brute Force Lock Database"]
-        
-        subgraph DomainModules ["Módulos de Domínio"]
-            ModAuth["db-family-users.js\n(Auth & LGPD)"]
-            ModAccounts["db-accounts.js\n(Contas & Limites)"]
-            ModRecurring["db-recurring.js\n(Planejamento)"]
-            ModTxs["db-transactions.js\n(Lançamentos)"]
-            ModInvoices["db-card-invoices.js\n(Faturas & Rotativo)"]
-            ModReports["db-reports.js\n(Dashboard & Fluxo)"]
-            ModSync["db-sync-dedup.js\n(Deduplicação)"]
-        end
-    end
-
-    subgraph DataLayer ["Camada de Persistência"]
-        SQLiteEngine["🗄️ SQLite Engine (better-sqlite3)\n- PRAGMA journal_mode = WAL\n- PRAGMA foreign_keys = ON\n- Auto Daily Backups"]
-        DBFile[("financeiro.db")]
-    end
-
-    DesktopApp --> IPC --> CoreRouter
-    MobilePWA --> RPC_HTTP --> CoreRouter
-    WebBrowser --> RPC_HTTP --> CoreRouter
-
-    CoreRouter --> DomainModules
-    DomainModules --> SQLiteEngine --> DBFile
+    Router --> Security["🛡️ Security & Permissions Guard"]
+    Security --> DomainMixins["📦 Módulos de Domínio (Contas, Faturas, Lançamentos, Metas)"]
+    DomainMixins --> SQLite["🗄️ SQLite Engine (better-sqlite3 em modo WAL)"]
+    SQLite --> DBFile[("financeiro.db")]
 ```
 
 ---
