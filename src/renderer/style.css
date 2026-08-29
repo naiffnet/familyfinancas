@@ -5458,12 +5458,23 @@ body.cacula-layout .main-content {
 
   /* Agrupamento por data na lista */
   .tx-group-header {
-    font-size: 10px;
+    font-size: 10.5px;
     font-weight: 800;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    padding: 8px 2px 4px;
+    padding: 12px 2px 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .tx-group-header::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+    opacity: 0.5;
   }
 
   /* ══════════════════════════════════════════

@@ -1,7 +1,7 @@
 /* ============================================
  * app.bundle.js — FamilyFinancas Renderer
  * Gerado por: npm run build:renderer
- * 2026-08-29T12:37:16.406Z
+ * 2026-08-29T12:54:53.965Z
  * Modulos: 25
  * ============================================ */
 
@@ -13941,8 +13941,13 @@ async function renderMobileAppDashboard(container) {
   if (!container) container = document.getElementById('page-dashboard');
   if (!container) return;
 
-  const currentMonth = State.currentMonth || (new Date().getMonth() + 1);
-  const currentYear  = State.currentYear  || new Date().getFullYear();
+  const now        = new Date();
+  const todayDay   = now.getDate();
+  const todayMonth = now.getMonth() + 1;
+  const todayYear  = now.getFullYear();
+
+  const currentMonth = State.currentMonth || todayMonth;
+  const currentYear  = State.currentYear  || todayYear;
   const userId       = State.user?.id || 1;
 
   // Skeleton enquanto carrega
@@ -13981,30 +13986,58 @@ async function renderMobileAppDashboard(container) {
   const monthShort  = `${monthNames[currentMonth]} ${currentYear}`;
 
   // ── Helper: data relativa ─────────────────────────────────
-  function relativeDay(dueDay) {
-    const today  = new Date();
-    const target = new Date(currentYear, currentMonth - 1, dueDay);
-    const diff   = Math.round((target - new Date(today.getFullYear(), today.getMonth(), today.getDate())) / 86400000);
+  function relativeDay(dueDay, curM = currentMonth, curY = currentYear) {
+    const dNow   = new Date();
+    const tDay   = dNow.getDate();
+    const tMonth = dNow.getMonth() + 1;
+    const tYear  = dNow.getFullYear();
+
+    if (curY === tYear && curM === tMonth) {
+      const diff = dueDay - tDay;
+      if (diff === 0) return 'Hoje';
+      if (diff === 1) return 'Amanhã';
+      if (diff === -1) return 'Ontem';
+    }
+    const target = new Date(curY, curM - 1, dueDay);
     const dayNames = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-    if (diff === 0) return 'Hoje';
-    if (diff === 1) return 'Amanhã';
-    if (diff === -1) return 'Ontem';
     return `${dayNames[target.getDay()]}, ${dueDay}`;
   }
 
-  // ── Separar transações em grupos ─────────────────────────
-  const today      = new Date();
-  const todayDay   = today.getDate();
-  const todayMonth = today.getMonth() + 1;
-  const todayYear  = today.getFullYear();
+  // ── Separar transações em grupos ordenados cronologicamente ─
+  function getGroupInfo(dueDay, curM = currentMonth, curY = currentYear) {
+    const dNow   = new Date();
+    const tDay   = dNow.getDate();
+    const tMonth = dNow.getMonth() + 1;
+    const tYear  = dNow.getFullYear();
 
-  function getGroup(dueDay) {
-    if (currentYear === todayYear && currentMonth === todayMonth) {
-      if (dueDay === todayDay)    return 'Hoje';
-      if (dueDay === todayDay - 1) return 'Ontem';
-      if (dueDay >= todayDay - 7)  return 'Esta Semana';
+    // Mês atual
+    if (curY === tYear && curM === tMonth) {
+      if (dueDay < tDay) {
+        return { name: 'Passou', icon: '⏳', order: 1 };
+      }
+      if (dueDay === tDay) {
+        return { name: 'Hoje', icon: '📌', order: 2 };
+      }
+      if (dueDay <= tDay + 6) {
+        return { name: 'Esta Semana', icon: '📅', order: 3 };
+      }
+      return { name: 'Este Mês', icon: '🗓️', order: 4 };
     }
-    return 'Este Mês';
+
+    // Próximo mês
+    const isNextMonth = (curY === tYear && curM === tMonth + 1) ||
+                        (curY === tYear + 1 && curM === 1 && tMonth === 12);
+    if (isNextMonth) {
+      return { name: 'Próximo Mês', icon: '🔮', order: 5 };
+    }
+
+    // Mês anterior (passado)
+    if ((curY < tYear) || (curY === tYear && curM < tMonth)) {
+      return { name: 'Passou', icon: '⏳', order: 1 };
+    }
+
+    // Meses futuros distantes (não exibir na home)
+    return { name: 'Meses Futuros', icon: '📆', order: 6, skip: true };
   }
 
   // ── HTML do carrossel de cartões ─────────────────────────
@@ -14094,7 +14127,7 @@ async function renderMobileAppDashboard(container) {
     return cardsHtml + dotsHtml;
   }
 
-  // ── HTML das transações com swipe ────────────────────────
+  // ── HTML das transações com swipe (ordenadas cronologicamente) ──
   function renderTxList() {
     if (recurringItems.length === 0) {
       return `<div class="empty-tx-box">
@@ -14104,23 +14137,37 @@ async function renderMobileAppDashboard(container) {
       </div>`;
     }
 
-    const items  = recurringItems.slice(0, 15);
-    let lastGroup = null;
+    // 1. Ordenação cronológica rigorosa (dias passados primeiro: 1, 2... até dias futuros)
+    const sortedItems = [...recurringItems].sort((a, b) => {
+      const dayA = a.due_day || (a.date ? parseInt(a.date.split('-')[2]) : 1);
+      const dayB = b.due_day || (b.date ? parseInt(b.date.split('-')[2]) : 1);
+      return dayA - dayB;
+    });
+
+    // 2. Filtrar itens válidos (ignora meses futuros distantes) e limitar
+    const filteredItems = sortedItems.filter(item => {
+      const group = getGroupInfo(item.due_day || 1);
+      return !group.skip;
+    });
+
+    const items = filteredItems.slice(0, 20);
+    let lastGroupName = null;
     let html = '';
 
     for (const item of items) {
-      const group    = getGroup(item.due_day || 1);
+      const dueDay   = item.due_day || 1;
+      const group    = getGroupInfo(dueDay);
       const isPaid   = item.is_paid === 1;
       const isExpense = item.type === 'expense';
       const amount   = item.amount || 0;
       const cat      = State.categories?.find(c => c.id === item.category_id);
       const catIcon  = cat?.icon || (isExpense ? '💸' : '💰');
-      const relDay   = relativeDay(item.due_day || 1);
+      const relDay   = relativeDay(dueDay);
 
-      // Cabeçalho de grupo
-      if (group !== lastGroup) {
-        html += `<div class="tx-group-header">${group}</div>`;
-        lastGroup = group;
+      // Cabeçalho de grupo cronológico
+      if (group.name !== lastGroupName) {
+        html += `<div class="tx-group-header"><span>${group.icon} ${group.name}</span></div>`;
+        lastGroupName = group.name;
       }
 
       // Conta vinculada
@@ -14162,7 +14209,7 @@ async function renderMobileAppDashboard(container) {
       `;
     }
 
-    if (recurringItems.length > 15) {
+    if (recurringItems.length > 20) {
       html += `
         <button class="block-link" style="width:100%;padding:10px;text-align:center;font-size:12px;"
           onclick="navigate('recurring')">
