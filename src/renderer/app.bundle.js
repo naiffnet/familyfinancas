@@ -1,7 +1,7 @@
 /* ============================================
  * app.bundle.js — FamilyFinancas Renderer
  * Gerado por: npm run build:renderer
- * 2026-08-29T12:22:46.019Z
+ * 2026-08-29T12:37:16.406Z
  * Modulos: 25
  * ============================================ */
 
@@ -14241,21 +14241,25 @@ async function renderMobileAppDashboard(container) {
         ${renderCreditCardSlider()}
       </div>
 
-      <!-- 4. Contas & Saldos -->
-      <div class="mobile-block-header" style="margin-top:14px;">
-        <span class="block-title">🏦 Contas & Saldos</span>
-        <button class="block-link" onclick="navigate('accounts')">Gerenciar →</button>
+      <!-- 4. Contas & Saldos (Colapsável) -->
+      <div class="mobile-block-header accounts-toggle-header" id="m-accounts-toggle-header" style="margin-top:14px; cursor:pointer;" onclick="toggleMobileAccountsList()">
+        <div class="block-title-wrap">
+          <span class="block-title">🏦 Contas & Saldos</span>
+          <span class="accounts-chevron" id="m-accounts-chevron">${localStorage.getItem('mobile_accounts_expanded') === 'true' ? '▾' : '▸'}</span>
+          <span class="accounts-summary-badge" id="m-accounts-summary-badge">${fmt.currency(bankAccounts.reduce((acc, a) => acc + (a.balance || 0), 0))}</span>
+        </div>
+        <button class="block-link" onclick="event.stopPropagation(); navigate('accounts')">Gerenciar →</button>
       </div>
-      <div class="mobile-lean-accounts">
+      <div class="mobile-lean-accounts ${localStorage.getItem('mobile_accounts_expanded') === 'true' ? '' : 'collapsed'}" id="m-lean-accounts">
         ${bankAccounts.length === 0
-          ? `<p style="font-size:12px;color:var(--text-muted);text-align:center;">Nenhuma conta cadastrada.</p>`
+          ? `<p style="font-size:12px;color:var(--text-muted);text-align:center;padding:10px 0;">Nenhuma conta cadastrada.</p>`
           : bankAccounts.map(acc => {
               const bal  = acc.balance || 0;
               let icon   = '🏦';
               if (acc.type === 'wallet')  icon = '💵';
               else if (acc.type === 'savings') icon = '🐖';
               return `
-                <div class="lean-acc-row" onclick="navigate('accounts')">
+                <div class="lean-acc-row">
                   <div class="lean-acc-left">
                     <div class="lean-acc-icon">${icon}</div>
                     <div>
@@ -14401,6 +14405,28 @@ function openMobileQuickEntry(type = 'expense', accountId = null) {
     MobileQuickEntry.open(type, accountId);
   } else {
     openAvulsoModal(type, null, null, type, accountId ? { accountId } : null);
+  }
+}
+
+/**
+ * Alterna a visualização da lista de Contas & Saldos no Dashboard Mobile
+ */
+function toggleMobileAccountsList() {
+  const container = document.getElementById('m-lean-accounts');
+  const chevron   = document.getElementById('m-accounts-chevron');
+  if (!container) return;
+
+  const isCollapsed = container.classList.contains('collapsed');
+  if (isCollapsed) {
+    container.classList.remove('collapsed');
+    if (chevron) chevron.textContent = '▾';
+    localStorage.setItem('mobile_accounts_expanded', 'true');
+    if (navigator.vibrate) navigator.vibrate(15);
+  } else {
+    container.classList.add('collapsed');
+    if (chevron) chevron.textContent = '▸';
+    localStorage.setItem('mobile_accounts_expanded', 'false');
+    if (navigator.vibrate) navigator.vibrate(10);
   }
 }
 

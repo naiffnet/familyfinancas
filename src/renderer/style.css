@@ -4744,11 +4744,53 @@ body.cacula-layout .main-content {
     min-height: 30px !important;
   }
 
-  /* Lean Accounts List */
+  /* Lean Accounts List (Colapsável) */
+  .accounts-toggle-header {
+    user-select: none;
+    padding: 6px 4px;
+    border-radius: 10px;
+    transition: background 0.15s ease;
+  }
+
+  .accounts-toggle-header:active {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .accounts-chevron {
+    font-size: 13px;
+    color: var(--accent, #10b981);
+    font-weight: 900;
+    transition: transform 0.2s ease;
+    margin-left: 2px;
+  }
+
+  .accounts-summary-badge {
+    font-size: 10.5px;
+    font-weight: 800;
+    color: var(--text-muted);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2px 7px;
+    margin-left: 4px;
+  }
+
   .mobile-lean-accounts {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    overflow: hidden;
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease, margin 0.25s ease;
+    max-height: 1200px;
+    opacity: 1;
+  }
+
+  .mobile-lean-accounts.collapsed {
+    max-height: 0 !important;
+    opacity: 0 !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    pointer-events: none !important;
   }
 
   .lean-acc-row {
@@ -4759,11 +4801,11 @@ body.cacula-layout .main-content {
     background: var(--bg-surface);
     border: 1px solid var(--border);
     border-radius: 12px;
-    cursor: pointer;
+    cursor: default;
   }
 
   .lean-acc-row:active {
-    background: rgba(255,255,255,0.04);
+    background: rgba(255,255,255,0.03);
   }
 
   .lean-acc-left {
