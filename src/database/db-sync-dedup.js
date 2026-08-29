@@ -533,6 +533,181 @@ module.exports = (Base) => class extends Base {
         }
       }
 
+      // 1.2 Processar itens recorrentes (contas fixas)
+      if (changes.recurring && Array.isArray(changes.recurring)) {
+        for (const rec of changes.recurring) {
+          const syncId = rec.sync_id || crypto.randomUUID();
+          const targetUserId = rec.user_id || userId;
+          const existing = this.db.prepare('SELECT id, updated_at FROM recurring_items WHERE sync_id = ?').get(syncId);
+
+          if (existing) {
+            if (!rec.updated_at || rec.updated_at >= existing.updated_at) {
+              this.db.prepare(`
+                UPDATE recurring_items SET
+                  user_id = @user_id, name = @name, type = @type, amount = @amount,
+                  category_id = @category_id, account_id = @account_id, due_day = @due_day,
+                  is_active = @is_active, is_priority = @is_priority, icon = @icon,
+                  color = @color, notes = @notes, is_deleted = @is_deleted, updated_at = @updated_at
+                WHERE id = @id
+              `).run({
+                id: existing.id,
+                user_id: targetUserId,
+                name: rec.name || 'Conta Fixa',
+                type: rec.type || 'expense',
+                amount: Math.abs(Number(rec.amount) || 0),
+                category_id: rec.category_id || null,
+                account_id: rec.account_id || null,
+                due_day: rec.due_day || 1,
+                is_active: rec.is_active !== undefined ? rec.is_active : 1,
+                is_priority: rec.is_priority || 0,
+                icon: rec.icon || '📋',
+                color: rec.color || '#10b981',
+                notes: rec.notes || null,
+                is_deleted: rec.is_deleted ? 1 : 0,
+                updated_at: rec.updated_at || serverTimestamp
+              });
+              result.applied.recurring++;
+            }
+          } else {
+            this.db.prepare(`
+              INSERT INTO recurring_items (
+                sync_id, user_id, name, type, amount, category_id, account_id,
+                due_day, is_active, is_priority, icon, color, notes, is_deleted, updated_at
+              ) VALUES (
+                @sync_id, @user_id, @name, @type, @amount, @category_id, @account_id,
+                @due_day, @is_active, @is_priority, @icon, @color, @notes, @is_deleted, @updated_at
+              )
+            `).run({
+              sync_id: syncId,
+              user_id: targetUserId,
+              name: rec.name || 'Conta Fixa',
+              type: rec.type || 'expense',
+              amount: Math.abs(Number(rec.amount) || 0),
+              category_id: rec.category_id || null,
+              account_id: rec.account_id || null,
+              due_day: rec.due_day || 1,
+              is_active: rec.is_active !== undefined ? rec.is_active : 1,
+              is_priority: rec.is_priority || 0,
+              icon: rec.icon || '📋',
+              color: rec.color || '#10b981',
+              notes: rec.notes || null,
+              is_deleted: rec.is_deleted ? 1 : 0,
+              updated_at: rec.updated_at || serverTimestamp
+            });
+            result.applied.recurring++;
+          }
+        }
+      }
+
+      // 1.3 Processar contas bancárias
+      if (changes.accounts && Array.isArray(changes.accounts)) {
+        for (const acc of changes.accounts) {
+          const syncId = acc.sync_id || crypto.randomUUID();
+          const targetUserId = acc.user_id || userId;
+          const existing = this.db.prepare('SELECT id, updated_at FROM accounts WHERE sync_id = ?').get(syncId);
+
+          if (existing) {
+            if (!acc.updated_at || acc.updated_at >= existing.updated_at) {
+              this.db.prepare(`
+                UPDATE accounts SET
+                  user_id = @user_id, name = @name, type = @type, bank = @bank,
+                  balance = @balance, color = @color, credit_limit = @credit_limit,
+                  closing_day = @closing_day, due_day = @due_day, is_active = @is_active,
+                  is_deleted = @is_deleted, updated_at = @updated_at
+                WHERE id = @id
+              `).run({
+                id: existing.id,
+                user_id: targetUserId,
+                name: acc.name,
+                type: acc.type || 'checking',
+                bank: acc.bank || 'outro',
+                balance: Number(acc.balance) || 0,
+                color: acc.color || '#10b981',
+                credit_limit: acc.credit_limit || null,
+                closing_day: acc.closing_day || null,
+                due_day: acc.due_day || null,
+                is_active: acc.is_active !== undefined ? acc.is_active : 1,
+                is_deleted: acc.is_deleted ? 1 : 0,
+                updated_at: acc.updated_at || serverTimestamp
+              });
+              result.applied.accounts++;
+            }
+          } else {
+            this.db.prepare(`
+              INSERT INTO accounts (
+                sync_id, user_id, name, type, bank, balance, color,
+                credit_limit, closing_day, due_day, is_active, is_deleted, updated_at
+              ) VALUES (
+                @sync_id, @user_id, @name, @type, @bank, @balance, @color,
+                @credit_limit, @closing_day, @due_day, @is_active, @is_deleted, @updated_at
+              )
+            `).run({
+              sync_id: syncId,
+              user_id: targetUserId,
+              name: acc.name,
+              type: acc.type || 'checking',
+              bank: acc.bank || 'outro',
+              balance: Number(acc.balance) || 0,
+              color: acc.color || '#10b981',
+              credit_limit: acc.credit_limit || null,
+              closing_day: acc.closing_day || null,
+              due_day: acc.due_day || null,
+              is_active: acc.is_active !== undefined ? acc.is_active : 1,
+              is_deleted: acc.is_deleted ? 1 : 0,
+              updated_at: acc.updated_at || serverTimestamp
+            });
+            result.applied.accounts++;
+          }
+        }
+      }
+
+      // 1.4 Processar categorias
+      if (changes.categories && Array.isArray(changes.categories)) {
+        for (const cat of changes.categories) {
+          const syncId = cat.sync_id || crypto.randomUUID();
+          const targetUserId = cat.user_id || userId;
+          const existing = this.db.prepare('SELECT id, updated_at FROM categories WHERE sync_id = ?').get(syncId);
+
+          if (existing) {
+            if (!cat.updated_at || cat.updated_at >= existing.updated_at) {
+              this.db.prepare(`
+                UPDATE categories SET
+                  name = @name, icon = @icon, color = @color, type = @type,
+                  is_deleted = @is_deleted, updated_at = @updated_at
+                WHERE id = @id
+              `).run({
+                id: existing.id,
+                name: cat.name,
+                icon: cat.icon || '📌',
+                color: cat.color || '#10b981',
+                type: cat.type || 'both',
+                is_deleted: cat.is_deleted ? 1 : 0,
+                updated_at: cat.updated_at || serverTimestamp
+              });
+              result.applied.categories++;
+            }
+          } else {
+            this.db.prepare(`
+              INSERT INTO categories (
+                sync_id, user_id, name, icon, color, type, is_deleted, updated_at
+              ) VALUES (
+                @sync_id, @user_id, @name, @icon, @color, @type, @is_deleted, @updated_at
+              )
+            `).run({
+              sync_id: syncId,
+              user_id: targetUserId,
+              name: cat.name,
+              icon: cat.icon || '📌',
+              color: cat.color || '#10b981',
+              type: cat.type || 'both',
+              is_deleted: cat.is_deleted ? 1 : 0,
+              updated_at: cat.updated_at || serverTimestamp
+            });
+            result.applied.categories++;
+          }
+        }
+      }
+
       // 2. Coletar alterações do servidor ocorridas após clientSyncTimestamp
       const sinceTime = clientSyncTimestamp || '1970-01-01T00:00:00.000Z';
       result.serverChanges.transactions = this.db.prepare(`
@@ -563,4 +738,37 @@ module.exports = (Base) => class extends Base {
     processSync();
     return result;
   }
+
+  /**
+   * Retorna apenas se há alterações na nuvem de forma super leve (< 100 bytes)
+   */
+  getSyncStatus({ familyId, clientSyncTimestamp }) {
+    const sinceTime = clientSyncTimestamp || '1970-01-01T00:00:00.000Z';
+
+    const txCount = this.db.prepare(`
+      SELECT count(*) as c FROM transactions t
+      JOIN users u ON t.user_id = u.id
+      WHERE u.family_id = ? AND t.updated_at > ?
+    `).get(familyId, sinceTime)?.c || 0;
+
+    const recCount = this.db.prepare(`
+      SELECT count(*) as c FROM recurring_items r
+      JOIN users u ON r.user_id = u.id
+      WHERE u.family_id = ? AND r.updated_at > ?
+    `).get(familyId, sinceTime)?.c || 0;
+
+    const accCount = this.db.prepare(`
+      SELECT count(*) as c FROM accounts a
+      JOIN users u ON a.user_id = u.id
+      WHERE u.family_id = ? AND a.updated_at > ?
+    `).get(familyId, sinceTime)?.c || 0;
+
+    const totalChanges = txCount + recCount + accCount;
+    return {
+      hasChanges: totalChanges > 0,
+      totalChanges,
+      serverTime: new Date().toISOString()
+    };
+  }
 };
+

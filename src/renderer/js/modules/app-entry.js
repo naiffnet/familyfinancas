@@ -25,4 +25,5 @@ import './admin.js';
 import './mobile-shell.js';
 import './mobile-quick-entry.js';
 import './mobile-dashboard.js';
+import './cloud-sync-service.js';
 import './app-init.js';

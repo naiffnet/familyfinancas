@@ -467,9 +467,31 @@ async function openSettingsModal(activeTab = 'profile') {
         <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid var(--border); padding-bottom: 10px;">
           💾 Gestão de Backups & Exportação de Dados
         </h3>
-        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
-          Exporte ou restaure suas informações financeiras em múltiplos formatos seguros e compatíveis com planilhas e sistemas externos:
-        </p>
+        <!-- CARD 0: SINCRONIZAÇÃO EM NUVEM (FLY.IO) -->
+        <div style="margin-bottom: 20px; padding: 18px; border-radius: var(--radius-md); border: 1px solid var(--accent); background: linear-gradient(135deg, rgba(16,185,129,0.06) 0%, rgba(59,130,246,0.04) 100%); display: flex; flex-direction: column; gap: 12px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 20px;">☁️</span>
+              <div>
+                <div style="font-weight: 800; font-size: 14.5px; color: var(--text-primary);">Sincronização em Nuvem (Fly.io)</div>
+                <div style="font-size: 11.5px; color: var(--text-muted);">Sincronização delta inteligente • Prioridade por registro mais recente (Last-Write-Wins)</div>
+              </div>
+            </div>
+            <span id="cloud-sync-status-badge" class="badge badge-success" style="font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.3);">
+              ${navigator.onLine ? '🟢 Nuvem Sincronizada' : '🟡 Modo Offline'}
+            </span>
+          </div>
+
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; border-top: 1px solid rgba(255,255,255,0.07); padding-top: 10px;">
+            <div style="font-size: 12px; color: var(--text-muted);">
+              <span>Última sincronização: </span>
+              <strong id="cloud-sync-last-time" style="color: var(--text-primary);">${localStorage.getItem('ff_last_cloud_sync_timestamp') ? new Date(localStorage.getItem('ff_last_cloud_sync_timestamp')).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Nunca'}</strong>
+            </div>
+            <button class="btn btn-primary btn-sm" id="btn-cloud-sync-now" style="font-size: 12px; font-weight: 800; padding: 6px 14px;">
+              🔄 Sincronizar com a Nuvem
+            </button>
+          </div>
+        </div>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px;">
           

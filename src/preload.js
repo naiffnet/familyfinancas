@@ -123,6 +123,7 @@ contextBridge.exposeInMainWorld('api', {
     importBatch: (d) => ipcRenderer.invoke('importer:importBatch', d),
   },
   sync: {
+    getStatus: (d) => ipcRenderer.invoke('sync:getStatus', d),
     pushPull: (d) => ipcRenderer.invoke('sync:pushPull', d),
     findDuplicates: (d) => ipcRenderer.invoke('sync:findDuplicates', d),
     checkCandidate: (d) => ipcRenderer.invoke('sync:checkCandidate', d),

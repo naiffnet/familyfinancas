@@ -257,8 +257,12 @@ function initThemeSwitcher() {
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initThemeSwitcher);
+  document.addEventListener('DOMContentLoaded', () => {
+    initThemeSwitcher();
+    if (typeof CloudSyncService !== 'undefined') CloudSyncService.init();
+  });
 } else {
   initThemeSwitcher();
+  if (typeof CloudSyncService !== 'undefined') CloudSyncService.init();
 }
 

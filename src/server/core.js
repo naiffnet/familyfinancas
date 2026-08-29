@@ -163,6 +163,7 @@ function createOwnershipChecks(db) {
     'importer:parseOfx': (session) => true,
     'importer:parseCsv': (session) => true,
     'importer:importBatch': (session, d) => isSameFamilyUser(db, d.userId, session.familyId),
+    'sync:getStatus': (session, d) => session.familyId === d.familyId || isSameFamilyUser(db, d.userId, session.familyId),
     'sync:pushPull': (session, d) => isSameFamilyUser(db, d.userId, session.familyId),
     'sync:findDuplicates': (session, d) => session.familyId === d.familyId || isSameFamilyUser(db, d.userId, session.familyId),
     'sync:checkCandidate': (session, d) => session.familyId === d.familyId || isSameFamilyUser(db, d.userId, session.familyId),
@@ -514,6 +515,7 @@ function buildHandlers(db) {
       }
     },
 
+    'sync:getStatus': (d) => db.getSyncStatus(d),
     'sync:pushPull': (d) => db.syncPushPull(d),
     'sync:findDuplicates': (d) => db.findPotentialDuplicates(d),
     'sync:checkCandidate': (d) => db.checkDuplicateCandidate(d),

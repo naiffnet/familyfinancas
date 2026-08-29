@@ -178,6 +178,7 @@ if (!window.api) {
       importBatch: (d) => makeRpcCall('importer:importBatch', d),
     },
     sync: {
+      getStatus: (d) => makeRpcCall('sync:getStatus', d),
       pushPull: (d) => makeRpcCall('sync:pushPull', d),
       findDuplicates: (d) => makeRpcCall('sync:findDuplicates', d),
       checkCandidate: (d) => makeRpcCall('sync:checkCandidate', d),

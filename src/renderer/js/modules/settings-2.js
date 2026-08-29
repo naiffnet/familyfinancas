@@ -187,6 +187,14 @@ function bindBackupTabEvents(capitalizedMonth) {
     URL.revokeObjectURL(url);
   };
 
+  if (document.getElementById('btn-cloud-sync-now')) {
+    document.getElementById('btn-cloud-sync-now').onclick = async () => {
+      if (typeof CloudSyncService !== 'undefined') {
+        await CloudSyncService.sync({ force: true });
+      }
+    };
+  }
+
   if (document.getElementById('btn-backup')) {
     document.getElementById('btn-backup').onclick = async () => {
       try {

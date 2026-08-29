@@ -267,6 +267,44 @@ class DbCore {
       console.warn("Aviso ao criar índices e tabela de auditoria SQLite:", e);
     }
 
+    // 4.10. Smart Cloud Sync Support Columns (sync_id, updated_at, is_deleted)
+    try {
+      this.db.exec(`
+        ALTER TABLE transactions ADD COLUMN sync_id TEXT;
+      `);
+    } catch (e) {}
+    try { this.db.exec("ALTER TABLE transactions ADD COLUMN updated_at TEXT;"); } catch (e) {}
+    try { this.db.exec("ALTER TABLE transactions ADD COLUMN is_deleted INTEGER DEFAULT 0;"); } catch (e) {}
+    try { this.db.exec("CREATE INDEX IF NOT EXISTS idx_transactions_sync_id ON transactions(sync_id);"); } catch (e) {}
+    try { this.db.exec("CREATE INDEX IF NOT EXISTS idx_transactions_updated_at ON transactions(updated_at);"); } catch (e) {}
+
+    try { this.db.exec("ALTER TABLE recurring_items ADD COLUMN sync_id TEXT;"); } catch (e) {}
+    try { this.db.exec("ALTER TABLE recurring_items ADD COLUMN updated_at TEXT;"); } catch (e) {}
+    try { this.db.exec("ALTER TABLE recurring_items ADD COLUMN is_deleted INTEGER DEFAULT 0;"); } catch (e) {}
+    try { this.db.exec("CREATE INDEX IF NOT EXISTS idx_recurring_sync_id ON recurring_items(sync_id);"); } catch (e) {}
+
+    try { this.db.exec("ALTER TABLE accounts ADD COLUMN sync_id TEXT;"); } catch (e) {}
+    try { this.db.exec("ALTER TABLE accounts ADD COLUMN updated_at TEXT;"); } catch (e) {}
+    try { this.db.exec("ALTER TABLE accounts ADD COLUMN is_deleted INTEGER DEFAULT 0;"); } catch (e) {}
+
+    try { this.db.exec("ALTER TABLE categories ADD COLUMN sync_id TEXT;"); } catch (e) {}
+    try { this.db.exec("ALTER TABLE categories ADD COLUMN updated_at TEXT;"); } catch (e) {}
+    try { this.db.exec("ALTER TABLE categories ADD COLUMN is_deleted INTEGER DEFAULT 0;"); } catch (e) {}
+
+    // Backfill updated_at and sync_id for existing rows if empty
+    try {
+      this.db.exec(`
+        UPDATE transactions SET updated_at = created_at WHERE updated_at IS NULL;
+        UPDATE transactions SET is_deleted = 0 WHERE is_deleted IS NULL;
+        UPDATE recurring_items SET updated_at = created_at WHERE updated_at IS NULL;
+        UPDATE recurring_items SET is_deleted = 0 WHERE is_deleted IS NULL;
+        UPDATE accounts SET updated_at = created_at WHERE updated_at IS NULL;
+        UPDATE accounts SET is_deleted = 0 WHERE is_deleted IS NULL;
+        UPDATE categories SET updated_at = created_at WHERE updated_at IS NULL;
+        UPDATE categories SET is_deleted = 0 WHERE is_deleted IS NULL;
+      `);
+    } catch (e) {}
+
     // 5. Migrate accounts CHECK constraint to include 'voucher'
     try {
       const accountSchema = this.db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='accounts'").get();
