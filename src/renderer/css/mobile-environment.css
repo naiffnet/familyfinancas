@@ -149,29 +149,11 @@
     transform: translateY(-2px) scale(1.08);
   }
 
-  /* 5. Floating Action Button (FAB) */
-  .mobile-quick-fab {
-    display: flex !important;
-    position: fixed !important;
-    bottom: calc(var(--mobile-nav-height) + var(--safe-bottom) + 12px) !important;
-    right: 14px !important;
-    width: 48px !important;
-    height: 48px !important;
-    border-radius: 50% !important;
-    background: linear-gradient(135deg, var(--accent, #10b981) 0%, #059669 100%) !important;
-    color: #ffffff !important;
-    border: none !important;
-    box-shadow: 0 6px 18px rgba(16, 185, 129, 0.4) !important;
-    align-items: center !important;
-    justify-content: center !important;
-    font-size: 22px !important;
-    cursor: pointer !important;
-    z-index: 9980 !important;
-    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  }
-
-  .mobile-quick-fab:active {
-    transform: scale(0.9) !important;
+  /* 5. Floating Action Button (FAB) - Substituído pela Bottom Action Bar moderna */
+  .mobile-quick-fab,
+  .mobile-fab-menu,
+  .mobile-fab-backdrop {
+    display: none !important;
   }
 
   .mobile-fab-menu {
