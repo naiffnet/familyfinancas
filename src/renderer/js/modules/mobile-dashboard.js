@@ -364,7 +364,7 @@ async function renderMobileAppDashboard(container) {
         <span>Receita</span>
       </button>
       <button class="action-bar-btn action-bar-scanner" id="m-ab-scanner" aria-label="Escanear Cupom">
-        📷
+        <span class="action-bar-scanner-icon">📷</span>
       </button>
     </div>
   `;
