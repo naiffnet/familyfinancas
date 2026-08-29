@@ -12,6 +12,7 @@
     "start:server:local": "electron server.js",
     "build:renderer": "node scripts/concat-modules.js",
     "watch:renderer": "node scripts/concat-modules.js --watch",
+    "dist:win": "node scripts/concat-modules.js && npx electron-builder --win --x64",
     "test": "electron scripts/run-tests.js"
   },
   "engines": {
@@ -20,6 +21,40 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "build": {
+    "appId": "com.financasfamilia.app",
+    "productName": "FinançasFamília",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "server.js",
+      "package.json"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "**/better-sqlite3/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "src/renderer/icon-512.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "FinançasFamília"
+    }
+  },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "better-sqlite3": "^12.10.0",
