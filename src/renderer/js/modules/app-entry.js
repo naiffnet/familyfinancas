@@ -23,5 +23,6 @@ import './settings-2.js';
 import './auth.js';
 import './admin.js';
 import './mobile-shell.js';
+import './mobile-quick-entry.js';
 import './mobile-dashboard.js';
 import './app-init.js';
