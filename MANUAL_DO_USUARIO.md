@@ -1,4 +1,4 @@
-# 📖 Manual Completo do Usuário — FinançasFamília
+﻿# 📖 Manual Completo do Usuário — FinançasFamília
 
 > **Guia Operacional Familiar 100% voltado para o Usuário Final**  
 > Controle financeiro doméstico, cartões de crédito, fluxo de caixa, orçamentos e segurança local.
@@ -15,11 +15,12 @@
 - [6. Planejamento Mensal & Despesas Recorrentes](#-6-planejamento-mensal--despesas-recorrentes)
 - [7. Orçamentos por Categoria & Metas Financeiras](#-7-orçamentos-por-categoria--metas-financeiras)
 - [8. Dashboard, Visões & Kanban em 3 Colunas](#-8-dashboard-visões--kanban-em-3-colunas)
-- [9. Relatórios, Auditoria de Juros & Impressão / PDF](#-9-relatórios-auditoria-de-juros--impressão--pdf)
-- [10. Trilha de Auditoria, Segurança & LGPD](#-10-trilha-de-auditoria-segurança--lgpd)
-- [11. Backups, Teste de Integridade & Restauração](#-11-backups-teste-de-integridade--restauração)
-- [12. Acesso pelo Celular & Responsividade Mobile](#-12-acesso-pelo-celular--responsividade-mobile)
-- [13. FAQ — Dúvidas Mais Frequentes do Dia a Dia](#-13-faq--dúvidas-mais-frequentes-do-dia-a-dia)
+- [9. Conciliação Bancária Inteligente (OFX/CSV) ⭐ Novo](#-9-conciliação-bancária-inteligente-ofxcsv)
+- [10. Relatórios, Auditoria de Juros & Impressão / PDF](#-10-relatórios-auditoria-de-juros--impressão--pdf)
+- [11. Trilha de Auditoria, Segurança & LGPD](#-11-trilha-de-auditoria-segurança--lgpd)
+- [12. Backups, Teste de Integridade & Restauração](#-12-backups-teste-de-integridade--restauração)
+- [13. Acesso pelo Celular & Responsividade Mobile](#-13-acesso-pelo-celular--responsividade-mobile)
+- [14. FAQ — Dúvidas Mais Frequentes do Dia a Dia](#-14-faq--dúvidas-mais-frequentes-do-dia-a-dia)
 
 ---
 
@@ -29,47 +30,45 @@
 Ao abrir o aplicativo pela primeira vez, você criará a conta do **Administrador da Família**:
 - **Nome da Família:** Identifica o seu grupo doméstico (ex: *Família Silva*, *Família Oliveira*).
 - **Usuário Administrador Master:** Possui acesso total a todas as configurações, contas e membros.
-- **Identificação Visual:** Escolha uma cor e um ícone temático para cada membro para identificação ágil nos gráficos e lançamentos. (Ex: Carlos, Mariana, Lucas e Beatriz).
+- **Identificação Visual:** Escolha uma cor e um ícone temático para cada membro.
 
 ### 1.2 Perfis de Membros da Família & Permissões Granulares
-Em **⚙️ Configurações › Membros da Família**, você pode adicionar familiares com papéis específicos:
-- **👑 Administrador (ADM):** Acesso irrestrito a configurações, contas e backups.
-- **👔 Membro:** Pode criar e gerenciar despesas e receitas.
-- **👀 Visualizador:** Consulta somente-leitura aos relatórios e gráficos.
-- **🧸 Caçula:** Modo gamificado para educação financeira infantil.
+Em **Configurações › Membros da Família**, você pode adicionar familiares com papéis específicos:
+- **Administrador (ADM):** Acesso irrestrito a configurações, contas e backups.
+- **Membro:** Pode criar e gerenciar despesas e receitas.
+- **Visualizador:** Consulta somente-leitura aos relatórios e gráficos.
+- **Caçula:** Modo gamificado para educação financeira infantil.
 
 ### 1.3 Recuperação de Senha Segura com Pergunta Secreta
-Para sua segurança e privacidade sem depender de envio de e-mails para a nuvem:
 - Cadastre uma pergunta e resposta secreta no perfil.
-- Se esquecer a senha na tela de login, clique em *"Esqueci minha senha"*, responda à pergunta e cadastre uma nova senha localmente.
+- Se esquecer a senha, clique em *"Esqueci minha senha"*, responda à pergunta e cadastre uma nova senha localmente.
 
 ### 1.4 Personalização Visual, Temas & Layouts do Dashboard
-Escolha seu estilo visual e modo de visualização em **⚙️ Configurações › Aparência** ou através do botão rápido `🌓` no topo:
-- 🌙 **Tema Escuro (Dark Emerald):** Visual escuro moderno e sofisticado, com acentos em verde esmeralda relaxantes para uso diário e noturno.
-- ☀️ **Tema Claro (Light Clean):** Visual branco limpo, descansado e profissional com alto contraste, perfeito para ambientes iluminados.
-- 🌓 **Alternador Rápido de Tema:** Clique no ícone de sol/lua no topo superior direito da tela para trocar instantaneamente entre Claro e Escuro.
-- 🎛️ **Layouts do Dashboard:** Escolha entre o modo *Executivo por Zonas (Padrão)*, *Sub-Abas Operacionais* ou *Cockpit Integrado*.
+- Tema Escuro (Dark Emerald): visual escuro moderno com acentos em verde esmeralda.
+- Tema Claro (Light Clean): visual branco limpo e profissional.
+- Alternador Rápido de Tema via botão no topo superior direito.
+- Layouts do Dashboard: Executivo por Zonas, Sub-Abas Operacionais ou Cockpit Integrado.
 
 ---
 
 ## 🏦 2. Contas Bancárias, Carteiras & Cartões Benefício
 
 ### 2.1 Cadastrando Contas Correntes, Poupanças e Carteiras de Dinheiro
-Na tela **🏦 Contas**, adicione suas contas financeiras:
-- **Contas Correntes:** Bancos tradicionais e digitais (Itaú, Bradesco, Banrisul, Nubank, Inter, Caixa, Banco do Brasil, etc.).
-- **Poupanças & Investimentos:** Reservas financeiras e aplicações.
-- **Carteiras de Dinheiro Físico:** Controle de cédulas e moedas guardadas em casa.
+Na tela **Contas**, adicione suas contas financeiras:
+- Contas Correntes: bancos tradicionais e digitais (Nubank, Inter, Itaú, Bradesco, Caixa, etc.).
+- Poupanças & Investimentos: reservas financeiras e aplicações.
+- Carteiras de Dinheiro Físico: controle de cédulas e moedas.
 
-### 2.2 Cartões Benefício (*Flash, Caju, Alelo, Sodexo, Swile, Ticket, Banricard*)
+### 2.2 Cartões Benefício (Flash, Caju, Alelo, Sodexo, Swile, Ticket, Banricard)
 - Cadastre cartões corporativos de alimentação, refeição, mobilidade e saúde.
-- Os gastos com mercado ou restaurante são debitados exclusivamente do saldo benefício sem afetar o saldo bancário da conta corrente.
+- Os gastos são debitados exclusivamente do saldo benefício sem afetar a conta corrente.
 
 ### 2.3 Transferências Entre Contas Sem Duplicar Gastos
-- Ao movimentar dinheiro entre contas da família (ex: PIX da conta bancária para a carteira de dinheiro), use a opção **Transferência**.
-- O sistema debita da origem e credita no destino sem contabilizar como nova despesa ou receita nos relatórios.
+- Use a opção **Transferência** ao mover dinheiro entre contas da família.
+- O sistema debita da origem e credita no destino sem contabilizar como despesa ou receita.
 
-### 2.4 Limites Especiais (*Cheque Especial, Banricompras e Crédito Minuto*)
-- Cadastre o limite de Cheque Especial / LIS configurado no seu banco para visualizar o **Saldo Disponível Operacional** real da família.
+### 2.4 Limites Especiais (Cheque Especial, Banricompras e Crédito Minuto)
+- Cadastre o limite de Cheque Especial / LIS para visualizar o Saldo Disponível Operacional real.
 
 ---
 
@@ -77,88 +76,96 @@ Na tela **🏦 Contas**, adicione suas contas financeiras:
 
 ### 3.1 Ciclo do Cartão: Fechamento vs. Vencimento & Melhor Dia de Compra
 - **Dia de Fechamento (Corte):** Data limite das compras da fatura atual.
-- **Melhor Dia de Compra:** Compras realizadas a partir do dia seguinte ao corte caem automaticamente na fatura do mês subsequente (até 40 dias para pagar).
-- **Projeção Automática:** O aplicativo calcula e posiciona as parcelas no mês exato da fatura.
+- **Melhor Dia de Compra:** Compras após o corte caem na fatura do mês seguinte (até 40 dias para pagar).
+- **Projeção Automática:** O app calcula e posiciona as parcelas no mês exato da fatura.
 
 ### 3.2 Limite Total vs. Limite Comprometido em Tempo Real
-- **Limite Total:** O valor máximo liberado pela instituição financeira.
-- **Comprometido Total:** Soma de todas as compras parceladas futuras e faturas abertas.
-- **Disponível / Excedido:** Saldo livre calculado em tempo real com alertas visuais se ultrapassar 100%.
+- Limite Total: valor máximo liberado pela instituição.
+- Comprometido Total: soma de todas as compras parceladas futuras e faturas abertas.
+- Disponível / Excedido: saldo livre calculado em tempo real com alertas visuais.
 
 ### 3.3 Pagamento Integral da Fatura
-1. No card da fatura em **🔄 Planejamento**, clique em `💳 Pagar Fatura`.
-2. Selecione a **Conta Bancária Pagadora** e a data de pagamento.
-3. O sistema dá baixa na fatura, debita da conta bancária e **marca todas as compras atreladas como quitadas em uma operação atômica**.
+1. No card da fatura em **Planejamento**, clique em **Pagar Fatura**.
+2. Selecione a Conta Bancária Pagadora e a data de pagamento.
+3. O sistema dá baixa na fatura e marca todas as compras como quitadas atomicamente.
 
 ### 3.4 Pagamento Parcial & Saldo Rotativo Automático
-- Ao pagar um valor inferior ao total da fatura, o saldo restante é lançado na fatura do mês seguinte como **Saldo Rotativo**, com juros calculados com precisão.
+- Ao pagar um valor inferior ao total, o saldo restante vira **Saldo Rotativo** com juros calculados.
 
-### 3.5 Antecipação de Parcelas Futuras com Desconto
-- Selecione parcelas de meses futuros e antecipe-as para o mês atual com o percentual de desconto concedido pelo banco (como no Nubank/Inter).
+### 3.5 Antecipação de Parcelas Futuras com Desconto a Valor Presente ⭐ Novo
+> Economize nos juros pagando parcelas antes do vencimento!
+
+O sistema calcula o **Valor Presente (VP)** exato das parcelas, descontando os juros do período — igual ao que bancos como Nubank e Inter oferecem.
+
+**Como usar:**
+1. Acesse **Planejamento** e localize a fatura com parcelas futuras abertas.
+2. Clique no botão **Antecipar** que aparece ao lado da fatura.
+3. O modal exibe parcelas elegíveis, taxa de desconto configurável e Valor Líquido em tempo real.
+4. Selecione as parcelas, confirme a taxa e clique em **Confirmar Antecipação**.
+5. As parcelas são liquidadas e o saldo da conta bancária é debitado com o valor descontado.
+
+> Exemplo: 3 parcelas de R$ 100 com taxa de 1% a.m. = paga R$ 294,06 ao invés de R$ 300 (economia de R$ 5,94!).
 
 ### 3.6 Renegociação e Acordos de Fatura Parcelada
-- Se você parcelou o saldo com o banco, clique em `🤝 Parcelar / Acordo`. A fatura é marcada como <span class="badge badge-purple">Renegociada</span> e as novas parcelas são lançadas nos meses seguintes.
-- Para reverter, clique em `↩️ Desfazer Acordo / Reabrir`.
+- Clique em **Parcelar / Acordo** para registrar renegociações com o banco.
+- Para reverter, clique em **Desfazer Acordo / Reabrir**.
 
 ### 3.7 Estorno de Compras em 1 Clique
-- Caso uma compra seja cancelada ou devolvida, realize o estorno no pop-up do lançamento para restabelecer o limite do cartão e o saldo bancário.
+- Realize o estorno no pop-up do lançamento para restabelecer o limite do cartão e saldo bancário.
 
 ---
 
 ## 📝 4. Lançamentos & Leitura de Notas Fiscais (QR Code)
 
 ### 4.1 Lançamento de Despesas e Receitas
-- Registre entradas (salários, comissões, pensões, rendimentos) e saídas do dia a dia com categoria, membro responsável e conta de pagamento.
+- Registre entradas (salários, comissões, pensões) e saídas com categoria, membro e conta.
 
-### 4.2 Mês de Competência (*Consumo real*) vs. Data de Vencimento
-- Controle a competência (mês do consumo, ex: energia de `Ref: 02/2026`) independentemente da data de vencimento da fatura (`10/03/2026`).
+### 4.2 Mês de Competência vs. Data de Vencimento
+- Controle a competência (mês do consumo) independentemente da data de vencimento.
 
 ### 4.3 Leitor de Nota Fiscal por Câmera & QR Code (NFC-e)
-- Clique no botão `📷 Ler Nota Fiscal` e aponte a câmera para o QR Code do cupom fiscal. O valor, data, estabelecimento e categoria são preenchidos na hora via SEFAZ.
+- Clique em **Ler Nota Fiscal** e aponte a câmera para o QR Code do cupom. Dados preenchidos via SEFAZ.
 
 ### 4.4 Identificação e Alerta Automático de Gastos Duplicados
-- Se você ou outro membro da família tentar cadastrar um gasto idêntico já existente, o sistema emite um alerta em tempo real no formulário.
+- O sistema emite alerta em tempo real ao detectar lançamento idêntico já existente.
 
 ### 4.5 Pop-up de Detalhes do Lançamento & 3 Ações Rápidas
-- Ao tocar em qualquer linha de transação no Planejamento, abre-se uma janela com dados completos e 3 botões ergonômicos:
-  - `🗑️ Excluir Lançamento`
-  - `✏️ Editar Lançamento`
-  - `💳 Pagar / Baixar` (ou `↩️ Desfazer Pagamento`)
+- Toque em qualquer transação para acessar: Excluir, Editar e Pagar / Baixar.
 
 ---
 
-## ⚖️ 5. Juros, Multas, Descontos & Prorrogação em Feriados
+## 5. Juros, Multas, Descontos & Prorrogação em Feriados
 
 ### 5.1 Prorrogação Automática para Dias Úteis & Feriados Nacionais
-- Contas com vencimento em fins de semana ou feriados nacionais são prorrogadas para o primeiro dia útil seguinte (`📅 Prorroga: DD/MM`), sem incidência indevida de juros.
+- Contas com vencimento em fins de semana ou feriados nacionais são prorrogadas automaticamente.
 
-### 5.2 Cálculo de Juros Diários (% a.d.), Mensais (% a.m.) e Multas Fixas
+### 5.2 Cálculo de Juros Diários e Mensais e Multas Fixas
 - Cálculos pro-rata die com precisão centesimal para simulação de atrasos reais.
 
 ### 5.3 Projeção do Valor Atualizado para Pagamento Hoje
-- O aplicativo exibe o montante exato com encargos acumulados até a data atual.
+- O app exibe o montante exato com encargos acumulados até a data atual.
 
 ### 5.4 Pagamento com Acréscimo ou Desconto
-- Registre quitações com acréscimo de juros ou abatimento por desconto à vista via PIX.
+- Registre quitações com acréscimo de juros ou abatimento por desconto.
 
 ---
 
 ## 🔄 6. Planejamento Mensal & Despesas Recorrentes
 
 ### 6.1 Criando Despesas Fixas e Parcelamentos
-- Lance despesas contínuas (aluguel, condomínio, internet) e parceladas (1/12, 2/12) com projeção mensal.
+- Lance despesas contínuas e parceladas com projeção mensal automática.
 
-### 6.2 Despesas Prioritárias ⭐
-- Marque com estrela contas indispensáveis para destacá-las no topo do painel.
+### 6.2 Despesas Prioritárias
+- Marque com estrela contas indispensáveis para destacá-las no topo.
 
 ### 6.3 Adiar Parcela para o Mês Seguinte
 - Empurre compromissos para a competência seguinte com ajuste automático de fluxo.
 
 ### 6.4 Kanban de Planejamento com Arrastar e Soltar
-- Reordene a sequência de contas por prioridade de pagamento com drag & drop.
+- Reordene a sequência de contas por prioridade de pagamento.
 
-### 6.5 Cards de Decisão de Recorrência (*Apenas este mês vs Todos*)
-- Modais visuais claros para escolher entre alterar apenas a parcela atual ou todas as futuras.
+### 6.5 Cards de Decisão de Recorrência
+- Modais para escolher entre alterar apenas a parcela atual ou todas as futuras.
 
 ---
 
@@ -168,10 +175,10 @@ Na tela **🏦 Contas**, adicione suas contas financeiras:
 - Fixe limites máximos mensais para moradia, transporte, alimentação, etc.
 
 ### 7.2 Acompanhamento Visual das Barras de Limite
-- Indicadores cromáticos em tempo real: Verde (Seguro), Amarelo (Atenção) e Vermelho (Estourado).
+- Indicadores cromáticos: Verde (Seguro), Amarelo (Atenção) e Vermelho (Estourado).
 
 ### 7.3 Criando Metas de Economia & Aportes Financeiros
-- Acompanhe objetivos (Reserva, Viagens, Aquisições) com barras de progresso e aportes mensais.
+- Acompanhe objetivos com barras de progresso e aportes mensais.
 
 ---
 
@@ -185,76 +192,160 @@ Na tela **🏦 Contas**, adicione suas contas financeiras:
 ### 8.2 Filtro Rápido por Membro da Família e Tipo de Conta
 - Isole dados por membro responsável ou selecione contas específicas.
 
-### 8.3 Kanban Operacional (*Pendente, Alerta de Vencimento e Pago*)
+### 8.3 Kanban Operacional (Pendente, Alerta de Vencimento e Pago)
 - Três colunas com visão cronológica de pagamentos do mês.
 
 ### 8.4 Alerta de Pendências de Meses Anteriores
 - Banner inteligente com link direto para regularizar contas atrasadas.
 
+### 8.5 Radar de Assinaturas & Recorrências ⭐ Novo
+> Visualize o custo real de todas as suas assinaturas em um único painel!
+
+O **Radar de Assinaturas** exibe um grid com cada serviço recorrente cadastrado:
+- Custo mensal individual de cada assinatura (Netflix, Spotify, iCloud, planos de saúde, etc.).
+- Custo anualizado total — o que você realmente paga por ano em assinaturas.
+- Alertas de reajuste quando o valor de uma assinatura muda entre períodos.
+
+> Exemplo: Netflix R$ 55,90/mês + Spotify R$ 34,90/mês = R$ 90,80/mês = R$ 1.089,60/ano!
+
+### 8.6 Projeção Preditiva de Saldo Futuro (30 dias) ⭐ Novo
+> Saiba hoje como estará seu saldo bancário nos próximos 30 dias!
+
+O painel usa dados reais do app para calcular:
+- Saldo atual de todas as contas.
+- Receitas agendadas (salários, pensões, rendimentos).
+- Despesas recorrentes programadas nos próximos 30 dias.
+- Faturas de cartão abertas com vencimento no período.
+
+**Indicadores visuais:**
+- Verde: "Saldo Positivo e Seguro" — nenhum risco de negativar.
+- Vermelho com alerta: "Risco de Saldo Negativo" — indica a data e o valor mínimo projetado.
+
 ---
 
-## 📈 9. Relatórios, Auditoria de Juros & Impressão / PDF
+## 🔄 9. Conciliação Bancária Inteligente (OFX/CSV) ⭐ Novo
 
-### 9.1 Relatório de Fluxo de Caixa
+> Importe o extrato do seu banco e o sistema encontra automaticamente os lançamentos correspondentes!
+
+A **Conciliação Inteligente** usa *fuzzy matching* (correspondência aproximada) para cruzar o extrato bancário com os lançamentos já cadastrados no app — eliminando trabalho manual e erros.
+
+### 9.1 Importando o Extrato Bancário
+1. Acesse **Contas** e selecione a conta bancária desejada.
+2. Clique em **Importar Extrato** (formatos suportados: .OFX e .CSV).
+3. Selecione o arquivo baixado direto do internet banking do seu banco.
+
+### 9.2 Como Funciona o Matching Automático
+O sistema analisa cada transação e atribui um Score de Correspondência (0 a 100):
+
+| Critério | Pontuação máxima |
+|---|---|
+| Valor idêntico (até R$ 0,01 de diferença) | +50 pontos |
+| Data próxima (até 3 dias de diferença) | +30 pontos |
+| Descrição similar (fuzzy) | +20 pontos |
+
+Transações com score >= 70 são destacadas em verde como matches automáticos.
+
+### 9.3 Ações por Transação
+- **Conciliar:** vincula ao lançamento já existente (sem duplicar).
+- **Criar Novo:** importa como novo lançamento.
+- **Ignorar:** pula a transação (ex: transferências internas).
+
+### 9.4 Badge de Correspondências
+Um badge colorido indica: "N correspondências identificadas" antes de confirmar.
+
+### 9.5 Formatos Suportados por Banco
+
+| Banco | Formato Recomendado |
+|---|---|
+| Nubank | OFX (exportar no app) |
+| Inter | OFX ou CSV |
+| Itaú | OFX |
+| Bradesco | OFX |
+| Caixa Econômica | OFX |
+| Banco do Brasil | OFX |
+| Banrisul | CSV |
+| Outros bancos | CSV (qualquer formato) |
+
+---
+
+## 📈 10. Relatórios, Auditoria de Juros & Impressão / PDF
+
+### 10.1 Relatório de Fluxo de Caixa
 - Entradas vs saídas, taxa de poupança e saldo consolidado.
 
-### 9.2 Gráficos Interativos por Categoria
+### 10.2 Gráficos Interativos por Categoria
 - Gráficos em rosca, barras, polar e radar.
 
-### 9.3 Evolução Patrimonial Anual
+### 10.3 Evolução Patrimonial Anual
 - Histórico de crescimento patrimonial líquido mês a mês.
 
-### 9.4 Relatório de Auditoria de Juros e Descontos
+### 10.4 Relatório de Auditoria de Juros e Descontos
 - Demonstrativo de valores pagos em multas e economizados em descontos.
 
-### 9.5 Impressão e Exportação em PDF (`🖨️ Imprimir / PDF`)
+### 10.5 Impressão e Exportação em PDF
 - Emissão de relatórios prontos para arquivamento ou impressão física.
 
 ---
 
-## 🛡️ 10. Trilha de Auditoria, Segurança & LGPD
+## 🛡️ 11. Trilha de Auditoria, Segurança & LGPD
 
-### 10.1 Histórico Visual de Modificações (*Trilha de Auditoria*)
+### 11.1 Histórico Visual de Modificações
 - Registro completo de quem criou, editou, excluiu ou quitou cada lançamento.
 
-### 10.2 Direitos LGPD (*Exportação e Exclusão Segura*)
+### 11.2 Direitos LGPD (Exportação e Exclusão Segura)
 - Baixe todos os dados em formato aberto ou efetue exclusão definitiva com 1 clique.
 
 ---
 
-## 💾 11. Backups, Teste de Integridade & Restauração
+## 💾 12. Backups, Teste de Integridade & Restauração
 
-### 11.1 Exportando Backups em Excel, CSV, JSON e Banco `.db`
+### 12.1 Exportando Backups em Excel, CSV, JSON e Banco .db
 - Cópias de segurança exportáveis a qualquer momento.
 
-### 11.2 Testando a Integridade do Arquivo de Backup (`🔍 Testar .db`)
+### 12.2 Testando a Integridade do Arquivo de Backup
 - Verificação técnica da consistência do arquivo antes de restaurar.
 
-### 11.3 Restaurando um Backup com Segurança
+### 12.3 Restaurando um Backup com Segurança
 - Recuperação integral do banco de dados em segundos.
 
-### 11.4 Painel de Saúde e Métricas do Sistema
+### 12.4 Painel de Saúde e Métricas do Sistema
 - Monitoramento de registros, integridade das tabelas SQLite e desempenho.
 
 ---
 
-## 📱 12. Acesso pelo Celular & Responsividade Mobile
+## 📱 13. Acesso pelo Celular & Responsividade Mobile
 
-### 12.1 Conexão Local / Wi-Fi via QR Code
-- Abra o app no celular na mesma rede Wi-Fi lendo o QR Code no botão `📱 Conectar Aparelho`.
+### 13.1 Conexão Local / Wi-Fi via QR Code
+- Abra o app no celular na mesma rede Wi-Fi lendo o QR Code no botão **Conectar Aparelho**.
 
-### 12.2 Layout Mobile, Header Centralizado & Grids Touch-Friendly
-- Header em 3 colunas, botões em 42px e gaveta deslizante para navegação ágil com o polegar.
+### 13.2 Layout Mobile, Header Centralizado & Grids Touch-Friendly
+- Header em 3 colunas, botões em 42px e gaveta deslizante para navegação ágil.
 
 ---
 
-## ❓ 13. FAQ — Dúvidas Mais Frequentes do Dia a Dia
+## ❓ 14. FAQ — Dúvidas Mais Frequentes do Dia a Dia
 
-- **Como o app trata rendas de familiares em contas diferentes?**  
-  São reconhecidas como receitas legítimas individuais e preservadas sem falsos alertas de duplicidade.
+- **Como o app trata rendas de familiares em contas diferentes?**
+  São reconhecidas como receitas legítimas individuais sem falsos alertas de duplicidade.
 
-- **O que acontece ao quitar uma fatura de cartão?**  
-  O saldo é debitado da conta bancária e todas as compras atreladas à fatura são marcadas como pagas atomicamente.
+- **O que acontece ao quitar uma fatura de cartão?**
+  O saldo é debitado da conta bancária e todas as compras atreladas são marcadas como pagas atomicamente.
 
-- **Os dados ficam salvos na nuvem?**  
+- **Os dados ficam salvos na nuvem?**
   Não! Todos os dados são armazenados localmente no seu computador com criptografia AES-256 e conformidade com a LGPD.
+
+- **Como funciona o desconto na Antecipação de Parcelas?**
+  O sistema usa a fórmula de Valor Presente: cada parcela futura é descontada pela taxa mensal configurada. Quanto mais distante o vencimento, maior o desconto obtido.
+
+- **O arquivo OFX do meu banco nao esta sendo reconhecido. O que fazer?**
+  Tente exportar no formato .CSV com as colunas: Data, Descricao, Valor. O sistema aceita qualquer CSV com essas 3 colunas minimas.
+
+- **A Projeção Preditiva considera o salário que vou receber?**
+  Sim! Desde que a receita esteja cadastrada como recorrente (ex: salário todo dia 5) ou como lançamento agendado no mês atual.
+
+- **Posso usar a Conciliação para múltiplas contas no mesmo mês?**
+  Sim. A conciliação e feita conta a conta — importe o extrato de cada banco separadamente.
+
+---
+
+*Manual atualizado em: Agosto/2026 — Versao 1.0 com Pilar 1 (Operacional: Lancamentos, Extratos e Cartoes)*
