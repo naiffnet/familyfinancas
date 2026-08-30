@@ -256,13 +256,24 @@ function initThemeSwitcher() {
   }
 }
 
+function initSettingsTriggers() {
+  document.querySelectorAll('[data-page="settings"], #nav-settings').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      openSettingsModal('profile');
+    });
+  });
+}
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     initThemeSwitcher();
+    initSettingsTriggers();
     if (typeof CloudSyncService !== 'undefined') CloudSyncService.init();
   });
 } else {
   initThemeSwitcher();
+  initSettingsTriggers();
   if (typeof CloudSyncService !== 'undefined') CloudSyncService.init();
 }
 

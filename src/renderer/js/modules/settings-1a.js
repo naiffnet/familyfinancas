@@ -12,6 +12,11 @@ async function renderSettings() {
 }
 
 async function openSettingsModal(activeTab = 'profile') {
+  if (!State.user) {
+    if (typeof toast === 'function') toast('Faça login para acessar as configurações.', 'warning');
+    return;
+  }
+
   const PROFILE_LABELS = {
     1: 'ADM Dono do APP',
     2: 'Adm da Família',
@@ -20,21 +25,30 @@ async function openSettingsModal(activeTab = 'profile') {
     5: 'Filho Caçula'
   };
 
-  const [categories, users, settings] = await Promise.all([
-    window.api.categories.getAll(State.user.id),
-    window.api.auth.getUsers(),
-    window.api.settings.get(State.user.id),
-  ]);
-  State.settings = settings;
-
+  let categories = [];
+  let users = [State.user];
+  let settings = State.settings || {};
   let currentFamily = null;
-  if (State.user.family_id) {
-    try {
-      const families = await window.api.families.getAll();
-      currentFamily = families.find(f => f.id === State.user.family_id);
-    } catch (e) {
-      console.error('Error fetching current family:', e);
+
+  try {
+    const results = await Promise.allSettled([
+      window.api?.categories?.getAll ? window.api.categories.getAll(State.user.id) : Promise.resolve([]),
+      window.api?.auth?.getUsers ? window.api.auth.getUsers() : Promise.resolve([]),
+      window.api?.settings?.get ? window.api.settings.get(State.user.id) : Promise.resolve({}),
+      (State.user.family_id && window.api?.families?.getAll) ? window.api.families.getAll() : Promise.resolve([])
+    ]);
+
+    if (results[0].status === 'fulfilled' && Array.isArray(results[0].value)) categories = results[0].value;
+    if (results[1].status === 'fulfilled' && Array.isArray(results[1].value)) users = results[1].value;
+    if (results[2].status === 'fulfilled' && results[2].value) {
+      settings = results[2].value;
+      State.settings = settings;
     }
+    if (results[3].status === 'fulfilled' && Array.isArray(results[3].value)) {
+      currentFamily = results[3].value.find(f => f.id === State.user.family_id) || null;
+    }
+  } catch (err) {
+    console.warn('[Settings] Erro recuperável ao obter dados para configurações:', err);
   }
 
   const currentMonthName = new Date(State.currentYear, State.currentMonth - 1, 1).toLocaleDateString('pt-BR', { month: 'long' });

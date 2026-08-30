@@ -319,6 +319,18 @@ function navigate(page) {
     openSettingsModal('profile');
     return;
   }
+
+  // Trava de segurança: Famílias (ADM Geral) é exclusivo para Perfil 1 (is_system_admin / ADM Dono do APP)
+  if (page === 'families') {
+    if (!State.user || (State.user.profile_type !== 1 && State.user.is_system_admin !== 1)) {
+      if (typeof toast === 'function') {
+        toast('Acesso restrito ao Administrador Geral (ADM Dono do APP).', 'warning');
+      }
+      navigate('dashboard');
+      return;
+    }
+  }
+
   // Se a página alvo for restrita, encontrar o primeiro menu permitido
   if (State.permissions && State.permissions['allow_' + page] === 0) {
     const menus = ['dashboard', 'recurring', 'accounts', 'budget', 'goals', 'reports'];

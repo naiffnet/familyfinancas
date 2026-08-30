@@ -1,7 +1,7 @@
 /* ============================================
  * app.bundle.js — FamilyFinancas Renderer
  * Gerado por: npm run build:renderer
- * 2026-08-29T14:00:08.526Z
+ * 2026-08-30T01:13:24.122Z
  * Modulos: 26
  * ============================================ */
 
@@ -521,6 +521,18 @@ function navigate(page) {
     openSettingsModal('profile');
     return;
   }
+
+  // Trava de segurança: Famílias (ADM Geral) é exclusivo para Perfil 1 (is_system_admin / ADM Dono do APP)
+  if (page === 'families') {
+    if (!State.user || (State.user.profile_type !== 1 && State.user.is_system_admin !== 1)) {
+      if (typeof toast === 'function') {
+        toast('Acesso restrito ao Administrador Geral (ADM Dono do APP).', 'warning');
+      }
+      navigate('dashboard');
+      return;
+    }
+  }
+
   // Se a página alvo for restrita, encontrar o primeiro menu permitido
   if (State.permissions && State.permissions['allow_' + page] === 0) {
     const menus = ['dashboard', 'recurring', 'accounts', 'budget', 'goals', 'reports'];
@@ -9651,6 +9663,11 @@ async function renderSettings() {
 }
 
 async function openSettingsModal(activeTab = 'profile') {
+  if (!State.user) {
+    if (typeof toast === 'function') toast('Faça login para acessar as configurações.', 'warning');
+    return;
+  }
+
   const PROFILE_LABELS = {
     1: 'ADM Dono do APP',
     2: 'Adm da Família',
@@ -9659,21 +9676,30 @@ async function openSettingsModal(activeTab = 'profile') {
     5: 'Filho Caçula'
   };
 
-  const [categories, users, settings] = await Promise.all([
-    window.api.categories.getAll(State.user.id),
-    window.api.auth.getUsers(),
-    window.api.settings.get(State.user.id),
-  ]);
-  State.settings = settings;
-
+  let categories = [];
+  let users = [State.user];
+  let settings = State.settings || {};
   let currentFamily = null;
-  if (State.user.family_id) {
-    try {
-      const families = await window.api.families.getAll();
-      currentFamily = families.find(f => f.id === State.user.family_id);
-    } catch (e) {
-      console.error('Error fetching current family:', e);
+
+  try {
+    const results = await Promise.allSettled([
+      window.api?.categories?.getAll ? window.api.categories.getAll(State.user.id) : Promise.resolve([]),
+      window.api?.auth?.getUsers ? window.api.auth.getUsers() : Promise.resolve([]),
+      window.api?.settings?.get ? window.api.settings.get(State.user.id) : Promise.resolve({}),
+      (State.user.family_id && window.api?.families?.getAll) ? window.api.families.getAll() : Promise.resolve([])
+    ]);
+
+    if (results[0].status === 'fulfilled' && Array.isArray(results[0].value)) categories = results[0].value;
+    if (results[1].status === 'fulfilled' && Array.isArray(results[1].value)) users = results[1].value;
+    if (results[2].status === 'fulfilled' && results[2].value) {
+      settings = results[2].value;
+      State.settings = settings;
     }
+    if (results[3].status === 'fulfilled' && Array.isArray(results[3].value)) {
+      currentFamily = results[3].value.find(f => f.id === State.user.family_id) || null;
+    }
+  } catch (err) {
+    console.warn('[Settings] Erro recuperável ao obter dados para configurações:', err);
   }
 
   const currentMonthName = new Date(State.currentYear, State.currentMonth - 1, 1).toLocaleDateString('pt-BR', { month: 'long' });
@@ -13058,6 +13084,22 @@ function renderLogsInConsole(logs) {
 
 async function renderFamilies() {
   const page = document.getElementById('page-families');
+  if (!page) return;
+
+  if (!State.user || (State.user.profile_type !== 1 && State.user.is_system_admin !== 1)) {
+    page.innerHTML = `
+      <div style="padding: 50px 20px; text-align: center; color: var(--text-muted);">
+        <div style="font-size: 52px; margin-bottom: 16px;">🔒</div>
+        <h3 style="font-size: 18px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">Acesso Restrito ao ADM Geral</h3>
+        <p style="font-size: 13px; max-width: 450px; margin: 0 auto 20px auto; line-height: 1.5;">
+          Este painel é exclusivo para o Administrador Global Master / Dono do Aplicativo para gestão de múltiplas famílias.
+        </p>
+        <button class="btn btn-primary" onclick="navigate('dashboard')">Voltar ao Dashboard</button>
+      </div>
+    `;
+    return;
+  }
+
   page.innerHTML = '<div style="padding:20px;color:var(--text-muted)">Carregando painel administrativo...</div>';
 
   try {
@@ -15054,13 +15096,24 @@ function initThemeSwitcher() {
   }
 }
 
+function initSettingsTriggers() {
+  document.querySelectorAll('[data-page="settings"], #nav-settings').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      openSettingsModal('profile');
+    });
+  });
+}
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     initThemeSwitcher();
+    initSettingsTriggers();
     if (typeof CloudSyncService !== 'undefined') CloudSyncService.init();
   });
 } else {
   initThemeSwitcher();
+  initSettingsTriggers();
   if (typeof CloudSyncService !== 'undefined') CloudSyncService.init();
 }
 

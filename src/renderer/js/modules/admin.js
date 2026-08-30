@@ -465,6 +465,22 @@ function renderLogsInConsole(logs) {
 
 async function renderFamilies() {
   const page = document.getElementById('page-families');
+  if (!page) return;
+
+  if (!State.user || (State.user.profile_type !== 1 && State.user.is_system_admin !== 1)) {
+    page.innerHTML = `
+      <div style="padding: 50px 20px; text-align: center; color: var(--text-muted);">
+        <div style="font-size: 52px; margin-bottom: 16px;">🔒</div>
+        <h3 style="font-size: 18px; font-weight: 700; color: var(--text-primary); margin-bottom: 8px;">Acesso Restrito ao ADM Geral</h3>
+        <p style="font-size: 13px; max-width: 450px; margin: 0 auto 20px auto; line-height: 1.5;">
+          Este painel é exclusivo para o Administrador Global Master / Dono do Aplicativo para gestão de múltiplas famílias.
+        </p>
+        <button class="btn btn-primary" onclick="navigate('dashboard')">Voltar ao Dashboard</button>
+      </div>
+    `;
+    return;
+  }
+
   page.innerHTML = '<div style="padding:20px;color:var(--text-muted)">Carregando painel administrativo...</div>';
 
   try {
