@@ -824,10 +824,21 @@ module.exports = (Base) => class extends Base {
       ORDER BY total_penalty DESC
     `).all(...params, ...periodParams);
 
+    const formattedSummary = {
+      ...summary,
+      totalPenalty: Number(summary?.total_penalty || 0),
+      totalDiscount: Number(summary?.total_discount || 0),
+      penaltyCount: Number(summary?.count_late_paid || 0),
+      discountCount: Number(summary?.count_discounted || 0),
+      avgDaysLate: Number(summary?.avg_days_late || 0),
+      avgDailyRate: Number(summary?.avg_daily_rate || 0),
+      totalRecords: Number(summary?.total_records || 0)
+    };
+
     return {
-      summary,
+      summary: formattedSummary,
       byCategory,
-      bySupplier,
+      bySupplier: bySupplier.map(s => ({ ...s, supplier: s.description || 'Diversos' })),
       byAccount,
       transactions: enrichedTransactions
     };

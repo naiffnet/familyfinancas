@@ -1,7 +1,7 @@
 /* ============================================
  * app.bundle.js — FamilyFinancas Renderer
  * Gerado por: npm run build:renderer
- * 2026-08-30T21:07:34.481Z
+ * 2026-08-30T21:20:57.011Z
  * Modulos: 26
  * ============================================ */
 
@@ -8981,8 +8981,15 @@ async function renderReports() {
       `;
 
     } else if (tab === 'interest') {
-      const audit = await window.api.reports.getInterestAudit({ userId: State.user.id, month: State.currentMonth, year: State.currentYear });
-      const summary = audit.summary || { totalPenalty: 0, totalDiscount: 0, penaltyCount: 0, discountCount: 0, avgDaysLate: 0, avgDailyRate: 0 };
+      const audit = await window.api.reports.getInterestAudit({ userId: State.user.id, month: State.currentMonth, year: State.currentYear }) || {};
+      const summary = audit.summary || {};
+      const totalPenalty = Number(summary.totalPenalty ?? summary.total_penalty ?? 0);
+      const totalDiscount = Number(summary.totalDiscount ?? summary.total_discount ?? 0);
+      const penaltyCount = Number(summary.penaltyCount ?? summary.count_late_paid ?? 0);
+      const discountCount = Number(summary.discountCount ?? summary.count_discounted ?? 0);
+      const avgDaysLate = Number(summary.avgDaysLate ?? summary.avg_days_late ?? 0);
+      const avgDailyRate = Number(summary.avgDailyRate ?? summary.avg_daily_rate ?? 0);
+
       const byCat = audit.byCategory || [];
       const bySup = audit.bySupplier || [];
       const byAcc = audit.byAccount || [];
@@ -8997,22 +9004,22 @@ async function renderReports() {
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px;">
           <div class="card" style="text-align: center; border-top: 3px solid #ef4444;">
             <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">⚠️ Total Pago em Juros / Multas</div>
-            <div style="font-size: 22px; font-weight: 800; color: #f87171;">${fmt.currency(summary.totalPenalty)}</div>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">${summary.penaltyCount} pagamento(s) com acréscimo</div>
+            <div style="font-size: 22px; font-weight: 800; color: #f87171;">${fmt.currency(totalPenalty)}</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">${penaltyCount} pagamento(s) com acréscimo</div>
           </div>
           <div class="card" style="text-align: center; border-top: 3px solid #10b981;">
             <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">🏷️ Total de Descontos Obtidos</div>
-            <div style="font-size: 22px; font-weight: 800; color: var(--accent-light);">${fmt.currency(summary.totalDiscount)}</div>
-            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">${summary.discountCount} pagamento(s) com desconto</div>
+            <div style="font-size: 22px; font-weight: 800; color: var(--accent-light);">${fmt.currency(totalDiscount)}</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">${discountCount} pagamento(s) com desconto</div>
           </div>
           <div class="card" style="text-align: center; border-top: 3px solid #f59e0b;">
             <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">📅 Média de Dias de Atraso</div>
-            <div style="font-size: 22px; font-weight: 800; color: #fbbf24;">${summary.avgDaysLate.toFixed(1)} <span style="font-size: 13px; font-weight: 600;">dias</span></div>
+            <div style="font-size: 22px; font-weight: 800; color: #fbbf24;">${avgDaysLate.toFixed(1)} <span style="font-size: 13px; font-weight: 600;">dias</span></div>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Tempo médio de atraso pago</div>
           </div>
           <div class="card" style="text-align: center; border-top: 3px solid #06b6d4;">
             <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">📈 Taxa Média de Juros Diária</div>
-            <div style="font-size: 22px; font-weight: 800; color: #38bdf8;">${summary.avgDailyRate.toFixed(3)}% <span style="font-size: 13px; font-weight: 600;">a.d.</span></div>
+            <div style="font-size: 22px; font-weight: 800; color: #38bdf8;">${avgDailyRate.toFixed(3)}% <span style="font-size: 13px; font-weight: 600;">a.d.</span></div>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Custo médio diário do atraso</div>
           </div>
         </div>
@@ -9028,12 +9035,12 @@ async function renderReports() {
             ${byCat.length === 0 ? '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:16px">Nenhum juro registrado no período.</div>' : `
               <div style="display: flex; flex-direction: column; gap: 10px;">
                 ${byCat.map(c => {
-                  const pct = summary.totalPenalty > 0 ? ((c.total_penalty / summary.totalPenalty) * 100).toFixed(1) : 0;
+                  const pct = totalPenalty > 0 ? (((c.total_penalty || 0) / totalPenalty) * 100).toFixed(1) : 0;
                   return `
                     <div>
                       <div style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px;">
-                        <span>${c.category_icon || '📁'} <strong>${c.category_name}</strong> <span style="color:var(--text-muted);font-size:11px">(${c.count}x)</span></span>
-                        <span style="font-weight: 700; color: #f87171;">${fmt.currency(c.total_penalty)} <span style="font-size:11px;color:var(--text-muted)">(${pct}%)</span></span>
+                        <span>${c.category_icon || '📁'} <strong>${c.category_name}</strong> <span style="color:var(--text-muted);font-size:11px">(${c.count || 0}x)</span></span>
+                        <span style="font-weight: 700; color: #f87171;">${fmt.currency(c.total_penalty || 0)} <span style="font-size:11px;color:var(--text-muted)">(${pct}%)</span></span>
                       </div>
                       <div style="height: 6px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden;">
                         <div style="height: 100%; width: ${pct}%; background: ${c.category_color || '#ef4444'}; border-radius: 4px;"></div>
@@ -9054,12 +9061,13 @@ async function renderReports() {
             ${bySup.length === 0 ? '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:16px">Nenhum juro registrado no período.</div>' : `
               <div style="display: flex; flex-direction: column; gap: 10px;">
                 ${bySup.slice(0, 6).map((s, idx) => {
-                  const pct = summary.totalPenalty > 0 ? ((s.total_penalty / summary.totalPenalty) * 100).toFixed(1) : 0;
+                  const sName = s.supplier || s.description || 'Diversos';
+                  const pct = totalPenalty > 0 ? (((s.total_penalty || 0) / totalPenalty) * 100).toFixed(1) : 0;
                   return `
                     <div>
                       <div style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px;">
-                        <span><strong style="color:var(--text-primary)">${idx + 1}. ${s.supplier}</strong> <span style="color:var(--text-muted);font-size:11px">(${s.count}x)</span></span>
-                        <span style="font-weight: 700; color: #f87171;">${fmt.currency(s.total_penalty)}</span>
+                        <span><strong style="color:var(--text-primary)">${idx + 1}. ${sName}</strong> <span style="color:var(--text-muted);font-size:11px">(${s.count || 0}x)</span></span>
+                        <span style="font-weight: 700; color: #f87171;">${fmt.currency(s.total_penalty || 0)}</span>
                       </div>
                       <div style="height: 6px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden;">
                         <div style="height: 100%; width: ${pct}%; background: #f59e0b; border-radius: 4px;"></div>
@@ -9080,12 +9088,12 @@ async function renderReports() {
             ${byAcc.length === 0 ? '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:16px">Nenhum juro registrado no período.</div>' : `
               <div style="display: flex; flex-direction: column; gap: 10px;">
                 ${byAcc.map(a => {
-                  const pct = summary.totalPenalty > 0 ? ((a.total_penalty / summary.totalPenalty) * 100).toFixed(1) : 0;
+                  const pct = totalPenalty > 0 ? (((a.total_penalty || 0) / totalPenalty) * 100).toFixed(1) : 0;
                   return `
                     <div>
                       <div style="display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px;">
-                        <span>💳 <strong>${a.account_name}</strong> <span style="color:var(--text-muted);font-size:11px">(${a.count}x)</span></span>
-                        <span style="font-weight: 700; color: #f87171;">${fmt.currency(a.total_penalty)}</span>
+                        <span>💳 <strong>${a.account_name}</strong> <span style="color:var(--text-muted);font-size:11px">(${a.count || 0}x)</span></span>
+                        <span style="font-weight: 700; color: #f87171;">${fmt.currency(a.total_penalty || 0)}</span>
                       </div>
                       <div style="height: 6px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden;">
                         <div style="height: 100%; width: ${pct}%; background: ${a.account_color || '#3b82f6'}; border-radius: 4px;"></div>
@@ -9120,30 +9128,34 @@ async function renderReports() {
               <tbody>
                 ${txs.length === 0 ? '<tr><td colspan="10" class="no-data" style="padding:24px;text-align:center">Nenhum pagamento com juros ou desconto registrado neste período. 🎉</td></tr>' :
                   txs.map(t => {
-                    const isPenalty = t.penalty_amount > 0;
-                    const isDiscount = t.discount_amount > 0;
-                    const diffDays = t.days_late;
+                    const isPenalty = (t.penalty_amount || 0) > 0;
+                    const isDiscount = (t.discount_amount || 0) > 0;
+                    const diffDays = t.days_late ?? t.daysLate ?? 0;
                     let delayLabel = '—';
                     if (diffDays > 0) delayLabel = `<span style="color:#f87171;font-weight:700">+${diffDays}d atraso</span>`;
                     else if (diffDays < 0) delayLabel = `<span style="color:var(--accent-light);font-weight:700">${Math.abs(diffDays)}d antecip.</span>`;
                     else delayLabel = `<span style="color:var(--text-muted)">no dia</span>`;
 
+                    const baseVal = t.base_amount ?? t.amount ?? 0;
+                    const netVal = t.net_amount ?? t.net_paid ?? (baseVal + (t.penalty_amount || 0) - (t.discount_amount || 0));
+                    const rateVal = t.daily_rate_pct ?? t.daily_interest_pct ?? 0;
+
                     return `
                       <tr>
                         <td style="color:var(--text-muted)">${fmt.date(t.due_date || t.date)}</td>
-                        <td style="font-weight:600;color:var(--text-primary)">${fmt.date(t.payment_date)}</td>
+                        <td style="font-weight:600;color:var(--text-primary)">${fmt.date(t.payment_date || t.date)}</td>
                         <td>${delayLabel}</td>
                         <td style="font-weight:600">${t.description || '—'}</td>
                         <td>${t.category_icon || ''} ${t.category_name || '—'}</td>
                         <td>${t.account_name || '—'}</td>
-                        <td class="text-right" style="color:var(--text-muted)">${fmt.currency(t.base_amount)}</td>
+                        <td class="text-right" style="color:var(--text-muted)">${fmt.currency(baseVal)}</td>
                         <td class="text-right" style="font-weight:700;color:${isPenalty ? '#f87171' : (isDiscount ? 'var(--accent-light)' : 'var(--text-muted)')}">
                           ${isPenalty ? `+${fmt.currency(t.penalty_amount)}` : (isDiscount ? `-${fmt.currency(t.discount_amount)}` : 'R$ 0,00')}
                         </td>
                         <td class="text-right" style="font-size:12px;color:${isPenalty ? '#fbbf24' : 'var(--text-muted)'}">
-                          ${isPenalty && t.daily_rate_pct ? `${t.daily_rate_pct.toFixed(3)}% a.d.` : '—'}
+                          ${isPenalty && rateVal ? `${rateVal.toFixed(3)}% a.d.` : '—'}
                         </td>
-                        <td class="text-right" style="font-weight:800;color:var(--text-primary)">${fmt.currency(t.net_amount)}</td>
+                        <td class="text-right" style="font-weight:800;color:var(--text-primary)">${fmt.currency(netVal)}</td>
                       </tr>
                     `;
                   }).join('')}
