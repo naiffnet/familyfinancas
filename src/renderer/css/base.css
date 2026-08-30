@@ -383,6 +383,34 @@ select option { background: var(--bg-raised); }
   position: fixed;
   top: var(--titlebar-h);
   bottom: 0;
+  transition: top var(--transition);
+}
+
+/* Impersonation Banner (Modo Manutenção Geral) */
+#impersonation-banner {
+  position: fixed;
+  top: var(--titlebar-h);
+  left: 0;
+  right: 0;
+  height: 42px;
+  background: linear-gradient(90deg, #ea580c, #7c3aed);
+  color: #ffffff;
+  padding: 0 16px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  z-index: 99;
+}
+
+body.impersonation-active .sidebar,
+body.impersonation-active .main-content {
+  top: calc(var(--titlebar-h) + 42px) !important;
 }
 
 /* ════════════════════════════════════════

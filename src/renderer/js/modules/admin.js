@@ -8,18 +8,22 @@ async function startApp(user) {
   State.settings = await window.api.settings.get(user.id);
   State.permissions = await window.api.permissions.get(user.id);
   
-  State.familyName = null;
   if (user.family_id) {
     try {
       const families = await window.api.families.getAll();
-      const fam = families.find(f => f.id === user.family_id);
+      const fam = Array.isArray(families) ? families.find(f => f.id === user.family_id) : null;
       if (fam) {
         State.familyName = fam.name;
         localStorage.setItem('financeiro_family_id', user.family_id);
         localStorage.setItem('financeiro_family_name', fam.name);
+      } else if (!State.familyName) {
+        State.familyName = localStorage.getItem('financeiro_family_name') || null;
       }
     } catch (e) {
       console.error('Error fetching family name at startup:', e);
+      if (!State.familyName) {
+        State.familyName = localStorage.getItem('financeiro_family_name') || null;
+      }
     }
   }
   
@@ -79,6 +83,10 @@ async function startApp(user) {
   avatarEl.style.boxShadow = 'none';
 
   document.getElementById('sidebar-logout').onclick = () => {
+    sessionStorage.removeItem('impersonator_adm');
+    document.body.classList.remove('impersonation-active');
+    const bannerEl = document.getElementById('impersonation-banner');
+    if (bannerEl) bannerEl.remove();
     State.user = null;
     document.body.classList.remove('cacula-layout');
     document.getElementById('app').classList.add('hidden');
@@ -102,41 +110,27 @@ function checkImpersonation() {
   let banner = document.getElementById('impersonation-banner');
   
   if (impersonatorData) {
+    document.body.classList.add('impersonation-active');
     if (!banner) {
       banner = document.createElement('div');
       banner.id = 'impersonation-banner';
-      banner.style.cssText = `
-        background: linear-gradient(90deg, #f97316, #8b5cf6); 
-        color: #fff; 
-        padding: 10px; 
-        text-align: center; 
-        font-size: 13px; 
-        font-weight: 600; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center; 
-        gap: 12px; 
-        border-bottom: 1px solid rgba(255,255,255,0.15); 
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3); 
-        position: sticky; 
-        top: 0; 
-        z-index: 9999;
-      `;
       
       const appEl = document.getElementById('app');
       if (appEl) {
-        appEl.insertBefore(banner, appEl.firstChild);
+        appEl.appendChild(banner);
       }
     }
     
     banner.innerHTML = `
-      <span>🛠️ <strong>Modo Manutenção Geral:</strong> Administrando o ambiente da <strong>${State.familyName}</strong> como <strong>${State.user?.name}</strong>.</span>
-      <button class="btn btn-secondary btn-sm" id="btn-stop-impersonate" style="background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.45); color: white; padding: 4px 12px; font-size: 11px; border-radius: 4px; cursor: pointer; transition: all 0.2s; font-weight: 600;">Voltar ao ADM Dono do APP</button>
+      <span>🛠️ <strong>Modo Manutenção Geral:</strong> Administrando o ambiente da <strong>${State.familyName || 'Família'}</strong> como <strong>${State.user?.name}</strong>.</span>
+      <button class="btn btn-secondary btn-sm" id="btn-stop-impersonate" style="background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.5); color: white; padding: 4px 14px; font-size: 11px; border-radius: 4px; cursor: pointer; transition: all 0.2s; font-weight: 700; white-space: nowrap;">Voltar ao ADM Dono do APP</button>
     `;
     
     document.getElementById('btn-stop-impersonate').onclick = async () => {
       const admUser = JSON.parse(sessionStorage.getItem('impersonator_adm'));
       sessionStorage.removeItem('impersonator_adm');
+      
+      document.body.classList.remove('impersonation-active');
       
       // Remove banner
       const bannerEl = document.getElementById('impersonation-banner');
@@ -150,6 +144,7 @@ function checkImpersonation() {
       navigate('families');
     };
   } else {
+    document.body.classList.remove('impersonation-active');
     if (banner) banner.remove();
   }
 }
