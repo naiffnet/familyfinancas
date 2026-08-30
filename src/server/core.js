@@ -667,7 +667,12 @@ function createExpressApp(db) {
     try {
       let result;
       if (channel === 'auth:getUsers') {
-        result = await db.getUsers({ familyId: session.familyId });
+        const requestedFamilyId = args && args[0] && args[0].familyId ? args[0].familyId : null;
+        if (session && (session.isSystemAdmin === 1 || session.profileType === 1)) {
+          result = await db.getUsers(requestedFamilyId ? { familyId: requestedFamilyId } : (args[0] || {}));
+        } else {
+          result = await db.getUsers({ familyId: session.familyId });
+        }
       } else if (channel === 'families:getAll') {
         const allFamilies = await handler(...(args || []));
         if (session && session.isSystemAdmin !== 1 && session.profileType !== 1) {

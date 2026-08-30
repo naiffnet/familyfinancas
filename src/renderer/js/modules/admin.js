@@ -624,10 +624,11 @@ async function renderFamilies() {
     document.querySelectorAll('.btn-access-family').forEach(btn => {
       btn.onclick = async () => {
         const familyId = parseInt(btn.dataset.id);
-        const users = await window.api.auth.getUsers();
-        const famUsers = users.filter(u => u.family_id === familyId);
+        const famRow = btn.closest('tr');
+        const famName = famRow ? famRow.querySelector('td:first-child')?.textContent?.trim() : '';
+        const famUsers = await window.api.auth.getUsers({ familyId });
         
-        if (famUsers.length === 0) {
+        if (!famUsers || famUsers.length === 0) {
           toast('Esta família ainda não possui nenhum membro cadastrado para visualização!', 'error');
           return;
         }
@@ -635,10 +636,15 @@ async function renderFamilies() {
         const targetUser = famUsers.find(u => u.profile_type === 2) || famUsers.find(u => u.profile_type === 3) || famUsers[0];
         
         sessionStorage.setItem('impersonator_adm', JSON.stringify(State.user));
+        if (famName) {
+          State.familyName = famName;
+          localStorage.setItem('financeiro_family_name', famName);
+          localStorage.setItem('financeiro_family_id', familyId);
+        }
         
         await startApp(targetUser);
         
-        toast(`Acessando ambiente da ${State.familyName} como ${targetUser.name}...`);
+        toast(`Acessando ambiente da ${State.familyName || famName} como ${targetUser.name}...`);
         
         navigate('dashboard');
       };

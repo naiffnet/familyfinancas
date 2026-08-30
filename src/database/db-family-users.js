@@ -139,10 +139,14 @@ module.exports = (Base) => class extends Base {
 
   getUsers(filters = {}) {
     const familyId = filters && typeof filters === 'object' ? filters.familyId : filters;
-    if (!familyId) {
-      throw new Error('familyId é obrigatório para listar usuários');
+    if (familyId) {
+      const users = this.db.prepare('SELECT id, name, first_name, last_name, email, phone, cpf, birth_date, username, avatar_color, avatar_image, family_id, profile_type, position, is_system_admin FROM users WHERE family_id = ? ORDER BY position ASC, id ASC').all(familyId);
+      return users.map(u => {
+        if (u.cpf) u.cpf = decryptField(u.cpf);
+        return u;
+      });
     }
-    const users = this.db.prepare('SELECT id, name, first_name, last_name, email, phone, cpf, birth_date, username, avatar_color, avatar_image, family_id, profile_type, position, is_system_admin FROM users WHERE family_id = ? ORDER BY position ASC, id ASC').all(familyId);
+    const users = this.db.prepare('SELECT id, name, first_name, last_name, email, phone, cpf, birth_date, username, avatar_color, avatar_image, family_id, profile_type, position, is_system_admin FROM users ORDER BY family_id ASC, position ASC, id ASC').all();
     return users.map(u => {
       if (u.cpf) u.cpf = decryptField(u.cpf);
       return u;

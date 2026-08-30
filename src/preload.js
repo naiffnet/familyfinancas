@@ -14,7 +14,7 @@ contextBridge.exposeInMainWorld('api', {
   auth: {
     login:    (d) => ipcRenderer.invoke('auth:login', d),
     register: (d) => ipcRenderer.invoke('auth:register', d),
-    getUsers: () => ipcRenderer.invoke('auth:getUsers'),
+    getUsers: (d) => ipcRenderer.invoke('auth:getUsers', d),
     updateUser: (d) => ipcRenderer.invoke('auth:updateUser', d),
     deleteUser: (id) => ipcRenderer.invoke('auth:deleteUser', id),
     deleteSelf: (id) => ipcRenderer.invoke('auth:deleteSelf', id),
