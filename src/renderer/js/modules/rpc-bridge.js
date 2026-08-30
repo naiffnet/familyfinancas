@@ -154,6 +154,9 @@ if (!window.api) {
       getPredictiveCashflow:(d) => makeRpcCall('reports:getPredictiveCashflow', d),
       getBudget503020:      (d) => makeRpcCall('reports:getBudget503020', d),
       getPatrimonyAllocation:(d)=> makeRpcCall('reports:getPatrimonyAllocation', d),
+      getFamilyFairShare:   (d) => makeRpcCall('reports:getFamilyFairShare', d),
+      getPersonalDRE:       (d) => makeRpcCall('reports:getPersonalDRE', d),
+      simulateStressScenarios:(d)=> makeRpcCall('reports:simulateStressScenarios', d),
     },
     backup: {
       export: () => makeRpcCall('backup:export'),

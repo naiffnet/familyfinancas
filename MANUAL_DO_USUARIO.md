@@ -340,43 +340,61 @@ O menu **Relatórios** centraliza toda a inteligência e diagnósticos financeir
 - Painel de custos contínuos anualizados (streaming, academias, planos de saúde), custo total mensal/anual e detecção de reajustes.
 
 ### 10.6 ⚠️ Auditoria de Juros e Encargos
-- Demonstrativo minucioso de multas e juros pagos (% a.d.) por categoria, fornecedor ou banco, além de descontos obtidos.
+- Demonstrativo minucioso de multas e ---
 
-### 10.7 🖨️ Impressão e Exportação em PDF
-- Emissão de relatórios limpos e formatados para arquivamento ou prestação de contas.
+## 🏛️ 11. Governança Familiar, Fair Share & Relatórios Avançados (Pilar 3) ⭐ Novo!
+
+O **Pilar 3** eleva o gerenciamento doméstico para um padrão de governança executiva, provendo equilíbrio nas finanças compartilhadas e visão estratégica do patrimônio.
+
+### 11.1 🤝 Divisão Proporcional de Despesas (Fair Share Familiar)
+- **O que é?** Uma forma justa e harmoniosa de dividir as contas da casa entre os membros da família. Em vez de uma divisão cega 50/50, o algoritmo calcula a capacidade financeira de cada um:
+  $$\% Renda_i = \frac{Renda_i}{Renda_{Total}}$$
+- **Cota Justa:** Cada membro deve contribuir para as despesas comuns na mesma proporção de sua renda auferida no mês:
+  $$CotaJusta_i = Despesas_{Total} \times \% Renda_i$$
+- **Painel de Compensações:** Mostra o saldo de cada membro ($Desembolsado_i - CotaJusta_i$) e emite as instruções automáticas de quem deve pagar quanto para quem para zerar o saldo do mês.
+- **Alternador de Modo:** Permite alternar a qualquer momento entre a **Divisão Proporcional à Renda** e a **Divisão Igualitária (50/50)**.
+
+### 11.2 📑 DRE Pessoal Estruturado (Demonstrativo do Resultado do Exercício)
+- Uma demonstração contábil formal e executiva da sua família no mês:
+  - **(+) 1. Receitas Operacionais Brutas** (Salários, Proventos e Rendimentos)
+  - **(-) 2. Despesas Essenciais Fixas** (Moradia, Alimentação Básica, Saúde, Educação)
+  - **(=) 3. Margem de Contribuição 1** (Capacidade do orçamento de sustentar a família)
+  - **(-) 4. Despesas Operacionais & Estilo de Vida** (Lazer, Assinaturas, Compras e Viagens)
+  - **(=) 5. Resultado Operacional Antes dos Encargos Financeiros**
+  - **(+/-) 6. Resultado Financeiro Líquido** (Descontos obtidos vs Juros e Multas Pagas)
+  - **(=) 7. Superávit / Déficit Líquido do Exercício**
+  - **🎯 8. Taxa de Poupança Efetiva Realizada (%)**
+
+### 11.3 🧪 Simulador de Sensibilidade & Cenários de Estresse ("E se...?")
+- Permite testar a resiliência do orçamento familiar sob diferentes choques financeiros por meio de sliders interativos:
+  - **📉 Queda na Renda Familiar:** Simula o impacto de reduções salariais de até $-60\%$.
+  - **📈 Inflação e Aumento de Custos Fixos:** Simula reajustes de aluguel e energia de até $+50\%$.
+  - **✂️ Corte de Despesas Variáveis:** Simula a economia imediata gerada pelo corte de lazer e compras.
+- **Métricas Chave de Resiliência:**
+  - Novo Saldo Líquido Mensal Estimado.
+  - **⏱️ Meses de Sobrevida da Reserva de Emergência:** Caso haja déficit, calcula por quantos meses o dinheiro em contas e CDB/CDI suportará as despesas da família sem endividamento.
+  - **Diagnóstico Automático:** Classificação entre *Finanças Resilientes* (🟢), *Atenção / Risco Moderado* (🟡) e *Risco Alto / Crítico* (🔴).
 
 ---
 
-## 🛡️ 11. Trilha de Auditoria, Segurança & LGPD
+## 📱 12. Backup Local Criptografado & Sincronização em Nuvem (Multi-Dispositivo)
 
-### 11.1 Histórico Visual de Modificações
-- Registro completo de quem criou, editou, excluiu ou quitou cada lançamento.
+### 12.1 Backup Criptografado com Chave AES-256
+- Exportação de arquivo `.encrypted` seguro. Nenhum dado financeiro fica exposto em texto plano.
 
-### 11.2 Direitos LGPD (Exportação e Exclusão Segura)
-- Baixe todos os dados em formato aberto ou efetue exclusão definitiva com 1 clique.
-
----
-
-## 💾 12. Backups, Teste de Integridade & Restauração
-
-### 12.1 Exportando Backups em Excel, CSV, JSON e Banco .db
-- Cópias de segurança exportáveis a qualquer momento.
-
-### 12.2 Testando a Integridade do Arquivo de Backup
-- Verificação técnica da consistência do arquivo antes de restaurar.
-
-### 12.3 Restaurando um Backup com Segurança
-- Recuperação integral do banco de dados em segundos.
-
-### 12.4 Painel de Saúde e Métricas do Sistema
-- Monitoramento de registros, integridade das tabelas SQLite e desempenho.
+### 12.2 Sincronização em Nuvem via End-to-End Encryption
+- Permite sincronizar sua base com o app em outros computadores ou nuvem com total privacidade (chave privada conhecida somente por você).
 
 ---
 
-## 📱 13. Acesso pelo Celular & Responsividade Mobile
+## 🎨 13. Acessibilidade, Design Responsivo & Atalhos de Teclado
 
-### 13.1 Conexão Local / Wi-Fi via QR Code
-- Abra o app no celular na mesma rede Wi-Fi lendo o QR Code no botão **Conectar Aparelho**.
+### 13.1 Atalhos Rápidos no Teclado
+- `N` ➔ Nova Despesa
+- `R` ➔ Nova Receita
+- `T` ➔ Nova Transferência
+- `Esc` ➔ Fechar modal aberto
+- `Ctrl + P` ➔ Imprimir Relatório / Gerar PDF
 
 ### 13.2 Layout Mobile, Header Centralizado & Grids Touch-Friendly
 - Header em 3 colunas, botões em 42px e gaveta deslizante para navegação ágil.
@@ -397,8 +415,8 @@ O menu **Relatórios** centraliza toda a inteligência e diagnósticos financeir
 - **Como funciona o desconto na Antecipação de Parcelas?**
   O sistema usa a fórmula de Valor Presente: cada parcela futura é descontada pela taxa mensal configurada. Quanto mais distante o vencimento, maior o desconto obtido.
 
-- **O arquivo OFX do meu banco nao esta sendo reconhecido. O que fazer?**
-  Tente exportar no formato .CSV com as colunas: Data, Descricao, Valor. O sistema aceita qualquer CSV com essas 3 colunas minimas.
+- **O arquivo OFX do meu banco não está sendo reconhecido. O que fazer?**
+  Tente exportar no formato .CSV com as colunas: Data, Descricao, Valor. O sistema aceita qualquer CSV com essas 3 colunas mínimas.
 
 - **Como o cálculo do 50-30-20 sabe o que é Essencial ou Desejo?**
   Cada categoria possui um grupo orçamentário configurado (*Necessidades 50%*, *Estilo de Vida 30%* ou *Poupança/Metas 20%*). O app soma os lançamentos pagos daquele grupo e compara com o total de receitas do mês.
@@ -409,6 +427,13 @@ O menu **Relatórios** centraliza toda a inteligência e diagnósticos financeir
 - **O que significa ter dinheiro alocado em "Renda Fixa / CDI"?**
   São contas ou caixinhas que rendem 100% do CDI (ou taxa contratada), servindo como proteção contra a inflação e mantendo liquidez para sua Reserva de Emergência.
 
+- **Como a Divisão Familiar (Fair Share) calcula quem deve para quem?**
+  O app soma todas as despesas compartilhadas pagas por cada membro e subtrai a cota que cabia a ele (baseada no percentual de sua renda). Quem pagou mais do que sua cota tem saldo a receber; quem pagou menos recebe a instrução de compensar a diferença.
+
+- **O que fazer se o Simulador de Estresse indicar menos de 3 meses de sobrevida?**
+  O diagnóstico sugerirá aumentar a meta de Reserva de Emergência e simular um corte nas despesas de estilo de vida para recuperar a margem de segurança.
+
 ---
 
-*Manual atualizado em: Agosto/2026 — Versão 1.0 com Pilar 1 (Operacional) e Pilar 2 (Orçamentos, Metas CDI & Patrimônio)*
+*Manual atualizado em: Agosto/2026 — Versão 1.0 Completa com Pilar 1 (Operacional), Pilar 2 (Orçamentos & Metas CDI) e Pilar 3 (Governança Familiar, Fair Share, DRE Pessoal & Simulador de Estresse)*
+

@@ -383,6 +383,9 @@ async function renderReports() {
       <button class="report-tab" data-tab="forecast">🔮 Projeção Preditiva</button>
       <button class="report-tab" data-tab="subscriptions">📱 Radar de Assinaturas</button>
       <button class="report-tab" data-tab="interest">⚠️ Auditoria de Juros</button>
+      <button class="report-tab" data-tab="fair_share">🤝 Divisão Familiar</button>
+      <button class="report-tab" data-tab="dre">📑 DRE Pessoal</button>
+      <button class="report-tab" data-tab="stress_test">🧪 Simulador de Estresse</button>
     </div>
     <div id="report-content"></div>`;
 
@@ -837,6 +840,348 @@ async function renderReports() {
           </div>
         </div>
       `;
+    } else if (tab === 'fair_share') {
+      let currentFairMode = State.fairShareMode || 'proportional';
+      
+      const renderFairShareView = async (mode) => {
+        State.fairShareMode = mode;
+        const fairData = await window.api.reports.getFamilyFairShare({
+          userId: State.user.id,
+          month: State.currentMonth,
+          year: State.currentYear,
+          mode
+        });
+
+        const members = fairData?.members || [];
+        const settlements = fairData?.settlements || [];
+
+        content.innerHTML = `
+          <p style="font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 20px; background: rgba(255,255,255,0.02); padding: 12px 16px; border-left: 3px solid #3b82f6; border-radius: var(--radius-sm);">
+            💡 <strong>Divisão Proporcional de Despesas (Fair Share):</strong> Equalize os gastos familiares com base na capacidade financeira real de cada membro. O algoritmo calcula a fatia justa de desembolso proporcional à renda auferida (ou divisão igualitária) e apresenta as compensações necessárias para zerar o saldo do mês.
+          </p>
+
+          <!-- SELETOR DE MODO DE RATEIO -->
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
+            <div style="display: flex; gap: 8px; background: rgba(255,255,255,0.03); padding: 4px; border-radius: 8px; border: 1px solid var(--border);">
+              <button id="btn-fair-prop" class="btn btn-sm ${mode === 'proportional' ? 'btn-primary' : 'btn-secondary'}" style="font-size: 12px;">
+                ⚖️ Proporcional à Renda
+              </button>
+              <button id="btn-fair-equal" class="btn btn-sm ${mode === 'equal' ? 'btn-primary' : 'btn-secondary'}" style="font-size: 12px;">
+                👥 Divisão Igualitária (50/50)
+              </button>
+            </div>
+            <div style="font-size: 12.5px; color: var(--text-muted);">
+              Total Renda Familiar: <strong style="color:#10b981;">${fmt.currency(fairData.totalIncome || 0)}</strong> • Total Despesas: <strong style="color:#f87171;">${fmt.currency(fairData.totalExpenses || 0)}</strong>
+            </div>
+          </div>
+
+          <!-- CARDS POR MEMBRO -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 24px;">
+            ${members.map(m => {
+              const isToReceive = m.balance > 0.01;
+              const isToPay = m.balance < -0.01;
+              return `
+                <div class="card" style="border-top: 3px solid ${m.avatarColor || '#3b82f6'}; position: relative;">
+                  <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                    <div style="width: 38px; height: 38px; border-radius: 50%; background: ${m.avatarColor || '#3b82f6'}; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px;">
+                      ${(m.name || m.username || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <div style="font-weight: 700; font-size: 14px; color: var(--text-primary);">${m.name}</div>
+                      <div style="font-size: 11.5px; color: var(--text-muted);">Participação: <strong>${m.incomeSharePct.toFixed(1)}%</strong> da renda</div>
+                    </div>
+                  </div>
+
+                  <div style="display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; margin-bottom: 14px;">
+                    <div style="display: flex; justify-content: space-between;">
+                      <span style="color: var(--text-muted);">Renda no mês:</span>
+                      <strong style="color: #10b981;">${fmt.currency(m.income)}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                      <span style="color: var(--text-muted);">Despesas pagas:</span>
+                      <strong>${fmt.currency(m.paidExpenses)}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                      <span style="color: var(--text-muted);">Cota justa calculada:</span>
+                      <strong style="color: #3b82f6;">${fmt.currency(m.targetFairShare)}</strong>
+                    </div>
+                  </div>
+
+                  <div style="padding: 10px; border-radius: 6px; text-align: center; font-size: 12.5px; font-weight: 700; background: ${isToReceive ? 'rgba(16,185,129,0.1)' : (isToPay ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.03)')}; color: ${isToReceive ? '#34d399' : (isToPay ? '#f87171' : 'var(--text-muted)')}; border: 1px solid ${isToReceive ? 'rgba(16,185,129,0.25)' : (isToPay ? 'rgba(239,68,68,0.25)' : 'var(--border)')};">
+                    ${isToReceive ? `🟢 Tem a receber: ${fmt.currency(m.balance)}` : (isToPay ? `🔴 Deve compensar: ${fmt.currency(Math.abs(m.balance))}` : '⚪ Saldo equalizado')}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+
+          <!-- MATRIZ DE LIQUIDAÇÃO E ACERTO DE CONTAS -->
+          <div class="card">
+            <h3 style="font-size: 14px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; gap: 8px;">
+              <span>💸</span> Acerto de Contas & Compensações Recomendadas
+            </h3>
+            ${settlements.length === 0 ? `
+              <div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 13px;">
+                🎉 As contas da família estão 100% equalizadas neste período! Nenhuma compensação necessária.
+              </div>
+            ` : `
+              <div style="display: flex; flex-direction: column; gap: 10px;">
+                ${settlements.map(s => `
+                  <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-radius: 8px; background: rgba(59,130,246,0.06); border: 1px solid rgba(59,130,246,0.2);">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <span style="font-size: 20px;">🔄</span>
+                      <div>
+                        <div style="font-weight: 700; font-size: 13.5px; color: var(--text-primary);">
+                          <strong>${s.fromName}</strong> deve transferir para <strong>${s.toName}</strong>
+                        </div>
+                        <div style="font-size: 11.5px; color: var(--text-muted);">Compensação para equilibrar os gastos comuns do mês</div>
+                      </div>
+                    </div>
+                    <div style="font-size: 16px; font-weight: 800; color: #60a5fa;">
+                      ${fmt.currency(s.amount)}
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            `}
+          </div>
+        `;
+
+        document.getElementById('btn-fair-prop')?.addEventListener('click', () => renderFairShareView('proportional'));
+        document.getElementById('btn-fair-equal')?.addEventListener('click', () => renderFairShareView('equal'));
+      };
+
+      await renderFairShareView(currentFairMode);
+
+    } else if (tab === 'dre') {
+      const dre = await window.api.reports.getPersonalDRE({
+        userId: State.user.id,
+        month: State.currentMonth,
+        year: State.currentYear
+      });
+
+      content.innerHTML = `
+        <p style="font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 20px; background: rgba(255,255,255,0.02); padding: 12px 16px; border-left: 3px solid #10b981; border-radius: var(--radius-sm);">
+          💡 <strong>DRE Pessoal (Demonstrativo do Resultado do Exercício):</strong> Visão contábil executiva com margens financeiras, resultado operacional antes de encargos e taxa de poupança líquida auferida no mês.
+        </p>
+
+        <!-- KPI CARDS DO DRE -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px;">
+          <div class="card" style="text-align: center; border-top: 3px solid #10b981;">
+            <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">💵 Receita Bruta Realizada</div>
+            <div style="font-size: 22px; font-weight: 800; color: #34d399;">${fmt.currency(dre.grossIncome || 0)}</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Salários e proventos líquidos</div>
+          </div>
+          <div class="card" style="text-align: center; border-top: 3px solid #3b82f6;">
+            <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">🛡️ Margem de Contribuição 1</div>
+            <div style="font-size: 22px; font-weight: 800; color: #60a5fa;">${fmt.currency(dre.contributionMargin1 || 0)}</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Após custos essenciais fixos</div>
+          </div>
+          <div class="card" style="text-align: center; border-top: 3px solid ${dre.isSurplus ? '#10b981' : '#ef4444'};">
+            <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">🎯 Superávit Líquido do Exercício</div>
+            <div style="font-size: 22px; font-weight: 800; color: ${dre.isSurplus ? '#34d399' : '#f87171'};">${fmt.currency(dre.netResult || 0)}</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Taxa de Poupança: <strong>${dre.savingsRatePct}%</strong></div>
+          </div>
+        </div>
+
+        <!-- TABELA CONTÁBIL DO DRE -->
+        <div class="card" style="margin-bottom: 20px;">
+          <h3 style="font-size: 14px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;">
+            <span>📑 Demonstrativo Contábil Detalhado</span>
+            <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;">Competência: ${dre.period}</span>
+          </h3>
+
+          <div class="table-wrapper">
+            <table style="width: 100%; border-collapse: collapse;">
+              <tbody>
+                <tr style="background: rgba(16,185,129,0.06); font-weight: 800; border-bottom: 1px solid var(--border);">
+                  <td style="padding: 12px 16px;">(+) 1. RECEITAS OPERACIONAIS BRUTAS</td>
+                  <td class="text-right" style="padding: 12px 16px; color: #34d399; font-size: 15px;">${fmt.currency(dre.grossIncome)}</td>
+                  <td class="text-right" style="padding: 12px 16px; color: var(--text-muted); width: 90px;">100.0%</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 10px 16px 10px 32px; color: var(--text-muted);">(-) 2. Despesas Essenciais Fixas (Moradia, Alimentação, Saúde, Educação)</td>
+                  <td class="text-right" style="padding: 10px 16px; color: #f87171; font-weight: 600;">-${fmt.currency(dre.totalEssential)}</td>
+                  <td class="text-right" style="padding: 10px 16px; color: var(--text-muted);">${dre.essentialPct}%</td>
+                </tr>
+                <tr style="background: rgba(59,130,246,0.06); font-weight: 700; border-bottom: 1px solid var(--border);">
+                  <td style="padding: 10px 16px;">(=) 3. MARGEM DE CONTRIBUIÇÃO (RESULTADO BRUTO)</td>
+                  <td class="text-right" style="padding: 10px 16px; color: #60a5fa; font-size: 14px;">${fmt.currency(dre.contributionMargin1)}</td>
+                  <td class="text-right" style="padding: 10px 16px; color: var(--text-muted);">${dre.grossIncome > 0 ? ((dre.contributionMargin1 / dre.grossIncome) * 100).toFixed(1) : 0}%</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 10px 16px 10px 32px; color: var(--text-muted);">(-) 4. Despesas Operacionais & Estilo de Vida (Lazer, Assinaturas, Compras)</td>
+                  <td class="text-right" style="padding: 10px 16px; color: #f87171; font-weight: 600;">-${fmt.currency(dre.totalLifestyle)}</td>
+                  <td class="text-right" style="padding: 10px 16px; color: var(--text-muted);">${dre.lifestylePct}%</td>
+                </tr>
+                <tr style="background: rgba(255,255,255,0.02); font-weight: 700; border-bottom: 1px solid var(--border);">
+                  <td style="padding: 10px 16px;">(=) 5. RESULTADO OPERACIONAL ANTES DOS ENCARGOS</td>
+                  <td class="text-right" style="padding: 10px 16px; color: var(--text-primary); font-size: 14px;">${fmt.currency(dre.operatingResult)}</td>
+                  <td class="text-right" style="padding: 10px 16px; color: var(--text-muted);">${dre.grossIncome > 0 ? ((dre.operatingResult / dre.grossIncome) * 100).toFixed(1) : 0}%</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                  <td style="padding: 10px 16px 10px 32px; color: var(--text-muted);">(+/-) 6. Resultado Financeiro Líquido (Descontos obtidos vs Juros e Multas)</td>
+                  <td class="text-right" style="padding: 10px 16px; color: ${dre.financialResult.net >= 0 ? '#34d399' : '#f87171'}; font-weight: 600;">
+                    ${dre.financialResult.net >= 0 ? `+${fmt.currency(dre.financialResult.net)}` : `-${fmt.currency(Math.abs(dre.financialResult.net))}`}
+                  </td>
+                  <td class="text-right" style="padding: 10px 16px; color: var(--text-muted);">—</td>
+                </tr>
+                <tr style="background: ${dre.isSurplus ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)'}; font-weight: 900; border-top: 2px solid ${dre.isSurplus ? '#10b981' : '#ef4444'};">
+                  <td style="padding: 14px 16px; font-size: 14.5px;">(=) 7. SUPERÁVIT / (DÉFICIT) LÍQUIDO DO EXERCÍCIO</td>
+                  <td class="text-right" style="padding: 14px 16px; color: ${dre.isSurplus ? '#34d399' : '#f87171'}; font-size: 17px;">${fmt.currency(dre.netResult)}</td>
+                  <td class="text-right" style="padding: 14px 16px; color: var(--text-primary); font-weight: 800;">${dre.savingsRatePct}%</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+
+    } else if (tab === 'stress_test') {
+      let shockIncome = 0;
+      let shockFixed = 0;
+      let shockVariable = 0;
+
+      const renderStressView = async () => {
+        const sim = await window.api.reports.simulateStressScenarios({
+          userId: State.user.id,
+          incomeShockPct: shockIncome,
+          fixedExpenseShockPct: shockFixed,
+          variableExpenseShockPct: shockVariable
+        });
+
+        content.innerHTML = `
+          <p style="font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 20px; background: rgba(255,255,255,0.02); padding: 12px 16px; border-left: 3px solid #ec4899; border-radius: var(--radius-sm);">
+            💡 <strong>Simulador de Sensibilidade & Cenários de Estresse ("E se...?"):</strong> Projete a solidez do orçamento familiar em situações adversas (quedas de faturamento, aumento de aluguel/inflação ou cortes de despesas) e conheça a sobrevida real da sua reserva de emergência.
+          </p>
+
+          <!-- CONTROLES INTERATIVOS DE CHOQUE -->
+          <div class="card" style="margin-bottom: 20px;">
+            <h3 style="font-size: 14px; font-weight: 700; margin-bottom: 16px;">🎛️ Parâmetros de Simulação de Choque</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+              <div>
+                <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; margin-bottom: 6px;">
+                  <span>📉 Queda na Renda Familiar:</span>
+                  <strong style="color: #f87171;">-${shockIncome}%</strong>
+                </div>
+                <input type="range" id="slider-shock-income" min="0" max="60" step="5" value="${shockIncome}" style="width: 100%; cursor: pointer;">
+                <div style="display: flex; justify-content: space-between; font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">
+                  <span>0% (Normal)</span>
+                  <span>-30% (Crise)</span>
+                  <span>-60% (Severo)</span>
+                </div>
+              </div>
+
+              <div>
+                <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; margin-bottom: 6px;">
+                  <span>📈 Inflação / Aumento de Custos Fixos:</span>
+                  <strong style="color: #fbbf24;">+${shockFixed}%</strong>
+                </div>
+                <input type="range" id="slider-shock-fixed" min="0" max="50" step="5" value="${shockFixed}" style="width: 100%; cursor: pointer;">
+                <div style="display: flex; justify-content: space-between; font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">
+                  <span>0% (Estável)</span>
+                  <span>+20% (Alta)</span>
+                  <span>+50% (Crítica)</span>
+                </div>
+              </div>
+
+              <div>
+                <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; margin-bottom: 6px;">
+                  <span>✂️ Corte de Despesas Variáveis (Lazer/Extras):</span>
+                  <strong style="color: #34d399;">-${shockVariable}%</strong>
+                </div>
+                <input type="range" id="slider-shock-var" min="0" max="70" step="5" value="${shockVariable}" style="width: 100%; cursor: pointer;">
+                <div style="display: flex; justify-content: space-between; font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">
+                  <span>0% (Sem cortes)</span>
+                  <span>-30% (Aperto)</span>
+                  <span>-70% (Essencial)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- DIAGNÓSTICO DE RESILIÊNCIA -->
+          <div class="card" style="margin-bottom: 20px; background: ${sim.stressStatus === 'critical' ? 'rgba(239,68,68,0.08)' : (sim.stressStatus === 'warning' ? 'rgba(245,158,11,0.08)' : 'rgba(16,185,129,0.08)')}; border: 1px solid ${sim.stressStatus === 'critical' ? 'rgba(239,68,68,0.25)' : (sim.stressStatus === 'warning' ? 'rgba(245,158,11,0.25)' : 'rgba(16,185,129,0.25)')};">
+            <div style="font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px;">
+              ${sim.stressDiagnosis}
+            </div>
+            <div style="font-size: 12.5px; color: var(--text-muted);">
+              Reserva de Emergência Líquida Atual: <strong style="color: var(--text-primary);">${fmt.currency(sim.base.liquidReserve)}</strong>
+            </div>
+          </div>
+
+          <!-- COMPARAÇÃO BASE VS CENÁRIO SIMULADO -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+            <div class="card">
+              <h4 style="font-size: 13px; font-weight: 700; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase;">📊 Cenário Base Atual</h4>
+              <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+                <div style="display: flex; justify-content: space-between;">
+                  <span>Renda Mensal:</span>
+                  <strong style="color: #34d399;">${fmt.currency(sim.base.income)}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                  <span>Despesas Fixas:</span>
+                  <strong>${fmt.currency(sim.base.essential)}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                  <span>Despesas Variáveis:</span>
+                  <strong>${fmt.currency(sim.base.lifestyle)}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px solid var(--border);">
+                  <span>Saldo Mensal:</span>
+                  <strong style="color: ${sim.base.income - sim.base.essential - sim.base.lifestyle >= 0 ? '#34d399' : '#f87171'};">
+                    ${fmt.currency(sim.base.income - sim.base.essential - sim.base.lifestyle)}
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="card" style="border: 2px solid ${sim.simulated.netMonthly >= 0 ? '#10b981' : '#ef4444'};">
+              <h4 style="font-size: 13px; font-weight: 700; color: var(--accent-light); margin-bottom: 12px; text-transform: uppercase;">🧪 Cenário Estressado</h4>
+              <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+                <div style="display: flex; justify-content: space-between;">
+                  <span>Nova Renda Estimada:</span>
+                  <strong style="color: #34d399;">${fmt.currency(sim.simulated.income)}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                  <span>Novas Despesas Fixas:</span>
+                  <strong>${fmt.currency(sim.simulated.essential)}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                  <span>Novas Despesas Variáveis:</span>
+                  <strong>${fmt.currency(sim.simulated.lifestyle)}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px solid var(--border);">
+                  <span>Novo Saldo Líquido:</span>
+                  <strong style="color: ${sim.simulated.netMonthly >= 0 ? '#34d399' : '#f87171'}; font-size: 15px;">
+                    ${fmt.currency(sim.simulated.netMonthly)}
+                  </strong>
+                </div>
+                ${sim.simulated.netMonthly < 0 ? `
+                  <div style="padding: 8px 10px; border-radius: 6px; background: rgba(239,68,68,0.1); color: #f87171; font-weight: 700; font-size: 12px; text-align: center; margin-top: 6px;">
+                    ⏱️ Sobrevida da Reserva: ${sim.simulated.emergencyRunwayMonths} meses
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+
+        document.getElementById('slider-shock-income')?.addEventListener('input', (e) => {
+          shockIncome = Number(e.target.value);
+          renderStressView();
+        });
+        document.getElementById('slider-shock-fixed')?.addEventListener('input', (e) => {
+          shockFixed = Number(e.target.value);
+          renderStressView();
+        });
+        document.getElementById('slider-shock-var')?.addEventListener('input', (e) => {
+          shockVariable = Number(e.target.value);
+          renderStressView();
+        });
+      };
+
+      await renderStressView();
     }
   }
   await loadTab('cashflow');

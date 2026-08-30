@@ -99,6 +99,9 @@ contextBridge.exposeInMainWorld('api', {
     getPredictiveCashflow:(d) => ipcRenderer.invoke('reports:getPredictiveCashflow', d),
     getBudget503020:      (d) => ipcRenderer.invoke('reports:getBudget503020', d),
     getPatrimonyAllocation:(d)=> ipcRenderer.invoke('reports:getPatrimonyAllocation', d),
+    getFamilyFairShare:   (d) => ipcRenderer.invoke('reports:getFamilyFairShare', d),
+    getPersonalDRE:       (d) => ipcRenderer.invoke('reports:getPersonalDRE', d),
+    simulateStressScenarios:(d)=> ipcRenderer.invoke('reports:simulateStressScenarios', d),
   },
   backup: {
     export: () => ipcRenderer.invoke('backup:export'),

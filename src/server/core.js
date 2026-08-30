@@ -141,6 +141,9 @@ function createOwnershipChecks(db) {
     'reports:getPredictiveCashflow': (session, d) => isSameFamilyUser(db, d ? d.userId : null, session),
     'reports:getBudget503020': (session, d) => isSameFamilyUser(db, d ? d.userId : null, session),
     'reports:getPatrimonyAllocation': (session, d) => isSameFamilyUser(db, d ? d.userId : null, session),
+    'reports:getFamilyFairShare': (session, d) => isSameFamilyUser(db, d ? d.userId : null, session),
+    'reports:getPersonalDRE': (session, d) => isSameFamilyUser(db, d ? d.userId : null, session),
+    'reports:simulateStressScenarios': (session, d) => isSameFamilyUser(db, d ? d.userId : null, session),
     'permissions:get': (session, userId) => isSameFamilyUser(db, userId, session.familyId),
     'permissions:update': (session, d) => {
       if (session.profileType !== 1 && session.profileType !== 2) return false;
@@ -266,6 +269,9 @@ function buildHandlers(db) {
     'reports:getCashflow': (d) => db.getCashflow(d.userId, d.month, d.year),
     'reports:getPatrimony': (d) => db.getPatrimony(d.userId),
     'reports:getInterestAudit': (d) => db.getInterestAuditReport(d.userId, d.month, d.year),
+    'reports:getFamilyFairShare': (d) => db.getFamilyFairShareReport(d.userId, d.month, d.year, d.mode),
+    'reports:getPersonalDRE': (d) => db.getPersonalDRE(d.userId, d.month, d.year),
+    'reports:simulateStressScenarios': (d) => db.simulateStressScenarios(d.userId, d),
     'permissions:get': (userId) => db.getUserPermissions(userId),
     'permissions:update': (data) => db.updateUserPermissions(data),
     'families:getAll': () => db.getFamilies(),

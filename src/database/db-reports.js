@@ -1252,6 +1252,281 @@ module.exports = (Base) => class extends Base {
       diversificationDiagnosis
     };
   }
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════
+   * PILAR 3: GOVERNANÇA FAMILIAR & RELATÓRIOS AVANÇADOS
+   * ═══════════════════════════════════════════════════════════════════
+   */
+
+  /**
+   * 1. Divisão Proporcional de Despesas / Fair Share Familiar
+   * Apura a renda e despesas por membro e gera a matriz de compensação financeira.
+   */
+  getFamilyFairShareReport(userId, month, year, mode = 'proportional') {
+    const user = this.db.prepare('SELECT family_id, profile_type FROM users WHERE id = ?').get(userId);
+    if (!user) return { members: [], settlements: [], totalIncome: 0, totalExpenses: 0, mode };
+
+    const familyId = user.family_id;
+    let members = [];
+    if (familyId) {
+      members = this.db.prepare('SELECT id, name, username, avatar_color, profile_type FROM users WHERE family_id = ?').all(familyId);
+    } else {
+      members = this.db.prepare('SELECT id, name, username, avatar_color, profile_type FROM users WHERE id = ?').all(userId);
+    }
+
+    const m = month ? String(month).padStart(2, '0') : String(new Date().getMonth() + 1).padStart(2, '0');
+    const y = year ? String(year) : String(new Date().getFullYear());
+
+    let totalFamilyIncome = 0;
+    let totalFamilyExpenses = 0;
+
+    const memberStats = members.map(mUser => {
+      // Receitas auferidas pelo membro no mês
+      const incRow = this.db.prepare(`
+        SELECT COALESCE(SUM(amount + COALESCE(penalty_amount, 0) - COALESCE(discount_amount, 0)), 0) as total
+        FROM transactions
+        WHERE user_id = ? AND type = 'income'
+          AND strftime('%m', COALESCE(payment_date, date)) = ?
+          AND strftime('%Y', COALESCE(payment_date, date)) = ?
+      `).get(mUser.id, m, y);
+
+      // Despesas pagas pelo membro no mês
+      const expRow = this.db.prepare(`
+        SELECT COALESCE(SUM(amount + COALESCE(penalty_amount, 0) - COALESCE(discount_amount, 0)), 0) as total
+        FROM transactions
+        WHERE user_id = ? AND type = 'expense'
+          AND strftime('%m', COALESCE(payment_date, date)) = ?
+          AND strftime('%Y', COALESCE(payment_date, date)) = ?
+      `).get(mUser.id, m, y);
+
+      const income = incRow ? incRow.total : 0;
+      const expense = expRow ? expRow.total : 0;
+
+      totalFamilyIncome += income;
+      totalFamilyExpenses += expense;
+
+      return {
+        userId: mUser.id,
+        name: mUser.name || mUser.username,
+        username: mUser.username,
+        avatarColor: mUser.avatar_color || '#3b82f6',
+        income: Math.round(income * 100) / 100,
+        paidExpenses: Math.round(expense * 100) / 100,
+        incomeSharePct: 0,
+        targetFairShare: 0,
+        balance: 0 // Positivo: tem a receber | Negativo: deve pagar
+      };
+    });
+
+    const activeMembersCount = memberStats.length || 1;
+
+    // Calcular cotas justas
+    memberStats.forEach(stat => {
+      if (mode === 'proportional') {
+        stat.incomeSharePct = totalFamilyIncome > 0 ? (stat.income / totalFamilyIncome) * 100 : (100 / activeMembersCount);
+        stat.targetFairShare = Math.round((totalFamilyExpenses * (stat.incomeSharePct / 100)) * 100) / 100;
+      } else {
+        // Modo igualitário (50/50 ou 1/N)
+        stat.incomeSharePct = Math.round((100 / activeMembersCount) * 10) / 10;
+        stat.targetFairShare = Math.round((totalFamilyExpenses / activeMembersCount) * 100) / 100;
+      }
+      stat.balance = Math.round((stat.paidExpenses - stat.targetFairShare) * 100) / 100;
+    });
+
+    // Gerar matriz de compensação / liquidação (quem paga para quem)
+    const debtors = memberStats.filter(s => s.balance < -0.01).map(s => ({ ...s, remaining: Math.abs(s.balance) }));
+    const creditors = memberStats.filter(s => s.balance > 0.01).map(s => ({ ...s, remaining: s.balance }));
+    const settlements = [];
+
+    debtors.forEach(debtor => {
+      creditors.forEach(creditor => {
+        if (debtor.remaining > 0.01 && creditor.remaining > 0.01) {
+          const payAmount = Math.min(debtor.remaining, creditor.remaining);
+          if (payAmount > 0.01) {
+            settlements.push({
+              fromUserId: debtor.userId,
+              fromName: debtor.name,
+              toUserId: creditor.userId,
+              toName: creditor.name,
+              amount: Math.round(payAmount * 100) / 100,
+              description: `${debtor.name} ➔ Pagar R$ ${payAmount.toFixed(2).replace('.', ',')} para ${creditor.name}`
+            });
+            debtor.remaining -= payAmount;
+            creditor.remaining -= payAmount;
+          }
+        }
+      });
+    });
+
+    return {
+      month: m,
+      year: y,
+      mode,
+      totalIncome: Math.round(totalFamilyIncome * 100) / 100,
+      totalExpenses: Math.round(totalFamilyExpenses * 100) / 100,
+      members: memberStats,
+      settlements
+    };
+  }
+
+  /**
+   * 2. DRE Pessoal Estruturado (Demonstrativo do Resultado do Exercício)
+   * Visão contábil executiva com margens, resultado operacional e superávit líquido.
+   */
+  getPersonalDRE(userId, month, year) {
+    const user = this.db.prepare('SELECT family_id, profile_type FROM users WHERE id = ?').get(userId);
+    const familyId = user ? user.family_id : null;
+    const profileType = user ? user.profile_type : 2;
+    const perm = this.getUserPermissions(userId);
+
+    const m = month ? String(month).padStart(2, '0') : String(new Date().getMonth() + 1).padStart(2, '0');
+    const y = year ? String(year) : String(new Date().getFullYear());
+
+    let baseFilter = "WHERE strftime('%m', COALESCE(t.payment_date, t.date)) = ? AND strftime('%Y', COALESCE(t.payment_date, t.date)) = ?";
+    const params = [m, y];
+
+    if (profileType !== 1) {
+      if (perm.can_view_all === 1 && familyId) {
+        baseFilter += " AND (u.family_id = ? OR u_acc.family_id = ?)";
+        params.push(familyId, familyId);
+      } else {
+        baseFilter += " AND (t.user_id = ? OR a.user_id = ?)";
+        params.push(userId, userId);
+      }
+    }
+
+    const joins = `
+      FROM transactions t
+      LEFT JOIN categories c ON t.category_id = c.id
+      LEFT JOIN accounts a ON t.account_id = a.id
+      LEFT JOIN users u ON t.user_id = u.id
+      LEFT JOIN users u_acc ON a.user_id = u_acc.id
+    `;
+
+    const txs = this.db.prepare(`
+      SELECT t.*, c.name as category_name, c.budget_group, c.icon as category_icon, c.type as category_type
+      ${joins}
+      ${baseFilter}
+    `).all(...params);
+
+    // 1. Receitas Operacionais Brutas
+    const incomeItems = txs.filter(t => t.type === 'income');
+    const grossIncome = incomeItems.reduce((acc, t) => acc + (t.amount || 0) + (t.penalty_amount || 0) - (t.discount_amount || 0), 0);
+
+    // 2. Despesas Essenciais Fixas (Necessidades / Needs)
+    const essentialItems = txs.filter(t => t.type === 'expense' && (t.budget_group === 'needs' || !t.budget_group));
+    const totalEssential = essentialItems.reduce((acc, t) => acc + (t.amount || 0) + (t.penalty_amount || 0) - (t.discount_amount || 0), 0);
+
+    // 3. Margem de Contribuição 1
+    const contributionMargin1 = grossIncome - totalEssential;
+
+    // 4. Despesas Operacionais & Estilo de Vida (Desejos / Wants)
+    const lifestyleItems = txs.filter(t => t.type === 'expense' && t.budget_group === 'wants');
+    const totalLifestyle = lifestyleItems.reduce((acc, t) => acc + (t.amount || 0) + (t.penalty_amount || 0) - (t.discount_amount || 0), 0);
+
+    // 5. Resultado Operacional Antes do Resultado Financeiro
+    const operatingResult = contributionMargin1 - totalLifestyle;
+
+    // 6. Resultado Financeiro Líquido
+    // Proventos/Rendimentos (+) vs Multas e Juros Pagos (-)
+    const totalPenalties = txs.filter(t => t.type === 'expense').reduce((acc, t) => acc + (t.penalty_amount || 0), 0);
+    const totalDiscounts = txs.filter(t => t.type === 'expense').reduce((acc, t) => acc + (t.discount_amount || 0), 0);
+    const financialResult = totalDiscounts - totalPenalties;
+
+    // 7. Resultado Líquido do Exercício (Superávit ou Déficit do Mês)
+    const netResult = operatingResult + financialResult;
+    const savingsRatePct = grossIncome > 0 ? Math.max(0, (netResult / grossIncome) * 100) : 0;
+
+    return {
+      period: `${m}/${y}`,
+      grossIncome: Math.round(grossIncome * 100) / 100,
+      totalEssential: Math.round(totalEssential * 100) / 100,
+      contributionMargin1: Math.round(contributionMargin1 * 100) / 100,
+      totalLifestyle: Math.round(totalLifestyle * 100) / 100,
+      operatingResult: Math.round(operatingResult * 100) / 100,
+      financialResult: {
+        penalties: Math.round(totalPenalties * 100) / 100,
+        discounts: Math.round(totalDiscounts * 100) / 100,
+        net: Math.round(financialResult * 100) / 100
+      },
+      netResult: Math.round(netResult * 100) / 100,
+      savingsRatePct: Math.round(savingsRatePct * 10) / 10,
+      isSurplus: netResult >= 0,
+      essentialPct: grossIncome > 0 ? Math.round((totalEssential / grossIncome) * 100) : 0,
+      lifestylePct: grossIncome > 0 ? Math.round((totalLifestyle / grossIncome) * 100) : 0
+    };
+  }
+
+  /**
+   * 3. Simulador de Sensibilidade & Cenários de Estresse (Stress Testing)
+   * Simula o impacto de choques na renda ou despesas e calcula a nova sobrevida da reserva.
+   */
+  simulateStressScenarios(userId, { incomeShockPct = 0, fixedExpenseShockPct = 0, variableExpenseShockPct = 0 } = {}) {
+    const dre = this.getPersonalDRE(userId);
+    const patrimony = this.getPatrimonyAllocation(userId);
+
+    const baseIncome = dre.grossIncome || 5000;
+    const baseEssential = dre.totalEssential || 2500;
+    const baseLifestyle = dre.totalLifestyle || 1500;
+    const liquidReserve = (patrimony?.distribution || [])
+      .filter(d => ['checking', 'savings', 'cdb_di'].includes(d.key))
+      .reduce((sum, d) => sum + d.amount, 0) || patrimony.totalAssets || 10000;
+
+    // Aplicação dos choques
+    const simulatedIncome = Math.max(0, baseIncome * (1 - (incomeShockPct / 100)));
+    const simulatedEssential = baseEssential * (1 + (fixedExpenseShockPct / 100));
+    const simulatedLifestyle = Math.max(0, baseLifestyle * (1 - (variableExpenseShockPct / 100)));
+
+    const simulatedTotalExpenses = simulatedEssential + simulatedLifestyle;
+    const simulatedNetMonthly = simulatedIncome - simulatedTotalExpenses;
+
+    // Cálculo de meses de sobrevida
+    let emergencyRunwayMonths = 999;
+    if (simulatedNetMonthly < 0) {
+      emergencyRunwayMonths = Math.round((liquidReserve / Math.abs(simulatedNetMonthly)) * 10) / 10;
+    }
+
+    let stressStatus = 'safe';
+    let stressDiagnosis = '🟢 Finanças Resilientes: O orçamento continua gerando superávit mesmo sob o cenário de estresse.';
+
+    if (simulatedNetMonthly < 0) {
+      if (emergencyRunwayMonths < 3) {
+        stressStatus = 'critical';
+        stressDiagnosis = `🔴 Risco Alto: A reserva cobrirá apenas ${emergencyRunwayMonths} meses de déficit. Recomenda-se cortar despesas variáveis imediatamente.`;
+      } else if (emergencyRunwayMonths < 6) {
+        stressStatus = 'warning';
+        stressDiagnosis = `🟡 Atenção: Sobrevida estimada de ${emergencyRunwayMonths} meses. Reserva cobre o período de reestruturação.`;
+      } else {
+        stressStatus = 'moderate';
+        stressDiagnosis = `🟢 Resiliência Moderada: Sobrevida de ${emergencyRunwayMonths} meses de reserva em caixa.`;
+      }
+    }
+
+    return {
+      base: {
+        income: baseIncome,
+        essential: baseEssential,
+        lifestyle: baseLifestyle,
+        liquidReserve
+      },
+      simulated: {
+        income: Math.round(simulatedIncome * 100) / 100,
+        essential: Math.round(simulatedEssential * 100) / 100,
+        lifestyle: Math.round(simulatedLifestyle * 100) / 100,
+        totalExpenses: Math.round(simulatedTotalExpenses * 100) / 100,
+        netMonthly: Math.round(simulatedNetMonthly * 100) / 100,
+        emergencyRunwayMonths
+      },
+      shocks: {
+        incomeShockPct,
+        fixedExpenseShockPct,
+        variableExpenseShockPct
+      },
+      stressStatus,
+      stressDiagnosis
+    };
+  }
 };
 
 
