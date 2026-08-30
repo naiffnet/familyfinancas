@@ -189,12 +189,15 @@ async function renderDashboard() {
 
     bindDashboardEvents(contentDiv, effectiveSummary, effectiveTxs, monthly, today);
 
-    // Carregar painéis do Pilar 1 (Preditivo & Radar)
+    // Carregar painéis do Pilar 1 (Preditivo & Radar) e Pilar 2 (Regra 50-30-20)
     if (typeof renderPredictiveForecastSection === 'function') {
       renderPredictiveForecastSection(document.getElementById('dash-predictive-forecast-container'));
     }
     if (typeof renderSubscriptionRadarSection === 'function') {
       renderSubscriptionRadarSection(document.getElementById('dash-subscription-radar-container'));
+    }
+    if (typeof renderBudget503020DashboardWidget === 'function') {
+      renderBudget503020DashboardWidget(document.getElementById('dash-budget-503020-container'));
     }
 
   } else {
@@ -225,6 +228,9 @@ function renderExecutiveLayout(contentDiv, members, activeMemberFilter, activeTy
 
     <!-- 3.2 RADAR DE ASSINATURAS & RECORRÊNCIAS (PILAR 1) -->
     <div id="dash-subscription-radar-container"></div>
+
+    <!-- 3.3 EQUILÍBRIO ORÇAMENTÁRIO REGRA 50-30-20 (PILAR 2) -->
+    <div id="dash-budget-503020-container"></div>
 
     <!-- 4. PAINEL OPERACIONAL KANBAN 3 COLUNAS -->
     <div style="margin-bottom: 20px;">
@@ -320,6 +326,15 @@ function renderCockpitLayout(contentDiv, members, activeMemberFilter, activeType
 
     <!-- 3. ACTION PILLS HUB -->
     ${renderDashboardActionPills(summary, potentialDuplicates, today)}
+
+    <!-- 3.1 PROJEÇÃO PREDITIVA DE SALDO FUTURO (PILAR 1) -->
+    <div id="dash-predictive-forecast-container"></div>
+
+    <!-- 3.2 RADAR DE ASSINATURAS & RECORRÊNCIAS (PILAR 1) -->
+    <div id="dash-subscription-radar-container"></div>
+
+    <!-- 3.3 EQUILÍBRIO ORÇAMENTÁRIO REGRA 50-30-20 (PILAR 2) -->
+    <div id="dash-budget-503020-container"></div>
 
     <!-- 4. PAINEL OPERACIONAL KANBAN 3 COLUNAS (LARGURA TOTAL) -->
     <div style="margin-bottom: 20px;">

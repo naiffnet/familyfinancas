@@ -1,7 +1,7 @@
 /* ============================================
  * app.bundle.js — FamilyFinancas Renderer
  * Gerado por: npm run build:renderer
- * 2026-08-30T20:47:05.352Z
+ * 2026-08-30T20:58:40.452Z
  * Modulos: 26
  * ============================================ */
 
@@ -1119,12 +1119,15 @@ async function renderDashboard() {
 
     bindDashboardEvents(contentDiv, effectiveSummary, effectiveTxs, monthly, today);
 
-    // Carregar painéis do Pilar 1 (Preditivo & Radar)
+    // Carregar painéis do Pilar 1 (Preditivo & Radar) e Pilar 2 (Regra 50-30-20)
     if (typeof renderPredictiveForecastSection === 'function') {
       renderPredictiveForecastSection(document.getElementById('dash-predictive-forecast-container'));
     }
     if (typeof renderSubscriptionRadarSection === 'function') {
       renderSubscriptionRadarSection(document.getElementById('dash-subscription-radar-container'));
+    }
+    if (typeof renderBudget503020DashboardWidget === 'function') {
+      renderBudget503020DashboardWidget(document.getElementById('dash-budget-503020-container'));
     }
 
   } else {
@@ -1155,6 +1158,9 @@ function renderExecutiveLayout(contentDiv, members, activeMemberFilter, activeTy
 
     <!-- 3.2 RADAR DE ASSINATURAS & RECORRÊNCIAS (PILAR 1) -->
     <div id="dash-subscription-radar-container"></div>
+
+    <!-- 3.3 EQUILÍBRIO ORÇAMENTÁRIO REGRA 50-30-20 (PILAR 2) -->
+    <div id="dash-budget-503020-container"></div>
 
     <!-- 4. PAINEL OPERACIONAL KANBAN 3 COLUNAS -->
     <div style="margin-bottom: 20px;">
@@ -1250,6 +1256,15 @@ function renderCockpitLayout(contentDiv, members, activeMemberFilter, activeType
 
     <!-- 3. ACTION PILLS HUB -->
     ${renderDashboardActionPills(summary, potentialDuplicates, today)}
+
+    <!-- 3.1 PROJEÇÃO PREDITIVA DE SALDO FUTURO (PILAR 1) -->
+    <div id="dash-predictive-forecast-container"></div>
+
+    <!-- 3.2 RADAR DE ASSINATURAS & RECORRÊNCIAS (PILAR 1) -->
+    <div id="dash-subscription-radar-container"></div>
+
+    <!-- 3.3 EQUILÍBRIO ORÇAMENTÁRIO REGRA 50-30-20 (PILAR 2) -->
+    <div id="dash-budget-503020-container"></div>
 
     <!-- 4. PAINEL OPERACIONAL KANBAN 3 COLUNAS (LARGURA TOTAL) -->
     <div style="margin-bottom: 20px;">
@@ -2546,6 +2561,78 @@ async function renderSubscriptionRadarSection(container) {
     `;
   } catch (e) {
     console.warn('Erro ao renderizar radar de assinaturas:', e);
+  }
+}
+
+async function renderBudget503020DashboardWidget(container) {
+  if (!container) return;
+  try {
+    const analysis = await window.api.reports.getBudget503020({
+      userId: State.user.id,
+      month: State.currentMonth,
+      year: State.currentYear
+    });
+
+    if (!analysis || !analysis.groups || analysis.groups.length === 0) return;
+
+    const statusColors = {
+      safe: '#10b981',
+      warning: '#f59e0b',
+      danger: '#ef4444'
+    };
+
+    container.innerHTML = `
+      <div style="padding: 18px 20px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-surface); margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 22px;">⚖️</span>
+            <div>
+              <div style="font-weight: 800; font-size: 15px; color: var(--text-primary);">
+                Equilíbrio Orçamentário — Regra 50 - 30 - 20
+              </div>
+              <div style="font-size: 11.5px; color: var(--text-muted);">
+                Distribuição da renda líquida entre Necessidades (50%), Desejos (30%) e Poupança/Metas (20%)
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="navigate('budget')" style="font-size: 12px; padding: 4px 12px; border-radius: 6px;">
+              Detalhes do Orçamento ➔
+            </button>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-bottom: 12px;">
+          ${analysis.groups.map(g => {
+            const color = statusColors[g.status] || '#10b981';
+            return `
+              <div style="padding: 12px 14px; border-radius: 8px; background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-left: 3px solid ${color};">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <span style="font-weight: 700; font-size: 13px; color: var(--text-primary);">${g.name}</span>
+                  <span style="font-weight: 800; font-size: 12px; color: ${color};">${g.currentPct}% / ${g.targetPct}%</span>
+                </div>
+                <div style="height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; margin-bottom: 6px;">
+                  <div style="height: 100%; width: ${Math.min(100, (g.currentPct / g.targetPct) * 100)}%; background: ${color}; border-radius: 3px;"></div>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+                  <span>Gasto: <b>${fmt.currency(g.spent)}</b></span>
+                  <span>Teto: <b>${fmt.currency(g.targetAmount)}</b></span>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
+        ${analysis.diagnosis ? `
+          <div style="font-size: 12px; color: var(--text-secondary); background: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: 6px; border-left: 2px solid #3b82f6;">
+            💡 <strong>Diagnóstico Automático:</strong> ${analysis.diagnosis}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  } catch (e) {
+    console.warn('Erro ao renderizar widget 50-30-20 no dashboard:', e);
   }
 }
 
