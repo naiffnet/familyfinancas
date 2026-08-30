@@ -377,10 +377,12 @@ async function renderReports() {
       </div>
     </div>
     <div class="report-tabs">
-      <button class="report-tab active" data-tab="cashflow">Fluxo de Caixa</button>
-      <button class="report-tab" data-tab="categories">Por Categoria</button>
-      <button class="report-tab" data-tab="patrimony">Patrimônio</button>
-      <button class="report-tab" data-tab="interest">Auditoria de Juros</button>
+      <button class="report-tab active" data-tab="cashflow">📊 Fluxo de Caixa</button>
+      <button class="report-tab" data-tab="categories">🏷️ Por Categoria</button>
+      <button class="report-tab" data-tab="patrimony">🛡️ Patrimônio</button>
+      <button class="report-tab" data-tab="forecast">🔮 Projeção Preditiva</button>
+      <button class="report-tab" data-tab="subscriptions">📱 Radar de Assinaturas</button>
+      <button class="report-tab" data-tab="interest">⚠️ Auditoria de Juros</button>
     </div>
     <div id="report-content"></div>`;
 
@@ -528,6 +530,129 @@ async function renderReports() {
         }, 
         options: chartOptions('bar') 
       });
+    } else if (tab === 'forecast') {
+      const forecast = await window.api.reports.getPredictiveCashflow({
+        userId: State.user.id,
+        days: 30
+      });
+
+      const timeline = forecast?.timeline || [];
+      const hasNegative = forecast?.hasNegativeRisk;
+
+      content.innerHTML = `
+        <p style="font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 20px; background: rgba(255,255,255,0.02); padding: 12px 16px; border-left: 3px solid #8b5cf6; border-radius: var(--radius-sm);">
+          💡 <strong>Projeção Preditiva de Saldo Futuro (30 Dias):</strong> Acompanhe a estimativa diária do seu saldo combinando saldos bancários atuais, receitas agendadas, despesas recorrentes programadas e faturas de cartão de crédito que vencerão no período.
+        </p>
+
+        <!-- KPI CARDS PROJEÇÃO -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px;">
+          <div class="card" style="text-align: center; border-top: 3px solid #3b82f6;">
+            <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">🏦 Saldo Líquido Inicial</div>
+            <div style="font-size: 22px; font-weight: 800; color: #60a5fa;">${fmt.currency(forecast.initialBalance || 0)}</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Contas correntes e dinheiro</div>
+          </div>
+          <div class="card" style="text-align: center; border-top: 3px solid ${hasNegative ? '#ef4444' : '#10b981'};">
+            <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">📉 Menor Saldo Projetado</div>
+            <div style="font-size: 22px; font-weight: 800; color: ${hasNegative ? '#f87171' : '#34d399'};">${fmt.currency(forecast.minProjectedBalance || 0)}</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">${hasNegative ? `⚠️ Risco em ${fmt.date(forecast.firstNegativeDate)}` : '🟢 Saldo sempre positivo'}</div>
+          </div>
+          <div class="card" style="text-align: center; border-top: 3px solid #10b981;">
+            <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">🎯 Saldo Projetado (30 Dias)</div>
+            <div style="font-size: 22px; font-weight: 800; color: ${forecast.finalProjectedBalance >= 0 ? '#10b981' : '#f87171'};">${fmt.currency(forecast.finalProjectedBalance || 0)}</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Posição final prevista</div>
+          </div>
+        </div>
+
+        <!-- RÉGUA CRONOLÓGICA DIÁRIA -->
+        <div class="card" style="margin-bottom: 20px;">
+          <h3 style="font-size: 14px; font-weight: 700; margin-bottom: 12px;">📅 Régua Diária de Projeção (Próximos 30 Dias)</h3>
+          <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 10px;">
+            ${timeline.map(item => `
+              <div style="flex: 0 0 95px; padding: 10px 8px; border-radius: 8px; background: ${item.isNegative ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.02)'}; border: 1px solid ${item.isNegative ? 'rgba(239,68,68,0.25)' : 'rgba(255,255,255,0.05)'}; text-align: center;">
+                <div style="font-size: 10.5px; color: var(--text-muted); text-transform: uppercase;">${item.dayOfWeek}</div>
+                <div style="font-size: 12px; font-weight: 700; color: var(--text-primary); margin: 3px 0;">${item.date.split('-')[2]}/${item.date.split('-')[1]}</div>
+                <div style="font-size: 12px; font-weight: 800; color: ${item.isNegative ? '#f87171' : '#34d399'};">
+                  ${fmt.currency(item.projectedBalance)}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- GRÁFICO DIÁRIO DE SALDO -->
+        <div class="card">
+          <h3 style="font-size: 14px; font-weight: 700; margin-bottom: 12px;">📈 Gráfico Preditivo do Saldo em Conta</h3>
+          <div class="chart-card" style="height:300px"><canvas id="chart-forecast"></canvas></div>
+        </div>
+      `;
+
+      if (State.charts.forecast) State.charts.forecast.destroy();
+      State.charts.forecast = new Chart(document.getElementById('chart-forecast'), {
+        type: 'line',
+        data: {
+          labels: timeline.map(t => `${t.date.split('-')[2]}/${t.date.split('-')[1]}`),
+          datasets: [{
+            label: 'Saldo Estimado (R$)',
+            data: timeline.map(t => t.projectedBalance),
+            borderColor: hasNegative ? '#f87171' : '#8b5cf6',
+            backgroundColor: hasNegative ? 'rgba(239,68,68,0.1)' : 'rgba(139,92,246,0.1)',
+            fill: true,
+            tension: 0.3,
+            pointBackgroundColor: timeline.map(t => t.isNegative ? '#ef4444' : '#8b5cf6'),
+            pointRadius: 4
+          }]
+        },
+        options: chartOptions('line')
+      });
+
+    } else if (tab === 'subscriptions') {
+      const radar = await window.api.recurring.getSubscriptionRadar(State.user.id);
+      const subs = radar?.subscriptions || [];
+
+      content.innerHTML = `
+        <p style="font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 20px; background: rgba(255,255,255,0.02); padding: 12px 16px; border-left: 3px solid #ec4899; border-radius: var(--radius-sm);">
+          💡 <strong>Radar de Assinaturas & Recorrências:</strong> Monitore o custo contínuo e anualizado de todos os serviços de assinatura da sua família (streaming, softwares, academias, planos de saúde), detectando reajustes de mensalidade.
+        </p>
+
+        <!-- KPI CARDS ASSINATURAS -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px;">
+          <div class="card" style="text-align: center; border-top: 3px solid #c084fc;">
+            <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">📱 Total Mensal em Assinaturas</div>
+            <div style="font-size: 22px; font-weight: 800; color: #c084fc;">${fmt.currency(radar?.totalMonthly || 0)}</div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">${subs.length} assinatura(s) ativas</div>
+          </div>
+          <div class="card" style="text-align: center; border-top: 3px solid #fbbf24;">
+            <div style="color: var(--text-muted); font-size: 12px; margin-bottom: 4px;">📅 Custo Total Anualizado</div>
+            <div style="font-size: 22px; font-weight: 800; color: #fbbf24;">${fmt.currency(radar?.totalAnnual || 0)}<span style="font-size: 13px;">/ano</span></div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Impacto financeiro em 12 meses</div>
+          </div>
+        </div>
+
+        <!-- GRID DE ASSINATURAS DETALHADO -->
+        <div class="card" style="margin-bottom: 20px;">
+          <h3 style="font-size: 14px; font-weight: 700; margin-bottom: 14px;">📋 Painel de Serviços Recorrentes</h3>
+          ${subs.length === 0 ? '<div style="color:var(--text-muted);font-size:12.5px;padding:16px;text-align:center">Nenhuma assinatura cadastrada no módulo Planejamento.</div>' : `
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;">
+              ${subs.map(sub => `
+                <div style="padding: 12px 14px; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between;">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 22px;">${sub.category_icon || '📱'}</span>
+                    <div>
+                      <div style="font-weight: 700; font-size: 13px; color: var(--text-primary);">${sub.name}</div>
+                      <div style="font-size: 11px; color: var(--text-muted);">Dia ${sub.due_day || '—'} • ${fmt.currency(sub.annual_cost)}/ano</div>
+                      ${sub.price_change_alert ? `<div style="font-size: 10.5px; color: #f87171; font-weight: 600; margin-top: 2px;">⚠️ ${sub.price_change_alert}</div>` : ''}
+                    </div>
+                  </div>
+                  <div style="font-weight: 800; font-size: 14px; color: var(--text-primary);">
+                    ${fmt.currency(sub.monthly_amount)}/mês
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          `}
+        </div>
+      `;
+
     } else if (tab === 'interest') {
       const audit = await window.api.reports.getInterestAudit({ userId: State.user.id, month: State.currentMonth, year: State.currentYear });
       const summary = audit.summary || { totalPenalty: 0, totalDiscount: 0, penaltyCount: 0, discountCount: 0, avgDaysLate: 0, avgDailyRate: 0 };

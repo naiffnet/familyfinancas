@@ -320,22 +320,30 @@ Um badge colorido indica: "N correspondências identificadas" antes de confirmar
 
 ---
 
-## 📈 10. Relatórios, Auditoria de Juros & Impressão / PDF
+## 📈 10. Relatórios Financeiros, Inteligência & Impressão / PDF ⭐ Atualizado
 
-### 10.1 Relatório de Fluxo de Caixa
-- Entradas vs saídas, taxa de poupança e saldo consolidado.
+O menu **Relatórios** centraliza toda a inteligência e diagnósticos financeiros em 6 abas dedicadas:
 
-### 10.2 Gráficos Interativos por Categoria
-- Gráficos em rosca, barras, polar e radar.
+### 10.1 📊 Fluxo de Caixa
+- Listagem completa de receitas e despesas realizadas na competência, balanço líquido e taxa de poupança.
 
-### 10.3 Evolução Patrimonial Anual
-- Histórico de crescimento patrimonial líquido mês a mês.
+### 10.2 🏷️ Por Categoria
+- Gráficos interativos (rosca, barras, polar e radar) com filtros por tipo e status.
 
-### 10.4 Relatório de Auditoria de Juros e Descontos
-- Demonstrativo de valores pagos em multas e economizados em descontos.
+### 10.3 🛡️ Patrimônio & Alocação de Ativos
+- Visão consolidada de Ativos vs Passivos (Faturas em aberto), distribuição percentual por classe de ativo (Renda Fixa/CDI, Caixa, Renda Variável, Imóveis) e diagnóstico de risco.
 
-### 10.5 Impressão e Exportação em PDF
-- Emissão de relatórios prontos para arquivamento ou impressão física.
+### 10.4 🔮 Projeção Preditiva de Saldo Futuro (30 Dias)
+- Régua diária e gráfico de evolução combinando saldo bancário, receitas agendadas, despesas programadas e faturas de cartão com termômetro preventivo de saldo negativo.
+
+### 10.5 📱 Radar de Assinaturas & Recorrências
+- Painel de custos contínuos anualizados (streaming, academias, planos de saúde), custo total mensal/anual e detecção de reajustes.
+
+### 10.6 ⚠️ Auditoria de Juros e Encargos
+- Demonstrativo minucioso de multas e juros pagos (% a.d.) por categoria, fornecedor ou banco, além de descontos obtidos.
+
+### 10.7 🖨️ Impressão e Exportação em PDF
+- Emissão de relatórios limpos e formatados para arquivamento ou prestação de contas.
 
 ---
 
