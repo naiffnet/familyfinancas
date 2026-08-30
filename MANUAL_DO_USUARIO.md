@@ -1,4 +1,4 @@
-﻿# 📖 Manual Completo do Usuário — FinançasFamília
+# 📖 Manual Completo do Usuário — FinançasFamília
 
 > **Guia Operacional Familiar 100% voltado para o Usuário Final**  
 > Controle financeiro doméstico, cartões de crédito, fluxo de caixa, orçamentos e segurança local.
@@ -169,16 +169,68 @@ O sistema calcula o **Valor Presente (VP)** exato das parcelas, descontando os j
 
 ---
 
-## 🎯 7. Orçamentos por Categoria & Metas Financeiras
+## 🎯 7. Orçamentos, Regra 50-30-20 & Metas Inteligentes ⭐ Atualizado
 
-### 7.1 Definindo Tetos de Orçamento por Categoria
-- Fixe limites máximos mensais para moradia, transporte, alimentação, etc.
+### 7.1 Regra Orçamentária 50-30-20 (Diagnóstico Familiar Automático)
+> Equilibre as finanças da sua casa com a metodologia financeira mais recomendada no mundo!
 
-### 7.2 Acompanhamento Visual das Barras de Limite
-- Indicadores cromáticos: Verde (Seguro), Amarelo (Atenção) e Vermelho (Estourado).
+O **Painel da Regra 50-30-20** analisa em tempo real todas as entradas e saídas do mês e distribui seus gastos em três macro-grupos essenciais:
 
-### 7.3 Criando Metas de Economia & Aportes Financeiros
-- Acompanhe objetivos com barras de progresso e aportes mensais.
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│               METODOLOGIA ORÇAMENTÁRIA 50 - 30 - 20                    │
+├──────────────────┬──────────────────────────┬──────────────────────────┤
+│ 🏠 50% NECESSIDADES │ 🎮 30% ESTILO DE VIDA    │ 📈 20% POUPANÇA & METAS  │
+├──────────────────┼──────────────────────────┼──────────────────────────┤
+│ • Moradia & Luz   │ • Lazer & Passeios       │ • Reserva de Emergência  │
+│ • Supermercado   │ • Restaurantes & Bares   │ • Aportes em Metas (CDI) │
+│ • Saúde & Farmácia│ • Streaming & Assinaturas│ • Investimentos (FIIs)   │
+│ • Transporte     │ • Roupas & Compras       │ • Amortização de Dívidas │
+│ • Educação & Col.│ • Hobbies & Viagens      │ • Previdência / Futuro   │
+└──────────────────┴──────────────────────────┴──────────────────────────┘
+```
+
+#### Como interpretar o Painel 50-30-20:
+- **🟢 Saudável:** Seus gastos dentro do grupo estão abaixo ou no teto recomendado.
+- **⚠️ Atenção:** O grupo ultrapassou ligeiramente a margem ideal recomendada.
+- **🔴 Estourado:** O grupo excedeu consideravelmente o teto, acionando conselhos pedagógicos automáticos para renegociação ou corte de supérfluos.
+
+---
+
+### 7.2 Metas & Caixinhas Inteligentes com Rentabilidade CDI/CDB
+> Guarde dinheiro com objetivo claro e simule o poder dos juros compostos!
+
+Ao criar ou editar uma Meta, você conta com inteligência financeira integrada:
+
+#### 1. Tipos de Metas Disponíveis:
+- 🛡️ **Reserva de Emergência:** 3 a 6 meses do seu custo de vida essencial.
+- ✨ **Sonho / Viagem:** Férias, casamento, intercâmbio, cursos.
+- 📈 **Investimento / CDI:** Construção de patrimônio de médio/longo prazo.
+- 🚗 **Aquisição de Bens:** Carro, moto, eletrônicos, reformas.
+- 💳 **Quitação de Dívidas:** Reserva dedicada para liquidação de passivos.
+
+#### 2. Cálculo Automático do Aporte Mensal Sugerido ($PMT$):
+Se você definir um **Valor Alvo**, uma **Data Limite (Prazo)** e uma **Taxa de Rendimento Estimada (% CDI a.a.)**, o app calcula automaticamente quanto você precisa poupar por mês:
+- O cálculo considera o **saldo atual já poupado** mais os **juros compostos acumulados** até o vencimento.
+- **Vantagem Didática:** O aporte sugerido é menor do que a divisão linear simples, mostrando na prática o benefício de investir em aplicações que rendem CDI/CDB.
+
+---
+
+### 7.3 Gestão Patrimonial e Alocação de Ativos por Classe
+> Tenha uma visão 360° do seu patrimônio líquido consolidado e da diversificação de risco.
+
+Na aba **Relatórios ➔ Patrimônio**, o sistema classifica suas contas e investimentos por classe de ativo:
+- 🏦 **Conta Corrente / Caixa:** Liquidez imediata do dia a dia.
+- 💵 **Dinheiro Físico:** Valores guardados em espécie.
+- 🛡️ **Renda Fixa / CDI / Poupança:** Reservas de emergência e investimentos conservadores.
+- 📈 **Renda Variável / Ações / FIIs:** Ações, fundos imobiliários e cotas.
+- 🪙 **Criptoativos:** Bitcoin, Ethereum e ativos digitais.
+- 🏠 **Bens & Imóveis:** Patrimônio físico e imóveis próprios.
+
+#### Diagnóstico Automático de Diversificação:
+O sistema emite alertas preventivos, por exemplo:
+- *"Mais de 50% do patrimônio parado em conta corrente: Considere aplicar em Renda Fixa ou CDI com liquidez diária."*
+- *"Perfil Conservador Seguro: Mais de 70% do patrimônio protegido em Renda Fixa."*
 
 ---
 
@@ -340,12 +392,15 @@ Um badge colorido indica: "N correspondências identificadas" antes de confirmar
 - **O arquivo OFX do meu banco nao esta sendo reconhecido. O que fazer?**
   Tente exportar no formato .CSV com as colunas: Data, Descricao, Valor. O sistema aceita qualquer CSV com essas 3 colunas minimas.
 
-- **A Projeção Preditiva considera o salário que vou receber?**
-  Sim! Desde que a receita esteja cadastrada como recorrente (ex: salário todo dia 5) ou como lançamento agendado no mês atual.
+- **Como o cálculo do 50-30-20 sabe o que é Essencial ou Desejo?**
+  Cada categoria possui um grupo orçamentário configurado (*Necessidades 50%*, *Estilo de Vida 30%* ou *Poupança/Metas 20%*). O app soma os lançamentos pagos daquele grupo e compara com o total de receitas do mês.
 
-- **Posso usar a Conciliação para múltiplas contas no mesmo mês?**
-  Sim. A conciliação e feita conta a conta — importe o extrato de cada banco separadamente.
+- **Por que o Aporte Sugerido na Meta é menor que a divisão simples?**
+  Porque o simulador aplica a fórmula financeira com juros compostos ($PMT$). O rendimento estimado ao longo dos meses trabalha a seu favor, reduzindo o valor que você precisa tirar do bolso.
+
+- **O que significa ter dinheiro alocado em "Renda Fixa / CDI"?**
+  São contas ou caixinhas que rendem 100% do CDI (ou taxa contratada), servindo como proteção contra a inflação e mantendo liquidez para sua Reserva de Emergência.
 
 ---
 
-*Manual atualizado em: Agosto/2026 — Versao 1.0 com Pilar 1 (Operacional: Lancamentos, Extratos e Cartoes)*
+*Manual atualizado em: Agosto/2026 — Versão 1.0 com Pilar 1 (Operacional) e Pilar 2 (Orçamentos, Metas CDI & Patrimônio)*

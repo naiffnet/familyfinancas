@@ -133,12 +133,13 @@ module.exports = (Base) => class extends Base {
       benefit_monthly_credit: 0,
       benefit_credit_day: 1,
       card_last_digits: null,
+      asset_class: 'checking',
       ...data
     };
 
     const r = this.db.prepare(`
-      INSERT INTO accounts (user_id, name, type, bank, balance, color, credit_limit, closing_day, due_day, agency, account_number, overdraft_limit, banricompras_limit, credit_minuto_limit, benefit_type, benefit_monthly_credit, benefit_credit_day, card_last_digits)
-      VALUES (@user_id, @name, @type, @bank, @balance, @color, @credit_limit, @closing_day, @due_day, @agency, @account_number, @overdraft_limit, @banricompras_limit, @credit_minuto_limit, @benefit_type, @benefit_monthly_credit, @benefit_credit_day, @card_last_digits)
+      INSERT INTO accounts (user_id, name, type, bank, balance, color, credit_limit, closing_day, due_day, agency, account_number, overdraft_limit, banricompras_limit, credit_minuto_limit, benefit_type, benefit_monthly_credit, benefit_credit_day, card_last_digits, asset_class)
+      VALUES (@user_id, @name, @type, @bank, @balance, @color, @credit_limit, @closing_day, @due_day, @agency, @account_number, @overdraft_limit, @banricompras_limit, @credit_minuto_limit, @benefit_type, @benefit_monthly_credit, @benefit_credit_day, @card_last_digits, @asset_class)
     `).run(payload);
     const familyId = user ? user.family_id : null;
     this.logEvent('account:create', `Conta bancária "${data.name}" criada (Saldo inicial: R$ ${data.balance || 0}).`, familyId);
@@ -149,7 +150,7 @@ module.exports = (Base) => class extends Base {
       entityType: 'account',
       entityId: r.lastInsertRowid,
       description: `Criou conta: "${data.name}" (${data.type}, Saldo: R$ ${data.balance || 0})`,
-      newValues: { name: data.name, type: data.type, bank: data.bank, balance: data.balance, credit_limit: data.credit_limit }
+      newValues: { name: data.name, type: data.type, bank: data.bank, balance: data.balance, credit_limit: data.credit_limit, asset_class: payload.asset_class }
     });
     return { success: true, id: r.lastInsertRowid };
   }
@@ -172,6 +173,7 @@ module.exports = (Base) => class extends Base {
       benefit_monthly_credit: 0,
       benefit_credit_day: 1,
       card_last_digits: null,
+      asset_class: 'checking',
       ...old,
       ...data
     };
@@ -180,7 +182,8 @@ module.exports = (Base) => class extends Base {
       credit_limit=@credit_limit, closing_day=@closing_day, due_day=@due_day,
       agency=@agency, account_number=@account_number,
       overdraft_limit=@overdraft_limit, banricompras_limit=@banricompras_limit, credit_minuto_limit=@credit_minuto_limit,
-      benefit_type=@benefit_type, benefit_monthly_credit=@benefit_monthly_credit, benefit_credit_day=@benefit_credit_day, card_last_digits=@card_last_digits
+      benefit_type=@benefit_type, benefit_monthly_credit=@benefit_monthly_credit, benefit_credit_day=@benefit_credit_day, card_last_digits=@card_last_digits,
+      asset_class=@asset_class
       WHERE id=@id
     `).run(payload);
 
@@ -191,8 +194,8 @@ module.exports = (Base) => class extends Base {
         entityType: 'account',
         entityId: data.id,
         description: `Alterou conta: "${old.name}" ➔ "${data.name}"`,
-        oldValues: { name: old.name, balance: old.balance, credit_limit: old.credit_limit },
-        newValues: { name: data.name, balance: data.balance, credit_limit: data.credit_limit }
+        oldValues: { name: old.name, balance: old.balance, credit_limit: old.credit_limit, asset_class: old.asset_class },
+        newValues: { name: data.name, balance: data.balance, credit_limit: data.credit_limit, asset_class: payload.asset_class }
       });
     }
 
@@ -277,12 +280,20 @@ module.exports = (Base) => class extends Base {
     if (existing) {
       return { success: false, error: `Já existe uma categoria com o nome "${data.name}".` };
     }
-    const r = this.db.prepare(`INSERT INTO categories (user_id, name, type, color, icon) VALUES (@user_id, @name, @type, @color, @icon)`).run(data);
+    const payload = {
+      budget_group: 'essential',
+      ...data
+    };
+    const r = this.db.prepare(`INSERT INTO categories (user_id, name, type, color, icon, budget_group) VALUES (@user_id, @name, @type, @color, @icon, @budget_group)`).run(payload);
     return { success: true, id: r.lastInsertRowid };
   }
 
   updateCategory(data) {
-    this.db.prepare(`UPDATE categories SET name=@name, type=@type, color=@color, icon=@icon WHERE id=@id`).run(data);
+    const payload = {
+      budget_group: 'essential',
+      ...data
+    };
+    this.db.prepare(`UPDATE categories SET name=@name, type=@type, color=@color, icon=@icon, budget_group=@budget_group WHERE id=@id`).run(payload);
     return { success: true };
   }
 

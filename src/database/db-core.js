@@ -305,6 +305,25 @@ class DbCore {
       `);
     } catch (e) {}
 
+    // 4.11. Pilar 2: Orçamentos 50-30-20, Metas CDI e Classes de Ativos Patrimoniais
+    try { this.db.exec("ALTER TABLE categories ADD COLUMN budget_group TEXT DEFAULT 'essential'"); } catch (e) {}
+    try { this.db.exec("ALTER TABLE goals ADD COLUMN yield_rate REAL DEFAULT 0"); } catch (e) {}
+    try { this.db.exec("ALTER TABLE goals ADD COLUMN goal_type TEXT DEFAULT 'general'"); } catch (e) {}
+    try { this.db.exec("ALTER TABLE accounts ADD COLUMN asset_class TEXT DEFAULT 'checking'"); } catch (e) {}
+
+    try {
+      this.db.exec(`
+        UPDATE categories SET budget_group = 'essential' WHERE name IN ('Moradia', 'Alimentação', 'Transporte', 'Saúde', 'Educação', 'Serviços') AND (budget_group IS NULL OR budget_group = '');
+        UPDATE categories SET budget_group = 'lifestyle' WHERE name IN ('Lazer', 'Vestuário', 'Assinaturas', 'Outros (Despesa)') AND (budget_group IS NULL OR budget_group = '');
+        UPDATE categories SET budget_group = 'financial' WHERE name IN ('Investimentos', 'Poupança', 'Reserva', 'Metas') AND (budget_group IS NULL OR budget_group = '');
+        
+        UPDATE accounts SET asset_class = 'checking' WHERE type = 'checking' AND (asset_class IS NULL OR asset_class = '');
+        UPDATE accounts SET asset_class = 'cash' WHERE type = 'wallet' AND (asset_class IS NULL OR asset_class = '');
+        UPDATE accounts SET asset_class = 'cdb_di' WHERE type IN ('savings', 'investment') AND (asset_class IS NULL OR asset_class = '');
+        UPDATE accounts SET asset_class = 'checking' WHERE type IN ('credit', 'voucher') AND (asset_class IS NULL OR asset_class = '');
+      `);
+    } catch (e) {}
+
     // 5. Migrate accounts CHECK constraint to include 'voucher'
     try {
       const accountSchema = this.db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='accounts'").get();
@@ -929,30 +948,30 @@ class DbCore {
 
   seedDefaultData() {
     const defaults = [
-      { name: 'Salário', type: 'income', color: '#10b981', icon: '💼' },
-      { name: 'Freelance', type: 'income', color: '#3b82f6', icon: '💻' },
-      { name: 'Investimentos', type: 'income', color: '#8b5cf6', icon: '📈' },
-      { name: 'Aluguel Recebido', type: 'income', color: '#06b6d4', icon: '🏘️' },
-      { name: 'Outros (Receita)', type: 'income', color: '#14b8a6', icon: '💰' },
-      { name: 'Moradia', type: 'expense', color: '#f59e0b', icon: '🏠' },
-      { name: 'Alimentação', type: 'expense', color: '#ef4444', icon: '🍽️' },
-      { name: 'Transporte', type: 'expense', color: '#f97316', icon: '🚗' },
-      { name: 'Saúde', type: 'expense', color: '#ec4899', icon: '❤️' },
-      { name: 'Educação', type: 'expense', color: '#6366f1', icon: '📚' },
-      { name: 'Lazer', type: 'expense', color: '#14b8a6', icon: '🎮' },
-      { name: 'Vestuário', type: 'expense', color: '#a855f7', icon: '👔' },
-      { name: 'Assinaturas', type: 'expense', color: '#0ea5e9', icon: '📱' },
-      { name: 'Serviços', type: 'expense', color: '#84cc16', icon: '🔧' },
-      { name: 'Outros (Despesa)', type: 'expense', color: '#64748b', icon: '📋' },
+      { name: 'Salário', type: 'income', color: '#10b981', icon: '💼', budget_group: 'financial' },
+      { name: 'Freelance', type: 'income', color: '#3b82f6', icon: '💻', budget_group: 'financial' },
+      { name: 'Investimentos', type: 'income', color: '#8b5cf6', icon: '📈', budget_group: 'financial' },
+      { name: 'Aluguel Recebido', type: 'income', color: '#06b6d4', icon: '🏘️', budget_group: 'financial' },
+      { name: 'Outros (Receita)', type: 'income', color: '#14b8a6', icon: '💰', budget_group: 'financial' },
+      { name: 'Moradia', type: 'expense', color: '#f59e0b', icon: '🏠', budget_group: 'essential' },
+      { name: 'Alimentação', type: 'expense', color: '#ef4444', icon: '🍽️', budget_group: 'essential' },
+      { name: 'Transporte', type: 'expense', color: '#f97316', icon: '🚗', budget_group: 'essential' },
+      { name: 'Saúde', type: 'expense', color: '#ec4899', icon: '❤️', budget_group: 'essential' },
+      { name: 'Educação', type: 'expense', color: '#6366f1', icon: '📚', budget_group: 'essential' },
+      { name: 'Lazer', type: 'expense', color: '#14b8a6', icon: '🎮', budget_group: 'lifestyle' },
+      { name: 'Vestuário', type: 'expense', color: '#a855f7', icon: '👔', budget_group: 'lifestyle' },
+      { name: 'Assinaturas', type: 'expense', color: '#0ea5e9', icon: '📱', budget_group: 'lifestyle' },
+      { name: 'Serviços', type: 'expense', color: '#84cc16', icon: '🔧', budget_group: 'essential' },
+      { name: 'Outros (Despesa)', type: 'expense', color: '#64748b', icon: '📋', budget_group: 'lifestyle' },
     ];
     
     const checkExist = this.db.prepare('SELECT id FROM categories WHERE name = ? AND type = ?');
-    const insert = this.db.prepare(`INSERT INTO categories (user_id, name, type, color, icon, is_default) VALUES (NULL, ?, ?, ?, ?, 1)`);
+    const insert = this.db.prepare(`INSERT INTO categories (user_id, name, type, color, icon, is_default, budget_group) VALUES (NULL, ?, ?, ?, ?, 1, ?)`);
     
     defaults.forEach(c => {
       const exists = checkExist.get(c.name, c.type);
       if (!exists) {
-        insert.run(c.name, c.type, c.color, c.icon);
+        insert.run(c.name, c.type, c.color, c.icon, c.budget_group || 'essential');
       }
     });
 

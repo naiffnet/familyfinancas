@@ -134,11 +134,12 @@ if (!window.api) {
       set:    (d) => makeRpcCall('budgets:set', d),
     },
     goals: {
-      getAll:      (userId) => makeRpcCall('goals:getAll', userId),
-      create:      (d)      => makeRpcCall('goals:create', d),
-      update:      (d)      => makeRpcCall('goals:update', d),
-      delete:      (id)     => makeRpcCall('goals:delete', id),
-      addDeposit:  (d)      => makeRpcCall('goals:addDeposit', d),
+      getAll:         (userId) => makeRpcCall('goals:getAll', userId),
+      create:         (d)      => makeRpcCall('goals:create', d),
+      update:         (d)      => makeRpcCall('goals:update', d),
+      delete:         (id)     => makeRpcCall('goals:delete', id),
+      addDeposit:     (d)      => makeRpcCall('goals:addDeposit', d),
+      getSimulations: (userId) => makeRpcCall('goals:getSimulations', userId),
     },
     dashboard: {
       getSummary:     (d) => makeRpcCall('dashboard:getSummary', d),
@@ -151,6 +152,8 @@ if (!window.api) {
       getPatrimony:         (d) => makeRpcCall('reports:getPatrimony', d),
       getInterestAudit:     (d) => makeRpcCall('reports:getInterestAudit', d),
       getPredictiveCashflow:(d) => makeRpcCall('reports:getPredictiveCashflow', d),
+      getBudget503020:      (d) => makeRpcCall('reports:getBudget503020', d),
+      getPatrimonyAllocation:(d)=> makeRpcCall('reports:getPatrimonyAllocation', d),
     },
     backup: {
       export: () => makeRpcCall('backup:export'),

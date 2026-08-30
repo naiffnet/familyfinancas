@@ -288,11 +288,24 @@ async function openAccountModal(acc) {
         </select>
       </div>
     </div>
-    <div class="form-group">
-      <label>Perfil / Titular</label>
-      <select id="acc-user-id">
-        ${users.map(u => `<option value="${u.id}" ${(acc ? acc.user_id : State.user.id) === u.id ? 'selected' : ''}>${u.name} (@${u.username})</option>`).join('')}
-      </select>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Perfil / Titular</label>
+        <select id="acc-user-id">
+          ${users.map(u => `<option value="${u.id}" ${(acc ? acc.user_id : State.user.id) === u.id ? 'selected' : ''}>${u.name} (@${u.username})</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Classe Patrimonial de Ativo</label>
+        <select id="acc-asset-class">
+          <option value="checking" ${(acc?.asset_class || 'checking') === 'checking' ? 'selected' : ''}>🏦 Conta Corrente / Caixa</option>
+          <option value="cash" ${acc?.asset_class === 'cash' ? 'selected' : ''}>💵 Dinheiro Físico</option>
+          <option value="cdb_di" ${acc?.asset_class === 'cdb_di' ? 'selected' : ''}>🛡️ Renda Fixa / CDI / Poupança</option>
+          <option value="stocks_fii" ${acc?.asset_class === 'stocks_fii' ? 'selected' : ''}>📈 Renda Variável / Ações / FIIs</option>
+          <option value="crypto" ${acc?.asset_class === 'crypto' ? 'selected' : ''}>🪙 Criptoativos</option>
+          <option value="real_estate" ${acc?.asset_class === 'real_estate' ? 'selected' : ''}>🏠 Bens / Imóveis / Patrimônio</option>
+        </select>
+      </div>
     </div>
 
     <!-- 🏦 CAMPOS ESPECÍFICOS PARA CONTA CORRENTE / POUPANÇA / CARTEIRA -->
@@ -456,6 +469,7 @@ async function openAccountModal(acc) {
       benefit_monthly_credit: type === 'voucher' ? (isNaN(benefitMonthlyCreditVal) ? 0 : benefitMonthlyCreditVal) : 0,
       benefit_credit_day: type === 'voucher' ? (isNaN(benefitCreditDayVal) ? 1 : benefitCreditDayVal) : 1,
       card_last_digits: cardLastDigitsVal,
+      asset_class: document.getElementById('acc-asset-class')?.value || 'checking',
     };
 
     let res;

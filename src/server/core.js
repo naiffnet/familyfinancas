@@ -159,6 +159,9 @@ function createOwnershipChecks(db) {
     'accounts:executeReconciliation': (session, d) => isSameFamilyUser(db, d.userId, session.familyId),
     'recurring:getSubscriptionRadar': (session, d) => isSameFamilyUser(db, (typeof d === 'object' && d !== null ? (d.userId || d.id) : d) || session.userId, session.familyId),
     'reports:getPredictiveCashflow': (session, d) => isSameFamilyUser(db, d.userId, session.familyId),
+    'reports:getBudget503020': (session, d) => isSameFamilyUser(db, d.userId, session.familyId),
+    'goals:getSimulations': (session, d) => isSameFamilyUser(db, typeof d === 'object' ? (d.userId || d.id) : d, session.familyId),
+    'reports:getPatrimonyAllocation': (session, d) => isSameFamilyUser(db, typeof d === 'object' ? (d.userId || d.id) : d, session.familyId),
     'transactions:refund': (session, d) => isSameFamilyUser(db, d.userId, session.familyId),
     'backup:testIntegrity': (session) => session.isSystemAdmin === 1 || session.profileType === 1,
     'backup:exportExcel': (session, d) => isSameFamilyUser(db, d.userId, session.familyId),
@@ -297,6 +300,9 @@ function buildHandlers(db) {
     'accounts:executeReconciliation': (d) => db.executeReconciliation(d),
     'recurring:getSubscriptionRadar': (d) => db.getSubscriptionRadar(typeof d === 'object' ? (d.userId || d.id) : d),
     'reports:getPredictiveCashflow': (d) => db.getPredictiveCashflowForecast(d),
+    'reports:getBudget503020': (d) => db.getBudget503020Analysis(d.userId, d.month, d.year),
+    'goals:getSimulations': (d) => db.getGoalSimulations(typeof d === 'object' ? (d.userId || d.id) : d),
+    'reports:getPatrimonyAllocation': (d) => db.getPatrimonyAllocation(typeof d === 'object' ? (d.userId || d.id) : d),
     'auth:exportMyData': (userId) => db.exportMyData(userId),
     'backup:exportExcel': async ({ userId, month, year, type }) => {
       try {

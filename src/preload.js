@@ -79,11 +79,12 @@ contextBridge.exposeInMainWorld('api', {
     set:    (d) => ipcRenderer.invoke('budgets:set', d),
   },
   goals: {
-    getAll:      (userId) => ipcRenderer.invoke('goals:getAll', userId),
-    create:      (d)      => ipcRenderer.invoke('goals:create', d),
-    update:      (d)      => ipcRenderer.invoke('goals:update', d),
-    delete:      (id)     => ipcRenderer.invoke('goals:delete', id),
-    addDeposit:  (d)      => ipcRenderer.invoke('goals:addDeposit', d),
+    getAll:         (userId) => ipcRenderer.invoke('goals:getAll', userId),
+    create:         (d)      => ipcRenderer.invoke('goals:create', d),
+    update:         (d)      => ipcRenderer.invoke('goals:update', d),
+    delete:         (id)     => ipcRenderer.invoke('goals:delete', id),
+    addDeposit:     (d)      => ipcRenderer.invoke('goals:addDeposit', d),
+    getSimulations: (userId) => ipcRenderer.invoke('goals:getSimulations', userId),
   },
   dashboard: {
     getSummary:     (d) => ipcRenderer.invoke('dashboard:getSummary', d),
@@ -96,6 +97,8 @@ contextBridge.exposeInMainWorld('api', {
     getPatrimony:         (d) => ipcRenderer.invoke('reports:getPatrimony', d),
     getInterestAudit:     (d) => ipcRenderer.invoke('reports:getInterestAudit', d),
     getPredictiveCashflow:(d) => ipcRenderer.invoke('reports:getPredictiveCashflow', d),
+    getBudget503020:      (d) => ipcRenderer.invoke('reports:getBudget503020', d),
+    getPatrimonyAllocation:(d)=> ipcRenderer.invoke('reports:getPatrimonyAllocation', d),
   },
   backup: {
     export: () => ipcRenderer.invoke('backup:export'),

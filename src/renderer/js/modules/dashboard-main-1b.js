@@ -487,10 +487,20 @@ function renderDebitAccountStaticWidget(acc) {
 function renderDashboardGoalItem(goal) {
   const pct = goal.target_amount > 0 ? Math.min(100, Math.round((goal.current_amount / goal.target_amount) * 100)) : 0;
   const remaining = Math.max(0, goal.target_amount - goal.current_amount);
+  const typeIcons = {
+    general: '🎯',
+    emergency_fund: '🛡️',
+    dream: '✨',
+    investment: '📈',
+    purchase: '🚗',
+    debt_payoff: '💳'
+  };
+  const icon = goal.icon || typeIcons[goal.goal_type] || '🎯';
+
   return `
     <div class="dashboard-goal-item">
-      <div style="font-size:24px;width:40px;height:40px;border-radius:10px;background:${goal.color}22;color:${goal.color};display:flex;align-items:center;justify-content:center;flex-shrink:0">
-        ${goal.icon || '🎯'}
+      <div style="font-size:22px;width:38px;height:38px;border-radius:10px;background:${goal.color}22;color:${goal.color};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        ${icon}
       </div>
       <div style="flex:1;min-width:0">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
@@ -500,7 +510,7 @@ function renderDashboardGoalItem(goal) {
         <div class="progress-bar" style="height:6px;background:rgba(255,255,255,0.05);margin-bottom:6px">
           <div class="progress-fill" style="width:${pct}%;background:${goal.color}"></div>
         </div>
-        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted)">
+        <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--text-muted)">
           <span>Salvo: <b>${fmt.currency(goal.current_amount)}</b> de ${fmt.currency(goal.target_amount)}</span>
           <span>Falta: <b>${fmt.currency(remaining)}</b></span>
         </div>

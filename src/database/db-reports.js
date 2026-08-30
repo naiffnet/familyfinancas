@@ -517,7 +517,16 @@ module.exports = (Base) => class extends Base {
   }
 
   createGoal(data) {
-    const r = this.db.prepare(`INSERT INTO goals (user_id, name, target_amount, current_amount, deadline, color, icon) VALUES (@user_id, @name, @target_amount, @current_amount, @deadline, @color, @icon)`).run(data);
+    const payload = {
+      current_amount: 0,
+      deadline: null,
+      color: '#10b981',
+      icon: '🎯',
+      yield_rate: 0,
+      goal_type: 'general',
+      ...data
+    };
+    const r = this.db.prepare(`INSERT INTO goals (user_id, name, target_amount, current_amount, deadline, color, icon, yield_rate, goal_type) VALUES (@user_id, @name, @target_amount, @current_amount, @deadline, @color, @icon, @yield_rate, @goal_type)`).run(payload);
     const user = this.db.prepare("SELECT family_id, name FROM users WHERE id = ?").get(data.user_id);
     const familyId = user ? user.family_id : null;
     this.logEvent('goal:create', `Usuário "${user ? user.name : 'Desconhecido'}" criou uma meta: "${data.name}" (Meta: R$ ${data.target_amount}).`, familyId);
@@ -525,7 +534,14 @@ module.exports = (Base) => class extends Base {
   }
 
   updateGoal(data) {
-    this.db.prepare(`UPDATE goals SET name=@name, target_amount=@target_amount, deadline=@deadline, color=@color, icon=@icon WHERE id=@id`).run(data);
+    const payload = {
+      color: '#10b981',
+      icon: '🎯',
+      yield_rate: 0,
+      goal_type: 'general',
+      ...data
+    };
+    this.db.prepare(`UPDATE goals SET name=@name, target_amount=@target_amount, deadline=@deadline, color=@color, icon=@icon, yield_rate=@yield_rate, goal_type=@goal_type WHERE id=@id`).run(payload);
     return { success: true };
   }
 
@@ -922,6 +938,309 @@ module.exports = (Base) => class extends Base {
     };
   }
 
-  // ── FAMILIES & LOGS MANAGEMENT ─────────────────────────────────
+  // ── PILAR 2: REGRA 50-30-20 ANALYSIS ───────────────────────────
+  getBudget503020Analysis(userId, month, year) {
+    const user = this.db.prepare('SELECT family_id, profile_type FROM users WHERE id = ?').get(userId);
+    if (!user) return null;
+    const familyId = user.family_id;
+    const perm = this.getUserPermissions(userId);
+
+    const m = String(month).padStart(2, '0');
+    const y = String(year);
+
+    // 1. Obter Total de Renda Líquida no Mês
+    let incomeQuery;
+    let incomeParams;
+    if (user.profile_type === 1) {
+      incomeQuery = `SELECT SUM(amount + COALESCE(penalty_amount,0) - COALESCE(discount_amount,0)) as total FROM transactions WHERE type='income' AND is_paid=1 AND strftime('%m',COALESCE(payment_date,date))=? AND strftime('%Y',COALESCE(payment_date,date))=?`;
+      incomeParams = [m, y];
+    } else if (perm.can_view_all === 1) {
+      incomeQuery = `SELECT SUM(t.amount + COALESCE(t.penalty_amount,0) - COALESCE(t.discount_amount,0)) as total FROM transactions t JOIN users u ON t.user_id = u.id WHERE u.family_id=? AND t.type='income' AND t.is_paid=1 AND strftime('%m',COALESCE(t.payment_date,t.date))=? AND strftime('%Y',COALESCE(t.payment_date,t.date))=?`;
+      incomeParams = [familyId, m, y];
+    } else {
+      incomeQuery = `SELECT SUM(amount + COALESCE(penalty_amount,0) - COALESCE(discount_amount,0)) as total FROM transactions WHERE user_id=? AND type='income' AND is_paid=1 AND strftime('%m',COALESCE(payment_date,date))=? AND strftime('%Y',COALESCE(payment_date,date))=?`;
+      incomeParams = [userId, m, y];
+    }
+    const incomeRow = this.db.prepare(incomeQuery).get(...incomeParams);
+    const totalIncome = Math.max(0, incomeRow?.total || 0);
+
+    // 2. Obter Despesas por budget_group
+    let expenseQuery;
+    let expenseParams;
+    if (user.profile_type === 1) {
+      expenseQuery = `
+        SELECT COALESCE(c.budget_group, 'essential') as budget_group,
+               SUM(t.amount + COALESCE(t.penalty_amount,0) - COALESCE(t.discount_amount,0)) as total
+        FROM transactions t
+        LEFT JOIN categories c ON t.category_id = c.id
+        WHERE t.type='expense' AND t.is_paid=1 
+        AND strftime('%m',COALESCE(t.payment_date,t.date))=? AND strftime('%Y',COALESCE(t.payment_date,t.date))=?
+        GROUP BY COALESCE(c.budget_group, 'essential')
+      `;
+      expenseParams = [m, y];
+    } else if (perm.can_view_all === 1) {
+      expenseQuery = `
+        SELECT COALESCE(c.budget_group, 'essential') as budget_group,
+               SUM(t.amount + COALESCE(t.penalty_amount,0) - COALESCE(t.discount_amount,0)) as total
+        FROM transactions t
+        JOIN users u ON t.user_id = u.id
+        LEFT JOIN categories c ON t.category_id = c.id
+        WHERE u.family_id=? AND t.type='expense' AND t.is_paid=1 
+        AND strftime('%m',COALESCE(t.payment_date,t.date))=? AND strftime('%Y',COALESCE(t.payment_date,t.date))=?
+        GROUP BY COALESCE(c.budget_group, 'essential')
+      `;
+      expenseParams = [familyId, m, y];
+    } else {
+      expenseQuery = `
+        SELECT COALESCE(c.budget_group, 'essential') as budget_group,
+               SUM(t.amount + COALESCE(t.penalty_amount,0) - COALESCE(t.discount_amount,0)) as total
+        FROM transactions t
+        LEFT JOIN categories c ON t.category_id = c.id
+        WHERE t.user_id=? AND t.type='expense' AND t.is_paid=1 
+        AND strftime('%m',COALESCE(t.payment_date,t.date))=? AND strftime('%Y',COALESCE(t.payment_date,t.date))=?
+        GROUP BY COALESCE(c.budget_group, 'essential')
+      `;
+      expenseParams = [userId, m, y];
+    }
+
+    const expenseRows = this.db.prepare(expenseQuery).all(...expenseParams);
+    
+    // 3. Obter Aportes em Metas do Mês (Poupança / Investimentos)
+    let goalDepositsQuery;
+    let goalDepositsParams;
+    if (user.profile_type === 1) {
+      goalDepositsQuery = `SELECT SUM(amount) as total FROM goal_deposits WHERE strftime('%m',date)=? AND strftime('%Y',date)=?`;
+      goalDepositsParams = [m, y];
+    } else if (perm.can_view_all === 1) {
+      goalDepositsQuery = `SELECT SUM(gd.amount) as total FROM goal_deposits gd JOIN goals g ON gd.goal_id = g.id JOIN users u ON g.user_id = u.id WHERE u.family_id=? AND strftime('%m',gd.date)=? AND strftime('%Y',gd.date)=?`;
+      goalDepositsParams = [familyId, m, y];
+    } else {
+      goalDepositsQuery = `SELECT SUM(gd.amount) as total FROM goal_deposits gd JOIN goals g ON gd.goal_id = g.id WHERE g.user_id=? AND strftime('%m',gd.date)=? AND strftime('%Y',gd.date)=?`;
+      goalDepositsParams = [userId, m, y];
+    }
+    const goalDepositsRow = this.db.prepare(goalDepositsQuery).get(...goalDepositsParams);
+    const goalDepositsTotal = goalDepositsRow?.total || 0;
+
+    let essentialSpent = 0;
+    let lifestyleSpent = 0;
+    let financialSpent = goalDepositsTotal;
+
+    for (const row of expenseRows) {
+      if (row.budget_group === 'essential') essentialSpent += row.total;
+      else if (row.budget_group === 'lifestyle') lifestyleSpent += row.total;
+      else if (row.budget_group === 'financial') financialSpent += row.total;
+    }
+
+    const totalExpense = essentialSpent + lifestyleSpent + financialSpent;
+    const baseIncome = totalIncome > 0 ? totalIncome : totalExpense;
+
+    // Metas 50/30/20 teóricas
+    const essentialTarget = Math.round(baseIncome * 0.50 * 100) / 100;
+    const lifestyleTarget = Math.round(baseIncome * 0.30 * 100) / 100;
+    const financialTarget = Math.round(baseIncome * 0.20 * 100) / 100;
+
+    const essentialPct = baseIncome > 0 ? (essentialSpent / baseIncome) * 100 : 0;
+    const lifestylePct = baseIncome > 0 ? (lifestyleSpent / baseIncome) * 100 : 0;
+    const financialPct = baseIncome > 0 ? (financialSpent / baseIncome) * 100 : 0;
+
+    // Diagnósticos
+    const groups = [
+      {
+        id: 'essential',
+        name: 'Necessidades / Essenciais',
+        targetPct: 50,
+        targetAmount: essentialTarget,
+        spent: Math.round(essentialSpent * 100) / 100,
+        currentPct: Math.round(essentialPct * 10) / 10,
+        status: essentialPct <= 50 ? 'safe' : essentialPct <= 60 ? 'warning' : 'danger',
+        desc: 'Moradia, Alimentação básica, Saúde, Transporte e Educação'
+      },
+      {
+        id: 'lifestyle',
+        name: 'Desejos / Estilo de Vida',
+        targetPct: 30,
+        targetAmount: lifestyleTarget,
+        spent: Math.round(lifestyleSpent * 100) / 100,
+        currentPct: Math.round(lifestylePct * 10) / 10,
+        status: lifestylePct <= 30 ? 'safe' : lifestylePct <= 40 ? 'warning' : 'danger',
+        desc: 'Lazer, Restaurantes, Assinaturas, Vestuário e Compras'
+      },
+      {
+        id: 'financial',
+        name: 'Poupança, Metas & Futuro',
+        targetPct: 20,
+        targetAmount: financialTarget,
+        spent: Math.round(financialSpent * 100) / 100,
+        currentPct: Math.round(financialPct * 10) / 10,
+        status: financialPct >= 20 ? 'safe' : financialPct >= 10 ? 'warning' : 'danger',
+        desc: 'Aportes em Metas, Reserva de Emergência e Investimentos'
+      }
+    ];
+
+    let overallStatus = 'safe';
+    let diagnosis = 'Excelente equilíbrio orçamentário! Sua família está seguindo o padrão 50-30-20.';
+
+    if (essentialPct > 55) {
+      overallStatus = 'warning';
+      diagnosis = `Os gastos essenciais (${essentialPct.toFixed(0)}%) estão acima dos 50% recomendados. Considere renegociar contratos fixos (energia, internet, aluguel).`;
+    }
+    if (lifestylePct > 35) {
+      overallStatus = 'danger';
+      diagnosis = `Os gastos com estilo de vida (${lifestylePct.toFixed(0)}%) ultrapassaram o teto de 30%. Vale a pena revisar lazer e assinaturas supérfluas.`;
+    }
+    if (financialPct < 10) {
+      if (overallStatus !== 'danger') overallStatus = 'warning';
+      diagnosis += ' A poupança para metas está abaixo de 10% da renda. Tente poupar um pouco mais no início do mês.';
+    }
+
+    return {
+      month,
+      year,
+      totalIncome: Math.round(totalIncome * 100) / 100,
+      totalExpense: Math.round(totalExpense * 100) / 100,
+      groups,
+      overallStatus,
+      diagnosis
+    };
+  }
+
+  // ── PILAR 2: SIMULAÇÃO INTELIGENTE DE METAS (CDI/CDB & PMT) ────
+  getGoalSimulations(userId) {
+    const goals = this.getGoals(userId);
+    const today = new Date();
+
+    return goals.map(g => {
+      const target = Number(g.target_amount || 0);
+      const current = Number(g.current_amount || 0);
+      const remaining = Math.max(0, target - current);
+      const yieldRate = Number(g.yield_rate || 0); // % a.a.
+
+      let monthsRemaining = 0;
+      let pmtSuggested = 0;
+      let projectedYield = 0;
+      let futureValue = current;
+
+      if (g.deadline) {
+        const d = new Date(g.deadline);
+        monthsRemaining = Math.max(1, (d.getFullYear() - today.getFullYear()) * 12 + (d.getMonth() - today.getMonth()));
+      }
+
+      if (remaining > 0 && monthsRemaining > 0) {
+        if (yieldRate > 0) {
+          // Taxa mensal proporcional: i = (yieldRate / 100) / 12
+          const monthlyRate = (yieldRate / 100) / 12;
+          const n = monthsRemaining;
+
+          // FV = PV * (1+i)^n + PMT * [((1+i)^n - 1) / i]
+          // PMT = (Target - Current * (1+i)^n) / [((1+i)^n - 1) / i]
+          const compFactor = Math.pow(1 + monthlyRate, n);
+          const annuityFactor = (compFactor - 1) / monthlyRate;
+          const targetNeededFromDeposits = target - (current * compFactor);
+
+          if (targetNeededFromDeposits <= 0) {
+            pmtSuggested = 0;
+            projectedYield = (current * compFactor) - current;
+          } else {
+            pmtSuggested = Math.max(0, targetNeededFromDeposits / annuityFactor);
+            const totalDeposited = pmtSuggested * n;
+            projectedYield = target - (current + totalDeposited);
+          }
+        } else {
+          pmtSuggested = remaining / monthsRemaining;
+          projectedYield = 0;
+        }
+      }
+
+      const progressPct = target > 0 ? Math.min(100, (current / target) * 100) : 0;
+
+      return {
+        ...g,
+        remainingAmount: Math.round(remaining * 100) / 100,
+        monthsRemaining,
+        suggestedMonthlyDeposit: Math.round(pmtSuggested * 100) / 100,
+        projectedYield: Math.max(0, Math.round(projectedYield * 100) / 100),
+        progressPct: Math.round(progressPct * 10) / 10
+      };
+    });
+  }
+
+  // ── PILAR 2: GESTÃO PATRIMONIAL & ALOCAÇÃO DE ATIVOS ───────────
+  getPatrimonyAllocation(userId) {
+    const user = this.db.prepare('SELECT family_id, profile_type FROM users WHERE id = ?').get(userId);
+    if (!user) return null;
+    const familyId = user.family_id;
+    const perm = this.getUserPermissions(userId);
+
+    let accounts;
+    if (user.profile_type === 1) {
+      accounts = this.db.prepare(`SELECT * FROM accounts WHERE is_active=1`).all();
+    } else if (perm.can_view_all === 1) {
+      accounts = this.db.prepare(`SELECT a.* FROM accounts a JOIN users u ON a.user_id = u.id WHERE u.family_id=? AND a.is_active=1`).all(familyId);
+    } else {
+      accounts = this.db.prepare(`SELECT * FROM accounts WHERE user_id=? AND is_active=1`).all(userId);
+    }
+
+    const classNames = {
+      checking: { name: 'Conta Corrente / Caixa', icon: '🏦', color: '#3b82f6' },
+      cash: { name: 'Dinheiro Físico', icon: '💵', color: '#10b981' },
+      cdb_di: { name: 'Renda Fixa / CDI / Poupança', icon: '🛡️', color: '#8b5cf6' },
+      stocks_fii: { name: 'Renda Variável / Ações / FIIs', icon: '📈', color: '#f59e0b' },
+      crypto: { name: 'Criptoativos', icon: '🪙', color: '#06b6d4' },
+      real_estate: { name: 'Bens / Imóveis / Patrimônio Físico', icon: '🏠', color: '#ec4899' }
+    };
+
+    const allocationMap = {};
+    let totalAssets = 0;
+    let totalLiabilities = 0;
+
+    for (const acc of accounts) {
+      if (acc.type === 'credit') {
+        // Fatura em aberto ou saldo negativo de cartão
+        const invoiceSum = this.db.prepare(`SELECT SUM(amount) as total FROM invoices WHERE card_account_id=? AND is_paid=0`).get(acc.id);
+        totalLiabilities += (invoiceSum?.total || 0);
+      } else {
+        const bal = Number(acc.balance || 0);
+        if (bal >= 0) {
+          totalAssets += bal;
+          const aClass = acc.asset_class || 'checking';
+          allocationMap[aClass] = (allocationMap[aClass] || 0) + bal;
+        } else {
+          totalLiabilities += Math.abs(bal);
+        }
+      }
+    }
+
+    const netWorth = totalAssets - totalLiabilities;
+
+    const distribution = Object.keys(classNames).map(key => {
+      const amount = allocationMap[key] || 0;
+      const pct = totalAssets > 0 ? (amount / totalAssets) * 100 : 0;
+      return {
+        key,
+        ...classNames[key],
+        amount: Math.round(amount * 100) / 100,
+        percentage: Math.round(pct * 10) / 10
+      };
+    }).filter(d => d.amount > 0);
+
+    let diversificationDiagnosis = 'Patrimônio distribuído com boa segurança.';
+    const cdbPct = distribution.find(d => d.key === 'cdb_di')?.percentage || 0;
+    const checkingPct = distribution.find(d => d.key === 'checking')?.percentage || 0;
+
+    if (checkingPct > 50) {
+      diversificationDiagnosis = 'Mais de 50% do patrimônio está parado em conta corrente. Considere aplicar em Renda Fixa ou CDI com liquidez diária.';
+    } else if (cdbPct > 70) {
+      diversificationDiagnosis = 'Excelente perfil conservador! Mais de 70% do patrimônio alocado em segurança e liquidez.';
+    }
+
+    return {
+      totalAssets: Math.round(totalAssets * 100) / 100,
+      totalLiabilities: Math.round(totalLiabilities * 100) / 100,
+      netWorth: Math.round(netWorth * 100) / 100,
+      distribution,
+      diversificationDiagnosis
+    };
+  }
 };
+
 
