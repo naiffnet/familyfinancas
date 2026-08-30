@@ -88,6 +88,8 @@ if (!window.api) {
       update:   (d)      => makeRpcCall('accounts:update', d),
       delete:   (id)     => makeRpcCall('accounts:delete', id),
       transfer: (d)      => makeRpcCall('accounts:transfer', d),
+      reconcileOfx: (d)  => makeRpcCall('accounts:reconcileOfx', d),
+      executeReconciliation: (d) => makeRpcCall('accounts:executeReconciliation', d),
     },
     categories: {
       getAll: (userId) => makeRpcCall('categories:getAll', userId),
@@ -104,6 +106,7 @@ if (!window.api) {
       getMonthly:      (d)            => makeRpcCall('recurring:getMonthly', d),
       postponeInstallment: (d)        => makeRpcCall('recurring:postponeInstallment', d),
       updatePositions: (userId, positions) => makeRpcCall('recurring:updatePositions', { userId, positions }),
+      getSubscriptionRadar: (userId) => makeRpcCall('recurring:getSubscriptionRadar', userId),
     },
     transactions: {
       getAll:      (f)  => makeRpcCall('transactions:getAll', f),
@@ -116,13 +119,15 @@ if (!window.api) {
       refund:      (d)  => makeRpcCall('transactions:refund', d),
     },
     invoices: {
-      getMonthly:  (d) => makeRpcCall('invoices:getMonthly', d),
-      pay:         (d) => makeRpcCall('invoices:pay', d),
-      payPartial:  (d) => makeRpcCall('cards:payInvoicePartial', d),
-      anticipate:  (d) => makeRpcCall('cards:anticipateInstallments', d),
-      renegotiate: (d) => makeRpcCall('invoices:renegotiate', d),
-      reopen:      (d) => makeRpcCall('invoices:reopen', d),
-      recalculate: (d) => makeRpcCall('invoices:recalculate', d),
+      getMonthly:      (d) => makeRpcCall('invoices:getMonthly', d),
+      pay:             (d) => makeRpcCall('invoices:pay', d),
+      payPartial:      (d) => makeRpcCall('cards:payInvoicePartial', d),
+      anticipate:      (d) => makeRpcCall('cards:advanceInstallments', d),
+      getAdvanceable:  (d) => makeRpcCall('cards:getAdvanceableInstallments', d),
+      advance:         (d) => makeRpcCall('cards:advanceInstallments', d),
+      renegotiate:     (d) => makeRpcCall('invoices:renegotiate', d),
+      reopen:          (d) => makeRpcCall('invoices:reopen', d),
+      recalculate:     (d) => makeRpcCall('invoices:recalculate', d),
     },
     budgets: {
       getAll: (d) => makeRpcCall('budgets:getAll', d),
@@ -142,9 +147,10 @@ if (!window.api) {
       getCategoryChart:(d)=> makeRpcCall('dashboard:getCategoryChart', d),
     },
     reports: {
-      getCashflow:      (d) => makeRpcCall('reports:getCashflow', d),
-      getPatrimony:     (d) => makeRpcCall('reports:getPatrimony', d),
-      getInterestAudit: (d) => makeRpcCall('reports:getInterestAudit', d),
+      getCashflow:          (d) => makeRpcCall('reports:getCashflow', d),
+      getPatrimony:         (d) => makeRpcCall('reports:getPatrimony', d),
+      getInterestAudit:     (d) => makeRpcCall('reports:getInterestAudit', d),
+      getPredictiveCashflow:(d) => makeRpcCall('reports:getPredictiveCashflow', d),
     },
     backup: {
       export: () => makeRpcCall('backup:export'),
@@ -186,6 +192,15 @@ if (!window.api) {
       mergeBatch: (d) => makeRpcCall('sync:mergeBatch', d),
       dismissDuplicate: (d) => makeRpcCall('sync:dismissDuplicate', d),
       getHistory: (d) => makeRpcCall('sync:getHistory', d),
+    },
+    updater: {
+      getInfo: () => Promise.resolve({ currentVersion: '1.0.0 (Web)', isSecurityUpdate: false, history: [], canRollback: false }),
+      check: () => Promise.resolve({ status: 'not-available', message: 'Atualização contínua ativa na Web / PWA.' }),
+      download: () => Promise.resolve({ success: false }),
+      install: () => Promise.resolve({ success: false }),
+      rollback: () => Promise.resolve({ success: false, error: 'Rollback disponível apenas no aplicativo Desktop Windows instalado.' }),
+      onStatus: () => () => {},
+      onProgress: () => () => {}
     },
   };
 }

@@ -4,9 +4,11 @@ const fs = require('fs');
 const XLSX = require('xlsx');
 const Database = require('./database/db');
 const { createExpressApp, buildHandlers, PUBLIC_CHANNELS, createOwnershipChecks } = require('./server/core');
+const UpdaterService = require('./updater-service');
 
 let mainWindow;
 let db;
+let updaterService;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -153,6 +155,9 @@ app.whenReady().then(() => {
   });
 
   createWindow();
+  updaterService = new UpdaterService(mainWindow, db);
+  updaterService.registerIpcHandlers();
+
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 

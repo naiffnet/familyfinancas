@@ -799,3 +799,251 @@ async function renderSettingsAuditTab(bodyEl) {
   await loadAuditLogs();
 }
 
+async function renderSettingsUpdaterTab(bodyEl) {
+  let updaterInfo = {
+    currentVersion: '1.0.0',
+    isSecurityUpdate: false,
+    history: [],
+    canRollback: false
+  };
+
+  try {
+    if (window.api?.updater?.getInfo) {
+      updaterInfo = await window.api.updater.getInfo();
+    }
+  } catch (e) {
+    console.warn('[Updater] Erro ao obter dados de versão:', e);
+  }
+
+  bodyEl.innerHTML = `
+    <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid var(--border); padding-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+      <span>🔄 Versão & Atualizações do Sistema</span>
+      <span class="badge badge-emerald" style="font-size: 12px; padding: 4px 12px; border-radius: 20px; font-weight: 700; background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3);">
+        Versão Atual: v${updaterInfo.currentVersion || '1.0.0'}
+      </span>
+    </h3>
+
+    <!-- 1. CARD PRINCIPAL: STATUS E VERIFICAÇÃO -->
+    <div style="padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-surface); margin-bottom: 20px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); display: flex; align-items: center; justify-content: center; font-size: 22px;">
+            🚀
+          </div>
+          <div>
+            <div style="font-weight: 700; font-size: 15px; color: var(--text-primary);">
+              FinançasFamília Desktop
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+              Canal Oficial de Distribuição: <strong>GitHub Releases</strong> (Produção)
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" id="btn-check-updates" style="font-size: 12px; font-weight: 600; padding: 8px 18px; display: flex; align-items: center; gap: 6px;">
+          <span>🔍</span> Verificar Atualizações
+        </button>
+      </div>
+
+      <!-- CONTAINER DINÂMICO DE RESPOSTA DO UPDATE -->
+      <div id="updater-feedback-container" style="margin-top: 16px; display: none;"></div>
+    </div>
+
+    <!-- 2. CARD: PROTEÇÃO DO BANCO DE DADOS -->
+    <div style="padding: 16px 20px; border-radius: var(--radius-md); border: 1px solid rgba(16,185,129,0.25); background: rgba(16,185,129,0.05); margin-bottom: 20px; display: flex; align-items: flex-start; gap: 14px;">
+      <div style="font-size: 24px; line-height: 1;">🛡️</div>
+      <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+        <strong style="color: #34d399; font-size: 13px; display: block; margin-bottom: 2px;">Preservação Total dos Seus Dados:</strong>
+        Todas as atualizações do aplicativo substituem estritamente o código do programa. O seu banco de dados SQLite local (<code>financeiro.db</code>), suas contas e transações residem em diretório persistente isolado e <strong>nunca são alterados nem apagados</strong> durante updates.
+      </div>
+    </div>
+
+    <!-- 3. CARD: GESTÃO DE VERSÃO, HISTÓRICO E ROLLBACK SEGURO -->
+    <div style="padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-surface);">
+      <div style="font-weight: 700; font-size: 14px; color: var(--text-primary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+        <span>⏪ Reversão de Versão (Rollback Seguro)</span>
+      </div>
+
+      <div style="font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 16px;">
+        Caso você prefira o comportamento de uma versão anterior após uma atualização de layout ou recursos, você pode reverter o aplicativo para a versão anterior a qualquer momento.
+      </div>
+
+      ${updaterInfo.isSecurityUpdate ? `
+        <!-- TRAVA DE SEGURANÇA ATIVA -->
+        <div style="padding: 14px 16px; border-radius: 8px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; font-size: 12px; display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+          <span style="font-size: 18px;">🔒</span>
+          <div>
+            <strong>Atualização Crítica de Segurança Ativa:</strong>
+            Esta versão inclui correções mandatórias de segurança ou conformidade com a LGPD. A reversão para versões vulneráveis foi desativada para proteger a integridade dos seus dados.
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-sm" disabled style="opacity: 0.5; cursor: not-allowed; font-size: 12px;">
+          ⏪ Voltar para Versão Anterior (Bloqueado por Segurança)
+        </button>
+      ` : `
+        <!-- ROLLBACK HABILITADO -->
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+          <div style="font-size: 12px; color: var(--text-secondary);">
+            Ponto de Restauração: <strong>Snapshot Automático do SQLite criado antes de cada instalação.</strong>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btn-rollback-version" style="font-size: 12px; font-weight: 600; padding: 6px 16px; border-color: rgba(255,255,255,0.2);">
+            ⏪ Voltar para a Versão Anterior
+          </button>
+        </div>
+      `}
+
+      <!-- HISTÓRICO DE VERSÕES REGISTRADAS -->
+      ${updaterInfo.history && updaterInfo.history.length > 0 ? `
+        <div style="margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px;">
+          <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px;">
+            Histórico Local de Instalações:
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            ${updaterInfo.history.map((h, i) => `
+              <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; padding: 6px 10px; background: rgba(255,255,255,0.02); border-radius: 4px; border: 1px solid rgba(255,255,255,0.05);">
+                <span style="font-weight: 600; color: ${i === 0 ? '#34d399' : 'var(--text-secondary)'};">
+                  ${i === 0 ? '● (Atual) ' : '○ '}v${h.version}
+                </span>
+                <span style="color: var(--text-muted); font-family: monospace;">
+                  ${new Date(h.installedAt).toLocaleDateString('pt-BR')} ${new Date(h.installedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+
+  // Listeners de eventos do Updater
+  const feedbackContainer = document.getElementById('updater-feedback-container');
+  const btnCheck = document.getElementById('btn-check-updates');
+  const btnRollback = document.getElementById('btn-rollback-version');
+
+  if (btnCheck) {
+    btnCheck.onclick = async () => {
+      btnCheck.disabled = true;
+      btnCheck.innerHTML = '<span>⏳</span> Verificando...';
+      feedbackContainer.style.display = 'block';
+      feedbackContainer.innerHTML = `
+        <div style="padding: 12px 16px; border-radius: 8px; background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2); color: #93c5fd; font-size: 12px; display: flex; align-items: center; gap: 8px;">
+          <span>🔍</span> Consultando os servidores do GitHub Releases...
+        </div>
+      `;
+
+      try {
+        const res = await window.api.updater.check();
+        if (res && res.status === 'not-available') {
+          feedbackContainer.innerHTML = `
+            <div style="padding: 12px 16px; border-radius: 8px; background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); color: #6ee7b7; font-size: 12px; display: flex; align-items: center; gap: 8px;">
+              <span>✅</span> ${res.message || 'Você já está utilizando a versão mais recente!'}
+            </div>
+          `;
+        } else if (res && res.error) {
+          feedbackContainer.innerHTML = `
+            <div style="padding: 12px 16px; border-radius: 8px; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); color: #fca5a5; font-size: 12px; display: flex; align-items: center; gap: 8px;">
+              <span>⚠️</span> ${res.error}
+            </div>
+          `;
+        }
+      } catch (err) {
+        feedbackContainer.innerHTML = `
+          <div style="padding: 12px 16px; border-radius: 8px; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); color: #fca5a5; font-size: 12px;">
+            Erro: ${err.message}
+          </div>
+        `;
+      } finally {
+        btnCheck.disabled = false;
+        btnCheck.innerHTML = '<span>🔍</span> Verificar Atualizações';
+      }
+    };
+  }
+
+  // Ouvinte de status em tempo real emitido pelo Main Process
+  if (window.api?.updater?.onStatus) {
+    window.api.updater.onStatus((data) => {
+      if (!feedbackContainer) return;
+      feedbackContainer.style.display = 'block';
+
+      if (data.status === 'available') {
+        feedbackContainer.innerHTML = `
+          <div style="padding: 16px; border-radius: 8px; background: linear-gradient(135deg, rgba(16,185,129,0.12), rgba(59,130,246,0.12)); border: 1px solid rgba(16,185,129,0.3); margin-top: 10px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <div style="font-weight: 700; font-size: 14px; color: #34d399; display: flex; align-items: center; gap: 6px;">
+                <span>✨ Nova Versão Disponível:</span> <strong>v${data.version}</strong>
+              </div>
+              ${data.isSecurityUpdate ? '<span class="badge badge-danger" style="font-size: 10px; padding: 2px 8px; border-radius: 12px; background: rgba(239,68,68,0.2); color: #f87171; border: 1px solid rgba(239,68,68,0.4);">🔒 Segurança Obrigatória</span>' : ''}
+            </div>
+            <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; max-height: 100px; overflow-y: auto; background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 6px; white-space: pre-wrap;">
+              ${data.releaseNotes || 'Melhorias gerais de estabilidade e novas funcionalidades.'}
+            </div>
+            <div id="updater-progress-area" style="display: none; margin-bottom: 12px;">
+              <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">
+                <span>Baixando atualização...</span>
+                <span id="updater-progress-label">0%</span>
+              </div>
+              <div style="height: 6px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                <div id="updater-progress-fill" style="height: 100%; width: 0%; background: linear-gradient(90deg, #10b981, #3b82f6); transition: width 0.2s;"></div>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm" id="btn-download-update" style="font-size: 12px; font-weight: 700; padding: 8px 16px;">
+              ⬇️ Baixar e Preparar Instalação
+            </button>
+          </div>
+        `;
+
+        document.getElementById('btn-download-update')?.addEventListener('click', async () => {
+          const btnDl = document.getElementById('btn-download-update');
+          const pArea = document.getElementById('updater-progress-area');
+          if (btnDl) btnDl.style.display = 'none';
+          if (pArea) pArea.style.display = 'block';
+
+          await window.api.updater.download();
+        });
+      } else if (data.status === 'downloaded') {
+        feedbackContainer.innerHTML = `
+          <div style="padding: 16px; border-radius: 8px; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); margin-top: 10px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <div style="font-weight: 700; font-size: 14px; color: #34d399;">
+                🎉 Atualização v${data.version} Baixada com Sucesso!
+              </div>
+              <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+                Um snapshot seguro do seu banco de dados SQLite será criado antes de reiniciar.
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm" id="btn-apply-update" style="font-size: 12px; font-weight: 700; padding: 8px 18px; background: linear-gradient(135deg, #10b981, #059669);">
+              🚀 Instalar e Reiniciar Agora
+            </button>
+          </div>
+        `;
+
+        document.getElementById('btn-apply-update')?.addEventListener('click', async () => {
+          await window.api.updater.install();
+        });
+      }
+    });
+  }
+
+  if (window.api?.updater?.onProgress) {
+    window.api.updater.onProgress((prog) => {
+      const fill = document.getElementById('updater-progress-fill');
+      const label = document.getElementById('updater-progress-label');
+      if (fill) fill.style.width = `${prog.percent}%`;
+      if (label) label.textContent = `${prog.percent}%`;
+    });
+  }
+
+  if (btnRollback) {
+    btnRollback.onclick = async () => {
+      if (confirm('Deseja realmente reverter para a versão anterior do FinançasFamília?\n\nSeus dados e lançamentos continuarão preservados.')) {
+        const res = await window.api.updater.rollback({ restoreDatabase: false });
+        if (res.success) {
+          toast(res.message || 'Instrução de reversão enviada com sucesso.');
+        } else {
+          toast(res.error || 'Não foi possível reverter a versão.', 'error');
+        }
+      }
+    };
+  }
+}
+
+

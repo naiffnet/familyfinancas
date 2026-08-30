@@ -1,7 +1,7 @@
 /* ============================================
  * app.bundle.js — FamilyFinancas Renderer
  * Gerado por: npm run build:renderer
- * 2026-08-30T02:08:31.962Z
+ * 2026-08-30T14:59:15.602Z
  * Modulos: 26
  * ============================================ */
 
@@ -97,6 +97,8 @@ if (!window.api) {
       update:   (d)      => makeRpcCall('accounts:update', d),
       delete:   (id)     => makeRpcCall('accounts:delete', id),
       transfer: (d)      => makeRpcCall('accounts:transfer', d),
+      reconcileOfx: (d)  => makeRpcCall('accounts:reconcileOfx', d),
+      executeReconciliation: (d) => makeRpcCall('accounts:executeReconciliation', d),
     },
     categories: {
       getAll: (userId) => makeRpcCall('categories:getAll', userId),
@@ -113,6 +115,7 @@ if (!window.api) {
       getMonthly:      (d)            => makeRpcCall('recurring:getMonthly', d),
       postponeInstallment: (d)        => makeRpcCall('recurring:postponeInstallment', d),
       updatePositions: (userId, positions) => makeRpcCall('recurring:updatePositions', { userId, positions }),
+      getSubscriptionRadar: (userId) => makeRpcCall('recurring:getSubscriptionRadar', userId),
     },
     transactions: {
       getAll:      (f)  => makeRpcCall('transactions:getAll', f),
@@ -125,13 +128,15 @@ if (!window.api) {
       refund:      (d)  => makeRpcCall('transactions:refund', d),
     },
     invoices: {
-      getMonthly:  (d) => makeRpcCall('invoices:getMonthly', d),
-      pay:         (d) => makeRpcCall('invoices:pay', d),
-      payPartial:  (d) => makeRpcCall('cards:payInvoicePartial', d),
-      anticipate:  (d) => makeRpcCall('cards:anticipateInstallments', d),
-      renegotiate: (d) => makeRpcCall('invoices:renegotiate', d),
-      reopen:      (d) => makeRpcCall('invoices:reopen', d),
-      recalculate: (d) => makeRpcCall('invoices:recalculate', d),
+      getMonthly:      (d) => makeRpcCall('invoices:getMonthly', d),
+      pay:             (d) => makeRpcCall('invoices:pay', d),
+      payPartial:      (d) => makeRpcCall('cards:payInvoicePartial', d),
+      anticipate:      (d) => makeRpcCall('cards:advanceInstallments', d),
+      getAdvanceable:  (d) => makeRpcCall('cards:getAdvanceableInstallments', d),
+      advance:         (d) => makeRpcCall('cards:advanceInstallments', d),
+      renegotiate:     (d) => makeRpcCall('invoices:renegotiate', d),
+      reopen:          (d) => makeRpcCall('invoices:reopen', d),
+      recalculate:     (d) => makeRpcCall('invoices:recalculate', d),
     },
     budgets: {
       getAll: (d) => makeRpcCall('budgets:getAll', d),
@@ -151,9 +156,10 @@ if (!window.api) {
       getCategoryChart:(d)=> makeRpcCall('dashboard:getCategoryChart', d),
     },
     reports: {
-      getCashflow:      (d) => makeRpcCall('reports:getCashflow', d),
-      getPatrimony:     (d) => makeRpcCall('reports:getPatrimony', d),
-      getInterestAudit: (d) => makeRpcCall('reports:getInterestAudit', d),
+      getCashflow:          (d) => makeRpcCall('reports:getCashflow', d),
+      getPatrimony:         (d) => makeRpcCall('reports:getPatrimony', d),
+      getInterestAudit:     (d) => makeRpcCall('reports:getInterestAudit', d),
+      getPredictiveCashflow:(d) => makeRpcCall('reports:getPredictiveCashflow', d),
     },
     backup: {
       export: () => makeRpcCall('backup:export'),
@@ -195,6 +201,15 @@ if (!window.api) {
       mergeBatch: (d) => makeRpcCall('sync:mergeBatch', d),
       dismissDuplicate: (d) => makeRpcCall('sync:dismissDuplicate', d),
       getHistory: (d) => makeRpcCall('sync:getHistory', d),
+    },
+    updater: {
+      getInfo: () => Promise.resolve({ currentVersion: '1.0.0 (Web)', isSecurityUpdate: false, history: [], canRollback: false }),
+      check: () => Promise.resolve({ status: 'not-available', message: 'Atualização contínua ativa na Web / PWA.' }),
+      download: () => Promise.resolve({ success: false }),
+      install: () => Promise.resolve({ success: false }),
+      rollback: () => Promise.resolve({ success: false, error: 'Rollback disponível apenas no aplicativo Desktop Windows instalado.' }),
+      onStatus: () => () => {},
+      onProgress: () => () => {}
     },
   };
 }
@@ -1101,6 +1116,14 @@ async function renderDashboard() {
 
     bindDashboardEvents(contentDiv, effectiveSummary, effectiveTxs, monthly, today);
 
+    // Carregar painéis do Pilar 1 (Preditivo & Radar)
+    if (typeof renderPredictiveForecastSection === 'function') {
+      renderPredictiveForecastSection(document.getElementById('dash-predictive-forecast-container'));
+    }
+    if (typeof renderSubscriptionRadarSection === 'function') {
+      renderSubscriptionRadarSection(document.getElementById('dash-subscription-radar-container'));
+    }
+
   } else {
     // 🌐 VISÃO GERAL
     await renderGeneralDashboardTab();
@@ -1123,6 +1146,12 @@ function renderExecutiveLayout(contentDiv, members, activeMemberFilter, activeTy
 
     <!-- 3. CARDS & CONTAS -->
     ${renderDashboardCardsGrid(summary)}
+
+    <!-- 3.1 PROJEÇÃO PREDITIVA DE SALDO FUTURO (PILAR 1) -->
+    <div id="dash-predictive-forecast-container"></div>
+
+    <!-- 3.2 RADAR DE ASSINATURAS & RECORRÊNCIAS (PILAR 1) -->
+    <div id="dash-subscription-radar-container"></div>
 
     <!-- 4. PAINEL OPERACIONAL KANBAN 3 COLUNAS -->
     <div style="margin-bottom: 20px;">
@@ -1293,7 +1322,7 @@ async function renderGeneralDashboardTab() {
     <div style="margin-bottom:24px">
       <div style="font-size:13px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px">🏦 Todas as Contas e Cartões da Família</div>
       <div class="cards-widget-grid" id="cards-widget-grid-general">
-        ${creditAccounts.map(acc => renderCreditCardWidget(acc, summaryGeral.cardSpending[acc.id] || 0, null)).join('')}
+        ${creditAccounts.map(acc => renderCreditCardWidget(acc, (summaryGeral.cardSpending || {})[acc.id] || 0, null)).join('')}
         ${debitAccounts.map(acc => renderDebitAccountStaticWidget(acc)).join('')}
       </div>
     </div>` : ''}
@@ -2393,6 +2422,120 @@ function setupCategoryInteractiveChart(wrapperElementId, chartStateKey, txs) {
 
   renderCheckboxesAndDraw();
 }
+
+async function renderPredictiveForecastSection(container) {
+  if (!container) return;
+  try {
+    const forecast = await window.api.reports.getPredictiveCashflow({
+      userId: State.user.id,
+      days: 30
+    });
+
+    if (!forecast || !forecast.timeline || forecast.timeline.length === 0) return;
+
+    container.innerHTML = `
+      <div style="padding: 18px 20px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-surface); margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 22px;">🔮</span>
+            <div>
+              <div style="font-weight: 800; font-size: 15px; color: var(--text-primary);">
+                Projeção Preditiva de Saldo Futuro (30 Dias)
+              </div>
+              <div style="font-size: 11.5px; color: var(--text-muted);">
+                Estimativa diária combinando saldo atual, receitas agendadas, contas fixas e faturas de cartão
+              </div>
+            </div>
+          </div>
+
+          <!-- TERMÔMETRO DE RISCO -->
+          ${forecast.hasNegativeRisk ? `
+            <div style="display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 20px; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #f87171; font-size: 12px; font-weight: 700;">
+              <span>⚠️ Risco de Saldo Negativo em ${fmt.date(forecast.firstNegativeDate)}</span>
+              <span class="badge badge-danger" style="font-size: 10px; padding: 2px 6px;">Mín: ${fmt.currency(forecast.minProjectedBalance)}</span>
+            </div>
+          ` : `
+            <div style="display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 20px; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); color: #34d399; font-size: 12px; font-weight: 700;">
+              <span>🟢 Saldo Positivo e Seguro</span>
+              <span class="badge badge-green" style="font-size: 10px; padding: 2px 6px;">Mín: ${fmt.currency(forecast.minProjectedBalance)}</span>
+            </div>
+          `}
+        </div>
+
+        <!-- TIMELINE COMPACTA DE PROJEÇÃO -->
+        <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-top: 10px;">
+          ${forecast.timeline.slice(0, 15).map(item => `
+            <div style="flex: 0 0 85px; padding: 8px 6px; border-radius: 6px; background: ${item.isNegative ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.02)'}; border: 1px solid ${item.isNegative ? 'rgba(239,68,68,0.25)' : 'rgba(255,255,255,0.05)'}; text-align: center;">
+              <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">${item.dayOfWeek}</div>
+              <div style="font-size: 11px; font-weight: 700; color: var(--text-primary); margin: 2px 0;">${item.date.split('-')[2]}/${item.date.split('-')[1]}</div>
+              <div style="font-size: 11px; font-weight: 800; color: ${item.isNegative ? '#f87171' : '#34d399'};">
+                ${fmt.currency(item.projectedBalance)}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    console.warn('Erro ao renderizar projeção preditiva:', e);
+  }
+}
+
+async function renderSubscriptionRadarSection(container) {
+  if (!container) return;
+  try {
+    const radar = await window.api.recurring.getSubscriptionRadar(State.user.id);
+    if (!radar || !radar.subscriptions || radar.subscriptions.length === 0) return;
+
+    container.innerHTML = `
+      <div style="padding: 18px 20px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-surface); margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 22px;">📱</span>
+            <div>
+              <div style="font-weight: 800; font-size: 15px; color: var(--text-primary);">
+                Radar de Assinaturas & Recorrências
+              </div>
+              <div style="font-size: 11.5px; color: var(--text-muted);">
+                Monitoramento de custos contínuos anualizados e detecção de reajustes
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="padding: 4px 12px; border-radius: 8px; background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.25); font-size: 12px;">
+              <span style="color: var(--text-muted);">Total Mensal:</span> <strong style="color: #c084fc;">${fmt.currency(radar.totalMonthly)}</strong>
+            </div>
+            <div style="padding: 4px 12px; border-radius: 8px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); font-size: 12px;">
+              <span style="color: var(--text-muted);">Custo Anualizado:</span> <strong style="color: #fbbf24;">${fmt.currency(radar.totalAnnual)}/ano</strong>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px;">
+          ${radar.subscriptions.map(sub => `
+            <div style="padding: 10px 14px; border-radius: 8px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 18px;">${sub.category_icon || '📱'}</span>
+                <div>
+                  <div style="font-weight: 700; font-size: 13px; color: var(--text-primary);">${sub.name}</div>
+                  <div style="font-size: 11px; color: var(--text-muted);">Dia ${sub.due_day || '—'} • ${fmt.currency(sub.annual_cost)}/ano</div>
+                  ${sub.price_change_alert ? `<div style="font-size: 10px; color: #f87171; font-weight: 600; margin-top: 2px;">⚠️ ${sub.price_change_alert}</div>` : ''}
+                </div>
+              </div>
+              <div style="font-weight: 800; font-size: 13px; color: var(--text-primary);">
+                ${fmt.currency(sub.monthly_amount)}/mês
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    console.warn('Erro ao renderizar radar de assinaturas:', e);
+  }
+}
+
 
 
 /* ==== dashboard-main-2.js ==== */
@@ -3590,6 +3733,9 @@ function renderInvoicesList(container, invoices, accounts) {
 
                 <div class="invoice-card-actions">
                   ${!inv.is_paid ? `
+                    <button class="btn btn-sm advance-invoice-btn" data-id="${inv.id}" data-card-id="${cardAccountId}" style="background: rgba(139, 92, 246, 0.1); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.35); font-weight: 700; border-radius: 8px; padding: 6px 12px;" title="Antecipar parcelas futuras com desconto">
+                      ⚡ Antecipar
+                    </button>
                     <button class="btn btn-sm renegotiate-invoice-btn" data-id="${inv.id}" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35); font-weight: 700; border-radius: 8px; padding: 6px 12px;">
                       🤝 Acordo
                     </button>
@@ -3613,7 +3759,7 @@ function renderInvoicesList(container, invoices, accounts) {
   // Bind invoice card click to toggle highlight on its installments
   container.querySelectorAll('.invoice-card-item').forEach(cardEl => {
     cardEl.onclick = (e) => {
-      if (e.target.closest('.pay-invoice-btn, .renegotiate-invoice-btn, .reopen-invoice-btn, .invoice-highlight-btn')) {
+      if (e.target.closest('.pay-invoice-btn, .renegotiate-invoice-btn, .reopen-invoice-btn, .invoice-highlight-btn, .advance-invoice-btn')) {
         return;
       }
       const cardId = parseInt(cardEl.dataset.cardId);
@@ -3634,6 +3780,18 @@ function renderInvoicesList(container, invoices, accounts) {
       const cardColor = cardEl.dataset.bankColor;
       const cardName = cardEl.dataset.cardName;
       toggleInvoiceHighlight(cardId, cardColor, cardName, invoiceId);
+    };
+  });
+
+  container.querySelectorAll('.advance-invoice-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const invId = parseInt(btn.dataset.id);
+      const cardId = parseInt(btn.dataset.cardId);
+      const inv = invoices.find(i => i.id === invId);
+      if (inv && typeof openAdvanceInstallmentsModal === 'function') {
+        openAdvanceInstallmentsModal(cardId, inv);
+      }
     };
   });
 
@@ -4237,6 +4395,163 @@ function openTransactionDetailsModal({ tx, item, accounts = [], categories = [],
     };
   }
 }
+
+async function openAdvanceInstallmentsModal(cardAccountId, inv) {
+  try {
+    const items = await window.api.invoices.getAdvanceable(cardAccountId);
+    if (!items || items.length === 0) {
+      toast('Este cartão não possui compras parceladas futuras com parcelas a antecipar.', 'info');
+      return;
+    }
+
+    const cardName = inv?.card_name || 'Cartão de Crédito';
+    const mStr = String(inv?.month || State.currentMonth).padStart(2, '0');
+    const yStr = inv?.year || State.currentYear;
+
+    const modalHtml = `
+      <div style="padding: 16px;">
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.5;">
+          Antecipe parcelas futuras de compras no cartão <strong>${cardName}</strong> para a fatura atual (<strong>${mStr}/${yStr}</strong>), liberando seu limite e garantindo descontos a valor presente.
+        </p>
+
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label style="font-size: 12px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; display: block;">
+            📦 Selecione a Compra Parcelada:
+          </label>
+          <select id="adv-item-select" class="form-control" style="font-size: 13px; width: 100%; padding: 8px 12px; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-primary);">
+            ${items.map(it => `
+              <option value="${it.id}" data-amount="${it.amount}" data-remaining="${it.remaining_installments}" data-name="${it.name}">
+                ${it.name} — Restam ${it.remaining_installments}x de R$ ${fmt.currency(it.amount)}
+              </option>
+            `).join('')}
+          </select>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+          <div class="form-group">
+            <label style="font-size: 12px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; display: block;">
+              🔢 Parcelas a Antecipar:
+            </label>
+            <input type="number" id="adv-count-input" class="form-control" min="1" max="${items[0].remaining_installments}" value="1" style="font-size: 13px; width: 100%; padding: 8px 12px; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-primary);">
+          </div>
+
+          <div class="form-group">
+            <label style="font-size: 12px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; display: block;">
+              🏷️ Desconto Mensal (% a.m.):
+            </label>
+            <input type="number" step="0.05" id="adv-discount-rate" class="form-control" value="0.85" placeholder="0.85" style="font-size: 13px; width: 100%; padding: 8px 12px; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-primary);">
+          </div>
+        </div>
+
+        <!-- SIMULADOR VISUAL DE DESCONTO -->
+        <div id="adv-summary-card" style="padding: 14px 18px; border-radius: 8px; background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.25); margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; color: var(--text-secondary);">
+            <span>Valor Nominal Total:</span>
+            <strong id="adv-nominal-val" style="color: var(--text-primary);">R$ 0,00</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; color: #10b981;">
+            <span>Desconto a Valor Presente:</span>
+            <strong id="adv-discount-val">- R$ 0,00</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 800; border-top: 1px solid rgba(139, 92, 246, 0.2); padding-top: 8px; color: #c084fc;">
+            <span>Valor Líquido na Fatura:</span>
+            <strong id="adv-final-val">R$ 0,00</strong>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+          <button type="button" class="btn btn-secondary" onclick="Modal.close()">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="btn-confirm-advance" style="background: linear-gradient(135deg, #8b5cf6, #6d28d9); border-color: #8b5cf6; color: #fff; font-weight: 700; padding: 8px 20px; border-radius: 8px;">
+            ⚡ Confirmar Antecipação
+          </button>
+        </div>
+      </div>
+    `;
+
+    Modal.open(`⚡ Antecipação de Parcelas — ${cardName}`, modalHtml);
+
+    const selectEl = document.getElementById('adv-item-select');
+    const countEl = document.getElementById('adv-count-input');
+    const rateEl = document.getElementById('adv-discount-rate');
+    const nominalEl = document.getElementById('adv-nominal-val');
+    const discountEl = document.getElementById('adv-discount-val');
+    const finalEl = document.getElementById('adv-final-val');
+    const confirmBtn = document.getElementById('btn-confirm-advance');
+
+    const updateSimulation = () => {
+      const selectedOpt = selectEl.options[selectEl.selectedIndex];
+      if (!selectedOpt) return;
+      const itemAmount = parseFloat(selectedOpt.dataset.amount) || 0;
+      const maxRem = parseInt(selectedOpt.dataset.remaining, 10) || 1;
+
+      countEl.max = maxRem;
+      let count = parseInt(countEl.value, 10) || 1;
+      if (count > maxRem) { count = maxRem; countEl.value = maxRem; }
+      if (count < 1) { count = 1; countEl.value = 1; }
+
+      const rate = Math.max(0, parseFloat(rateEl.value) || 0) / 100;
+      const nominal = count * itemAmount;
+      let presentValue = 0;
+
+      for (let k = 1; k <= count; k++) {
+        const vp = rate > 0 ? (itemAmount / Math.pow(1 + rate, k)) : itemAmount;
+        presentValue += vp;
+      }
+
+      const discount = nominal - presentValue;
+
+      nominalEl.textContent = fmt.currency(nominal);
+      discountEl.textContent = `- ${fmt.currency(discount)}`;
+      finalEl.textContent = fmt.currency(presentValue);
+    };
+
+    selectEl.onchange = () => {
+      const selectedOpt = selectEl.options[selectEl.selectedIndex];
+      countEl.max = selectedOpt.dataset.remaining;
+      countEl.value = '1';
+      updateSimulation();
+    };
+
+    countEl.oninput = updateSimulation;
+    rateEl.oninput = updateSimulation;
+    updateSimulation();
+
+    confirmBtn.onclick = async () => {
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = 'Processando...';
+
+      const itemId = parseInt(selectEl.value, 10);
+      const count = parseInt(countEl.value, 10) || 1;
+      const rate = parseFloat(rateEl.value) || 0;
+
+      const res = await window.api.invoices.advance({
+        cardAccountId,
+        recurringItemId: itemId,
+        countToAdvance: count,
+        discountRateMonthly: rate,
+        currentMonth: inv?.month || State.currentMonth,
+        currentYear: inv?.year || State.currentYear,
+        userId: State.user.id
+      });
+
+      if (res && res.success) {
+        Modal.close();
+        toast(res.message || 'Parcelas antecipadas com sucesso!');
+        if (typeof renderRecurring === 'function') renderRecurring();
+        if (typeof renderDashboard === 'function') renderDashboard();
+        if (typeof renderTransactions === 'function') renderTransactions();
+        if (typeof renderAccounts === 'function') renderAccounts();
+      } else {
+        toast(res?.error || 'Erro ao antecipar parcelas', 'error');
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '⚡ Confirmar Antecipação';
+      }
+    };
+  } catch (err) {
+    toast(`Erro ao carregar parcelas: ${err.message}`, 'error');
+  }
+}
+
 
 
 /* ==== recurring-modal.js ==== */
@@ -7369,17 +7684,33 @@ async function openImportStatementModal(accounts) {
           result = await window.api.importer.parseCsv(content);
         }
 
-        parsedTransactions = (result?.transactions || []).map((t, idx) => ({
-          ...t,
-          id_temp: idx,
-          selected: true,
-          category_id: (allCategories.find(c => c.name.toLowerCase() === (t.suggestedCategory || '').toLowerCase()) || allCategories[0])?.id || null
-        }));
-
-        if (parsedTransactions.length === 0) {
+        const rawTxs = result?.transactions || [];
+        if (rawTxs.length === 0) {
           toast('Nenhuma transação identificada no arquivo.', 'warning');
           return;
         }
+
+        const targetAccId = parseInt(document.getElementById('import-target-account').value) || (account ? account.id : accounts[0]?.id);
+
+        let reconciledList = [];
+        try {
+          reconciledList = await window.api.accounts.reconcileOfx({
+            accountId: targetAccId,
+            transactions: rawTxs,
+            userId: State.user.id
+          });
+        } catch (recErr) {
+          console.warn('Erro ao rodar fuzzy reconciliation:', recErr);
+        }
+
+        parsedTransactions = (reconciledList && reconciledList.length > 0 ? reconciledList : rawTxs).map((t, idx) => ({
+          ...t,
+          id_temp: idx,
+          selected: true,
+          action: t.suggested_action || (t.match_candidate ? 'match' : 'create'),
+          candidate_id: t.match_candidate?.id || null,
+          category_id: (allCategories.find(c => c.name.toLowerCase() === (t.suggestedCategory || '').toLowerCase()) || allCategories[0])?.id || null
+        }));
 
         renderPreviewTable();
         previewContainer.style.display = 'block';
@@ -7393,7 +7724,11 @@ async function openImportStatementModal(accounts) {
   };
 
   function renderPreviewTable() {
-    countBadge.textContent = `${parsedTransactions.length} lançamentos encontrados no extrato`;
+    const matchCount = parsedTransactions.filter(t => t.match_candidate).length;
+    countBadge.innerHTML = `
+      <span>${parsedTransactions.length} lançamentos encontrados no extrato</span>
+      ${matchCount > 0 ? `<span style="background: rgba(16,185,129,0.15); color: #34d399; padding: 2px 8px; border-radius: 10px; font-weight: 700; margin-left: 8px;">✨ ${matchCount} correspondências identificadas</span>` : ''}
+    `;
 
     tableWrapper.innerHTML = `
       <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
@@ -7401,15 +7736,15 @@ async function openImportStatementModal(accounts) {
           <tr style="border-bottom: 1px solid var(--border); text-align: left; color: var(--text-muted);">
             <th style="padding: 6px 8px; width: 30px;">✓</th>
             <th style="padding: 6px 8px;">Data</th>
-            <th style="padding: 6px 8px;">Descrição</th>
+            <th style="padding: 6px 8px;">Extrato Bancário</th>
+            <th style="padding: 6px 8px;">Ação / Conciliação</th>
             <th style="padding: 6px 8px;">Categoria</th>
-            <th style="padding: 6px 8px;">Tipo</th>
             <th style="padding: 6px 8px; text-align: right;">Valor</th>
           </tr>
         </thead>
         <tbody>
           ${parsedTransactions.map(t => `
-            <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); background: ${t.selected ? 'transparent' : 'rgba(0,0,0,0.2)'}; opacity: ${t.selected ? '1' : '0.5'};">
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); background: ${t.selected ? (t.action === 'match' ? 'rgba(16,185,129,0.05)' : 'transparent') : 'rgba(0,0,0,0.2)'}; opacity: ${t.selected ? '1' : '0.5'};">
               <td style="padding: 6px 8px;">
                 <input type="checkbox" class="import-chk" data-idx="${t.id_temp}" ${t.selected ? 'checked' : ''}>
               </td>
@@ -7418,12 +7753,19 @@ async function openImportStatementModal(accounts) {
                 <input type="text" class="import-desc-edit" data-idx="${t.id_temp}" value="${(t.description || '').replace(/"/g, '&quot;')}" style="background: transparent; border: 1px solid transparent; color: var(--text-primary); width: 100%; font-size: 12px;">
               </td>
               <td style="padding: 6px 8px;">
+                ${t.match_candidate ? `
+                  <select class="import-action-select" data-idx="${t.id_temp}" style="padding: 3px 6px; font-size: 11px; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); border-radius: 4px; color: #34d399; font-weight: 600;">
+                    <option value="match" ${t.action === 'match' ? 'selected' : ''}>🟢 Conciliar: "${t.match_candidate.description}" (${fmt.currency(t.match_candidate.amount)})</option>
+                    <option value="create" ${t.action === 'create' ? 'selected' : ''}>🔵 Criar Novo Lançamento</option>
+                  </select>
+                ` : `
+                  <span class="badge badge-blue" style="font-size: 10px; padding: 3px 6px; border-radius: 4px; background: rgba(59,130,246,0.12); color: #60a5fa;">➕ Criar Novo</span>
+                `}
+              </td>
+              <td style="padding: 6px 8px;">
                 <select class="import-cat-select" data-idx="${t.id_temp}" style="padding: 3px 6px; font-size: 11px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary);">
                   ${allCategories.map(c => `<option value="${c.id}" ${c.id === t.category_id ? 'selected' : ''}>${c.icon || ''} ${c.name}</option>`).join('')}
                 </select>
-              </td>
-              <td style="padding: 6px 8px;">
-                <span class="badge ${t.type === 'income' ? 'badge-green' : 'badge-red'}" style="font-size: 10px;">${t.type === 'income' ? 'Receita' : 'Despesa'}</span>
               </td>
               <td style="padding: 6px 8px; text-align: right; font-weight: 700; color: ${t.type === 'income' ? 'var(--accent-light)' : '#f87171'};">
                 ${t.type === 'income' ? '+' : '-'}${fmt.currency(t.amount)}
@@ -7440,6 +7782,14 @@ async function openImportStatementModal(accounts) {
         parsedTransactions[idx].selected = e.target.checked;
         renderPreviewTable();
         updateConfirmButton();
+      };
+    });
+
+    tableWrapper.querySelectorAll('.import-action-select').forEach(sel => {
+      sel.onchange = (e) => {
+        const idx = parseInt(e.target.dataset.idx);
+        parsedTransactions[idx].action = e.target.value;
+        renderPreviewTable();
       };
     });
 
@@ -7462,7 +7812,7 @@ async function openImportStatementModal(accounts) {
     const selectedCount = parsedTransactions.filter(t => t.selected).length;
     confirmBtn.disabled = selectedCount === 0;
     confirmBtn.style.opacity = selectedCount === 0 ? '0.5' : '1';
-    confirmBtn.textContent = `Confirmar Importação (${selectedCount} lançamentos)`;
+    confirmBtn.textContent = `Confirmar Conciliação (${selectedCount} lançamentos)`;
   }
 
   toggleAllBtn.onclick = () => {
@@ -7484,23 +7834,39 @@ async function openImportStatementModal(accounts) {
 
     try {
       confirmBtn.disabled = true;
-      confirmBtn.textContent = 'Importando...';
+      confirmBtn.textContent = 'Conciliando...';
 
-      const res = await window.api.importer.importBatch({
-        userId: State.user.id,
+      const reconciliationsPayload = selectedItems.map(item => ({
+        fitid: item.fitid,
+        date: item.date,
+        amount: item.amount,
+        type: item.type,
+        description: item.description,
+        categoryId: item.category_id,
+        action: item.action || 'create',
+        candidateId: item.action === 'match' ? (item.candidate_id || item.match_candidate?.id) : null
+      }));
+
+      const res = await window.api.accounts.executeReconciliation({
         accountId: targetAccId,
-        transactions: selectedItems
+        reconciliations: reconciliationsPayload,
+        userId: State.user.id
       });
 
       if (res && res.success) {
-        toast(`🎉 ${res.count} lançamentos importados com sucesso!`);
+        toast(res.message || 'Conciliação realizada com sucesso!');
         Modal.close();
         renderAccounts();
+        if (typeof renderDashboard === 'function') renderDashboard();
       } else {
-        toast('Erro ao importar: ' + (res?.error || 'Desconhecido'), 'error');
+        toast('Erro ao conciliar: ' + (res?.error || 'Desconhecido'), 'error');
+        confirmBtn.disabled = false;
+        updateConfirmButton();
       }
     } catch (err) {
-      toast('Erro ao importar extrato: ' + err.message, 'error');
+      toast('Erro ao conciliar extrato: ' + err.message, 'error');
+      confirmBtn.disabled = false;
+      updateConfirmButton();
     }
   };
 }
@@ -9739,6 +10105,9 @@ async function openSettingsModal(activeTab = 'profile') {
             <button class="settings-modal-tab-btn ${activeTab === 'audit' ? 'active' : ''}" data-tab="audit">
               <span>🛡️</span> Trilha de Auditoria
             </button>
+            <button class="settings-modal-tab-btn ${activeTab === 'updater' ? 'active' : ''}" data-tab="updater">
+              <span>🔄</span> Versão & Atualizações
+            </button>
           </div>
         </div>
 
@@ -10280,6 +10649,8 @@ async function openSettingsModal(activeTab = 'profile') {
       renderSettingsLgpdTab(bodyEl);
     } else if (tab === 'audit') {
       await renderSettingsAuditTab(bodyEl);
+    } else if (tab === 'updater') {
+      await renderSettingsUpdaterTab(bodyEl);
     }
   };
 
@@ -11091,6 +11462,254 @@ async function renderSettingsAuditTab(bodyEl) {
 
   await loadAuditLogs();
 }
+
+async function renderSettingsUpdaterTab(bodyEl) {
+  let updaterInfo = {
+    currentVersion: '1.0.0',
+    isSecurityUpdate: false,
+    history: [],
+    canRollback: false
+  };
+
+  try {
+    if (window.api?.updater?.getInfo) {
+      updaterInfo = await window.api.updater.getInfo();
+    }
+  } catch (e) {
+    console.warn('[Updater] Erro ao obter dados de versão:', e);
+  }
+
+  bodyEl.innerHTML = `
+    <h3 style="margin: 0 0 16px 0; font-size: 16px; font-weight: 700; color: var(--text-primary); border-bottom: 1px solid var(--border); padding-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+      <span>🔄 Versão & Atualizações do Sistema</span>
+      <span class="badge badge-emerald" style="font-size: 12px; padding: 4px 12px; border-radius: 20px; font-weight: 700; background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3);">
+        Versão Atual: v${updaterInfo.currentVersion || '1.0.0'}
+      </span>
+    </h3>
+
+    <!-- 1. CARD PRINCIPAL: STATUS E VERIFICAÇÃO -->
+    <div style="padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-surface); margin-bottom: 20px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); display: flex; align-items: center; justify-content: center; font-size: 22px;">
+            🚀
+          </div>
+          <div>
+            <div style="font-weight: 700; font-size: 15px; color: var(--text-primary);">
+              FinançasFamília Desktop
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+              Canal Oficial de Distribuição: <strong>GitHub Releases</strong> (Produção)
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" id="btn-check-updates" style="font-size: 12px; font-weight: 600; padding: 8px 18px; display: flex; align-items: center; gap: 6px;">
+          <span>🔍</span> Verificar Atualizações
+        </button>
+      </div>
+
+      <!-- CONTAINER DINÂMICO DE RESPOSTA DO UPDATE -->
+      <div id="updater-feedback-container" style="margin-top: 16px; display: none;"></div>
+    </div>
+
+    <!-- 2. CARD: PROTEÇÃO DO BANCO DE DADOS -->
+    <div style="padding: 16px 20px; border-radius: var(--radius-md); border: 1px solid rgba(16,185,129,0.25); background: rgba(16,185,129,0.05); margin-bottom: 20px; display: flex; align-items: flex-start; gap: 14px;">
+      <div style="font-size: 24px; line-height: 1;">🛡️</div>
+      <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+        <strong style="color: #34d399; font-size: 13px; display: block; margin-bottom: 2px;">Preservação Total dos Seus Dados:</strong>
+        Todas as atualizações do aplicativo substituem estritamente o código do programa. O seu banco de dados SQLite local (<code>financeiro.db</code>), suas contas e transações residem em diretório persistente isolado e <strong>nunca são alterados nem apagados</strong> durante updates.
+      </div>
+    </div>
+
+    <!-- 3. CARD: GESTÃO DE VERSÃO, HISTÓRICO E ROLLBACK SEGURO -->
+    <div style="padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-surface);">
+      <div style="font-weight: 700; font-size: 14px; color: var(--text-primary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+        <span>⏪ Reversão de Versão (Rollback Seguro)</span>
+      </div>
+
+      <div style="font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 16px;">
+        Caso você prefira o comportamento de uma versão anterior após uma atualização de layout ou recursos, você pode reverter o aplicativo para a versão anterior a qualquer momento.
+      </div>
+
+      ${updaterInfo.isSecurityUpdate ? `
+        <!-- TRAVA DE SEGURANÇA ATIVA -->
+        <div style="padding: 14px 16px; border-radius: 8px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; font-size: 12px; display: flex; align-items: center; gap: 10px; margin-bottom: 14px;">
+          <span style="font-size: 18px;">🔒</span>
+          <div>
+            <strong>Atualização Crítica de Segurança Ativa:</strong>
+            Esta versão inclui correções mandatórias de segurança ou conformidade com a LGPD. A reversão para versões vulneráveis foi desativada para proteger a integridade dos seus dados.
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-sm" disabled style="opacity: 0.5; cursor: not-allowed; font-size: 12px;">
+          ⏪ Voltar para Versão Anterior (Bloqueado por Segurança)
+        </button>
+      ` : `
+        <!-- ROLLBACK HABILITADO -->
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+          <div style="font-size: 12px; color: var(--text-secondary);">
+            Ponto de Restauração: <strong>Snapshot Automático do SQLite criado antes de cada instalação.</strong>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btn-rollback-version" style="font-size: 12px; font-weight: 600; padding: 6px 16px; border-color: rgba(255,255,255,0.2);">
+            ⏪ Voltar para a Versão Anterior
+          </button>
+        </div>
+      `}
+
+      <!-- HISTÓRICO DE VERSÕES REGISTRADAS -->
+      ${updaterInfo.history && updaterInfo.history.length > 0 ? `
+        <div style="margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px;">
+          <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px;">
+            Histórico Local de Instalações:
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            ${updaterInfo.history.map((h, i) => `
+              <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; padding: 6px 10px; background: rgba(255,255,255,0.02); border-radius: 4px; border: 1px solid rgba(255,255,255,0.05);">
+                <span style="font-weight: 600; color: ${i === 0 ? '#34d399' : 'var(--text-secondary)'};">
+                  ${i === 0 ? '● (Atual) ' : '○ '}v${h.version}
+                </span>
+                <span style="color: var(--text-muted); font-family: monospace;">
+                  ${new Date(h.installedAt).toLocaleDateString('pt-BR')} ${new Date(h.installedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+
+  // Listeners de eventos do Updater
+  const feedbackContainer = document.getElementById('updater-feedback-container');
+  const btnCheck = document.getElementById('btn-check-updates');
+  const btnRollback = document.getElementById('btn-rollback-version');
+
+  if (btnCheck) {
+    btnCheck.onclick = async () => {
+      btnCheck.disabled = true;
+      btnCheck.innerHTML = '<span>⏳</span> Verificando...';
+      feedbackContainer.style.display = 'block';
+      feedbackContainer.innerHTML = `
+        <div style="padding: 12px 16px; border-radius: 8px; background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2); color: #93c5fd; font-size: 12px; display: flex; align-items: center; gap: 8px;">
+          <span>🔍</span> Consultando os servidores do GitHub Releases...
+        </div>
+      `;
+
+      try {
+        const res = await window.api.updater.check();
+        if (res && res.status === 'not-available') {
+          feedbackContainer.innerHTML = `
+            <div style="padding: 12px 16px; border-radius: 8px; background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); color: #6ee7b7; font-size: 12px; display: flex; align-items: center; gap: 8px;">
+              <span>✅</span> ${res.message || 'Você já está utilizando a versão mais recente!'}
+            </div>
+          `;
+        } else if (res && res.error) {
+          feedbackContainer.innerHTML = `
+            <div style="padding: 12px 16px; border-radius: 8px; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); color: #fca5a5; font-size: 12px; display: flex; align-items: center; gap: 8px;">
+              <span>⚠️</span> ${res.error}
+            </div>
+          `;
+        }
+      } catch (err) {
+        feedbackContainer.innerHTML = `
+          <div style="padding: 12px 16px; border-radius: 8px; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); color: #fca5a5; font-size: 12px;">
+            Erro: ${err.message}
+          </div>
+        `;
+      } finally {
+        btnCheck.disabled = false;
+        btnCheck.innerHTML = '<span>🔍</span> Verificar Atualizações';
+      }
+    };
+  }
+
+  // Ouvinte de status em tempo real emitido pelo Main Process
+  if (window.api?.updater?.onStatus) {
+    window.api.updater.onStatus((data) => {
+      if (!feedbackContainer) return;
+      feedbackContainer.style.display = 'block';
+
+      if (data.status === 'available') {
+        feedbackContainer.innerHTML = `
+          <div style="padding: 16px; border-radius: 8px; background: linear-gradient(135deg, rgba(16,185,129,0.12), rgba(59,130,246,0.12)); border: 1px solid rgba(16,185,129,0.3); margin-top: 10px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <div style="font-weight: 700; font-size: 14px; color: #34d399; display: flex; align-items: center; gap: 6px;">
+                <span>✨ Nova Versão Disponível:</span> <strong>v${data.version}</strong>
+              </div>
+              ${data.isSecurityUpdate ? '<span class="badge badge-danger" style="font-size: 10px; padding: 2px 8px; border-radius: 12px; background: rgba(239,68,68,0.2); color: #f87171; border: 1px solid rgba(239,68,68,0.4);">🔒 Segurança Obrigatória</span>' : ''}
+            </div>
+            <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; max-height: 100px; overflow-y: auto; background: rgba(0,0,0,0.2); padding: 8px 12px; border-radius: 6px; white-space: pre-wrap;">
+              ${data.releaseNotes || 'Melhorias gerais de estabilidade e novas funcionalidades.'}
+            </div>
+            <div id="updater-progress-area" style="display: none; margin-bottom: 12px;">
+              <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">
+                <span>Baixando atualização...</span>
+                <span id="updater-progress-label">0%</span>
+              </div>
+              <div style="height: 6px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                <div id="updater-progress-fill" style="height: 100%; width: 0%; background: linear-gradient(90deg, #10b981, #3b82f6); transition: width 0.2s;"></div>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm" id="btn-download-update" style="font-size: 12px; font-weight: 700; padding: 8px 16px;">
+              ⬇️ Baixar e Preparar Instalação
+            </button>
+          </div>
+        `;
+
+        document.getElementById('btn-download-update')?.addEventListener('click', async () => {
+          const btnDl = document.getElementById('btn-download-update');
+          const pArea = document.getElementById('updater-progress-area');
+          if (btnDl) btnDl.style.display = 'none';
+          if (pArea) pArea.style.display = 'block';
+
+          await window.api.updater.download();
+        });
+      } else if (data.status === 'downloaded') {
+        feedbackContainer.innerHTML = `
+          <div style="padding: 16px; border-radius: 8px; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); margin-top: 10px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <div style="font-weight: 700; font-size: 14px; color: #34d399;">
+                🎉 Atualização v${data.version} Baixada com Sucesso!
+              </div>
+              <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">
+                Um snapshot seguro do seu banco de dados SQLite será criado antes de reiniciar.
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm" id="btn-apply-update" style="font-size: 12px; font-weight: 700; padding: 8px 18px; background: linear-gradient(135deg, #10b981, #059669);">
+              🚀 Instalar e Reiniciar Agora
+            </button>
+          </div>
+        `;
+
+        document.getElementById('btn-apply-update')?.addEventListener('click', async () => {
+          await window.api.updater.install();
+        });
+      }
+    });
+  }
+
+  if (window.api?.updater?.onProgress) {
+    window.api.updater.onProgress((prog) => {
+      const fill = document.getElementById('updater-progress-fill');
+      const label = document.getElementById('updater-progress-label');
+      if (fill) fill.style.width = `${prog.percent}%`;
+      if (label) label.textContent = `${prog.percent}%`;
+    });
+  }
+
+  if (btnRollback) {
+    btnRollback.onclick = async () => {
+      if (confirm('Deseja realmente reverter para a versão anterior do FinançasFamília?\n\nSeus dados e lançamentos continuarão preservados.')) {
+        const res = await window.api.updater.rollback({ restoreDatabase: false });
+        if (res.success) {
+          toast(res.message || 'Instrução de reversão enviada com sucesso.');
+        } else {
+          toast(res.error || 'Não foi possível reverter a versão.', 'error');
+        }
+      }
+    };
+  }
+}
+
 
 
 

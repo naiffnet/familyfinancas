@@ -568,3 +568,160 @@ function openTransactionDetailsModal({ tx, item, accounts = [], categories = [],
     };
   }
 }
+
+async function openAdvanceInstallmentsModal(cardAccountId, inv) {
+  try {
+    const items = await window.api.invoices.getAdvanceable(cardAccountId);
+    if (!items || items.length === 0) {
+      toast('Este cartão não possui compras parceladas futuras com parcelas a antecipar.', 'info');
+      return;
+    }
+
+    const cardName = inv?.card_name || 'Cartão de Crédito';
+    const mStr = String(inv?.month || State.currentMonth).padStart(2, '0');
+    const yStr = inv?.year || State.currentYear;
+
+    const modalHtml = `
+      <div style="padding: 16px;">
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.5;">
+          Antecipe parcelas futuras de compras no cartão <strong>${cardName}</strong> para a fatura atual (<strong>${mStr}/${yStr}</strong>), liberando seu limite e garantindo descontos a valor presente.
+        </p>
+
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label style="font-size: 12px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; display: block;">
+            📦 Selecione a Compra Parcelada:
+          </label>
+          <select id="adv-item-select" class="form-control" style="font-size: 13px; width: 100%; padding: 8px 12px; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-primary);">
+            ${items.map(it => `
+              <option value="${it.id}" data-amount="${it.amount}" data-remaining="${it.remaining_installments}" data-name="${it.name}">
+                ${it.name} — Restam ${it.remaining_installments}x de R$ ${fmt.currency(it.amount)}
+              </option>
+            `).join('')}
+          </select>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
+          <div class="form-group">
+            <label style="font-size: 12px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; display: block;">
+              🔢 Parcelas a Antecipar:
+            </label>
+            <input type="number" id="adv-count-input" class="form-control" min="1" max="${items[0].remaining_installments}" value="1" style="font-size: 13px; width: 100%; padding: 8px 12px; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-primary);">
+          </div>
+
+          <div class="form-group">
+            <label style="font-size: 12px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; display: block;">
+              🏷️ Desconto Mensal (% a.m.):
+            </label>
+            <input type="number" step="0.05" id="adv-discount-rate" class="form-control" value="0.85" placeholder="0.85" style="font-size: 13px; width: 100%; padding: 8px 12px; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border); color: var(--text-primary);">
+          </div>
+        </div>
+
+        <!-- SIMULADOR VISUAL DE DESCONTO -->
+        <div id="adv-summary-card" style="padding: 14px 18px; border-radius: 8px; background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.25); margin-bottom: 20px;">
+          <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; color: var(--text-secondary);">
+            <span>Valor Nominal Total:</span>
+            <strong id="adv-nominal-val" style="color: var(--text-primary);">R$ 0,00</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; color: #10b981;">
+            <span>Desconto a Valor Presente:</span>
+            <strong id="adv-discount-val">- R$ 0,00</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 800; border-top: 1px solid rgba(139, 92, 246, 0.2); padding-top: 8px; color: #c084fc;">
+            <span>Valor Líquido na Fatura:</span>
+            <strong id="adv-final-val">R$ 0,00</strong>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+          <button type="button" class="btn btn-secondary" onclick="Modal.close()">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="btn-confirm-advance" style="background: linear-gradient(135deg, #8b5cf6, #6d28d9); border-color: #8b5cf6; color: #fff; font-weight: 700; padding: 8px 20px; border-radius: 8px;">
+            ⚡ Confirmar Antecipação
+          </button>
+        </div>
+      </div>
+    `;
+
+    Modal.open(`⚡ Antecipação de Parcelas — ${cardName}`, modalHtml);
+
+    const selectEl = document.getElementById('adv-item-select');
+    const countEl = document.getElementById('adv-count-input');
+    const rateEl = document.getElementById('adv-discount-rate');
+    const nominalEl = document.getElementById('adv-nominal-val');
+    const discountEl = document.getElementById('adv-discount-val');
+    const finalEl = document.getElementById('adv-final-val');
+    const confirmBtn = document.getElementById('btn-confirm-advance');
+
+    const updateSimulation = () => {
+      const selectedOpt = selectEl.options[selectEl.selectedIndex];
+      if (!selectedOpt) return;
+      const itemAmount = parseFloat(selectedOpt.dataset.amount) || 0;
+      const maxRem = parseInt(selectedOpt.dataset.remaining, 10) || 1;
+
+      countEl.max = maxRem;
+      let count = parseInt(countEl.value, 10) || 1;
+      if (count > maxRem) { count = maxRem; countEl.value = maxRem; }
+      if (count < 1) { count = 1; countEl.value = 1; }
+
+      const rate = Math.max(0, parseFloat(rateEl.value) || 0) / 100;
+      const nominal = count * itemAmount;
+      let presentValue = 0;
+
+      for (let k = 1; k <= count; k++) {
+        const vp = rate > 0 ? (itemAmount / Math.pow(1 + rate, k)) : itemAmount;
+        presentValue += vp;
+      }
+
+      const discount = nominal - presentValue;
+
+      nominalEl.textContent = fmt.currency(nominal);
+      discountEl.textContent = `- ${fmt.currency(discount)}`;
+      finalEl.textContent = fmt.currency(presentValue);
+    };
+
+    selectEl.onchange = () => {
+      const selectedOpt = selectEl.options[selectEl.selectedIndex];
+      countEl.max = selectedOpt.dataset.remaining;
+      countEl.value = '1';
+      updateSimulation();
+    };
+
+    countEl.oninput = updateSimulation;
+    rateEl.oninput = updateSimulation;
+    updateSimulation();
+
+    confirmBtn.onclick = async () => {
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = 'Processando...';
+
+      const itemId = parseInt(selectEl.value, 10);
+      const count = parseInt(countEl.value, 10) || 1;
+      const rate = parseFloat(rateEl.value) || 0;
+
+      const res = await window.api.invoices.advance({
+        cardAccountId,
+        recurringItemId: itemId,
+        countToAdvance: count,
+        discountRateMonthly: rate,
+        currentMonth: inv?.month || State.currentMonth,
+        currentYear: inv?.year || State.currentYear,
+        userId: State.user.id
+      });
+
+      if (res && res.success) {
+        Modal.close();
+        toast(res.message || 'Parcelas antecipadas com sucesso!');
+        if (typeof renderRecurring === 'function') renderRecurring();
+        if (typeof renderDashboard === 'function') renderDashboard();
+        if (typeof renderTransactions === 'function') renderTransactions();
+        if (typeof renderAccounts === 'function') renderAccounts();
+      } else {
+        toast(res?.error || 'Erro ao antecipar parcelas', 'error');
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = '⚡ Confirmar Antecipação';
+      }
+    };
+  } catch (err) {
+    toast(`Erro ao carregar parcelas: ${err.message}`, 'error');
+  }
+}
+

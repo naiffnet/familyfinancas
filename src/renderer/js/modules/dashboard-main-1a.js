@@ -189,6 +189,14 @@ async function renderDashboard() {
 
     bindDashboardEvents(contentDiv, effectiveSummary, effectiveTxs, monthly, today);
 
+    // Carregar painéis do Pilar 1 (Preditivo & Radar)
+    if (typeof renderPredictiveForecastSection === 'function') {
+      renderPredictiveForecastSection(document.getElementById('dash-predictive-forecast-container'));
+    }
+    if (typeof renderSubscriptionRadarSection === 'function') {
+      renderSubscriptionRadarSection(document.getElementById('dash-subscription-radar-container'));
+    }
+
   } else {
     // 🌐 VISÃO GERAL
     await renderGeneralDashboardTab();
@@ -211,6 +219,12 @@ function renderExecutiveLayout(contentDiv, members, activeMemberFilter, activeTy
 
     <!-- 3. CARDS & CONTAS -->
     ${renderDashboardCardsGrid(summary)}
+
+    <!-- 3.1 PROJEÇÃO PREDITIVA DE SALDO FUTURO (PILAR 1) -->
+    <div id="dash-predictive-forecast-container"></div>
+
+    <!-- 3.2 RADAR DE ASSINATURAS & RECORRÊNCIAS (PILAR 1) -->
+    <div id="dash-subscription-radar-container"></div>
 
     <!-- 4. PAINEL OPERACIONAL KANBAN 3 COLUNAS -->
     <div style="margin-bottom: 20px;">
@@ -381,7 +395,7 @@ async function renderGeneralDashboardTab() {
     <div style="margin-bottom:24px">
       <div style="font-size:13px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px">🏦 Todas as Contas e Cartões da Família</div>
       <div class="cards-widget-grid" id="cards-widget-grid-general">
-        ${creditAccounts.map(acc => renderCreditCardWidget(acc, summaryGeral.cardSpending[acc.id] || 0, null)).join('')}
+        ${creditAccounts.map(acc => renderCreditCardWidget(acc, (summaryGeral.cardSpending || {})[acc.id] || 0, null)).join('')}
         ${debitAccounts.map(acc => renderDebitAccountStaticWidget(acc)).join('')}
       </div>
     </div>` : ''}

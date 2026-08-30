@@ -493,5 +493,69 @@ module.exports = (Base) => class extends Base {
     return { success: true };
   }
 
+  getSubscriptionRadar(userId) {
+    if (!userId) return { subscriptions: [], totalMonthly: 0, totalAnnual: 0 };
+    const user = this.db.prepare('SELECT family_id, profile_type FROM users WHERE id = ?').get(userId);
+    if (!user) return { subscriptions: [], totalMonthly: 0, totalAnnual: 0 };
+
+    const items = this.db.prepare(`
+      SELECT ri.*, c.name as category_name, c.color as category_color, c.icon as category_icon,
+             a.name as account_name, a.type as account_type
+      FROM recurring_items ri
+      LEFT JOIN categories c ON ri.category_id = c.id
+      LEFT JOIN accounts a ON ri.account_id = a.id
+      LEFT JOIN users u ON ri.user_id = u.id
+      WHERE (u.family_id = ? OR ri.user_id = ?) AND ri.type = 'expense'
+      AND (ri.repeat_months IS NULL OR ri.repeat_months <= 1)
+      ORDER BY ri.amount DESC
+    `).all(user.family_id, userId);
+
+    let totalMonthly = 0;
+    const subscriptions = items.map(item => {
+      const monthly = item.amount || 0;
+      const annual = monthly * 12;
+      totalMonthly += monthly;
+
+      // Buscar histórico dos últimos 6 meses para detectar reajustes de preço
+      const pastTxs = this.db.prepare(`
+        SELECT amount, date FROM transactions
+        WHERE recurring_item_id = ? AND is_avulso != 2
+        ORDER BY date DESC LIMIT 6
+      `).all(item.id);
+
+      let priceChangeAlert = null;
+      if (pastTxs.length >= 2) {
+        const oldest = pastTxs[pastTxs.length - 1].amount;
+        const newest = pastTxs[0].amount;
+        if (newest > oldest) {
+          const diff = newest - oldest;
+          priceChangeAlert = `Reajuste detectado: aumento de R$ ${diff.toFixed(2)} (+${((diff / oldest) * 100).toFixed(1)}%)`;
+        }
+      }
+
+      return {
+        id: item.id,
+        name: item.name,
+        monthly_amount: monthly,
+        annual_cost: annual,
+        due_day: item.due_day,
+        category_name: item.category_name || 'Assinaturas & Serviços',
+        category_color: item.category_color || '#8b5cf6',
+        category_icon: item.category_icon || '📱',
+        account_name: item.account_name || 'Conta Padrão',
+        account_type: item.account_type || 'checking',
+        price_change_alert: priceChangeAlert
+      };
+    });
+
+    return {
+      subscriptions,
+      totalMonthly,
+      totalAnnual: totalMonthly * 12,
+      count: subscriptions.length
+    };
+  }
+
   // ── TRANSACTIONS ─────────────────────────────────────────────
 };
+

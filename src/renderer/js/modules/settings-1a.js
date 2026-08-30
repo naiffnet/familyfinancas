@@ -88,6 +88,9 @@ async function openSettingsModal(activeTab = 'profile') {
             <button class="settings-modal-tab-btn ${activeTab === 'audit' ? 'active' : ''}" data-tab="audit">
               <span>🛡️</span> Trilha de Auditoria
             </button>
+            <button class="settings-modal-tab-btn ${activeTab === 'updater' ? 'active' : ''}" data-tab="updater">
+              <span>🔄</span> Versão & Atualizações
+            </button>
           </div>
         </div>
 
@@ -629,6 +632,8 @@ async function openSettingsModal(activeTab = 'profile') {
       renderSettingsLgpdTab(bodyEl);
     } else if (tab === 'audit') {
       await renderSettingsAuditTab(bodyEl);
+    } else if (tab === 'updater') {
+      await renderSettingsUpdaterTab(bodyEl);
     }
   };
 

@@ -724,3 +724,117 @@ function setupCategoryInteractiveChart(wrapperElementId, chartStateKey, txs) {
 
   renderCheckboxesAndDraw();
 }
+
+async function renderPredictiveForecastSection(container) {
+  if (!container) return;
+  try {
+    const forecast = await window.api.reports.getPredictiveCashflow({
+      userId: State.user.id,
+      days: 30
+    });
+
+    if (!forecast || !forecast.timeline || forecast.timeline.length === 0) return;
+
+    container.innerHTML = `
+      <div style="padding: 18px 20px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-surface); margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 22px;">🔮</span>
+            <div>
+              <div style="font-weight: 800; font-size: 15px; color: var(--text-primary);">
+                Projeção Preditiva de Saldo Futuro (30 Dias)
+              </div>
+              <div style="font-size: 11.5px; color: var(--text-muted);">
+                Estimativa diária combinando saldo atual, receitas agendadas, contas fixas e faturas de cartão
+              </div>
+            </div>
+          </div>
+
+          <!-- TERMÔMETRO DE RISCO -->
+          ${forecast.hasNegativeRisk ? `
+            <div style="display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 20px; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #f87171; font-size: 12px; font-weight: 700;">
+              <span>⚠️ Risco de Saldo Negativo em ${fmt.date(forecast.firstNegativeDate)}</span>
+              <span class="badge badge-danger" style="font-size: 10px; padding: 2px 6px;">Mín: ${fmt.currency(forecast.minProjectedBalance)}</span>
+            </div>
+          ` : `
+            <div style="display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 20px; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); color: #34d399; font-size: 12px; font-weight: 700;">
+              <span>🟢 Saldo Positivo e Seguro</span>
+              <span class="badge badge-green" style="font-size: 10px; padding: 2px 6px;">Mín: ${fmt.currency(forecast.minProjectedBalance)}</span>
+            </div>
+          `}
+        </div>
+
+        <!-- TIMELINE COMPACTA DE PROJEÇÃO -->
+        <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-top: 10px;">
+          ${forecast.timeline.slice(0, 15).map(item => `
+            <div style="flex: 0 0 85px; padding: 8px 6px; border-radius: 6px; background: ${item.isNegative ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.02)'}; border: 1px solid ${item.isNegative ? 'rgba(239,68,68,0.25)' : 'rgba(255,255,255,0.05)'}; text-align: center;">
+              <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase;">${item.dayOfWeek}</div>
+              <div style="font-size: 11px; font-weight: 700; color: var(--text-primary); margin: 2px 0;">${item.date.split('-')[2]}/${item.date.split('-')[1]}</div>
+              <div style="font-size: 11px; font-weight: 800; color: ${item.isNegative ? '#f87171' : '#34d399'};">
+                ${fmt.currency(item.projectedBalance)}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    console.warn('Erro ao renderizar projeção preditiva:', e);
+  }
+}
+
+async function renderSubscriptionRadarSection(container) {
+  if (!container) return;
+  try {
+    const radar = await window.api.recurring.getSubscriptionRadar(State.user.id);
+    if (!radar || !radar.subscriptions || radar.subscriptions.length === 0) return;
+
+    container.innerHTML = `
+      <div style="padding: 18px 20px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-surface); margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 14px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 22px;">📱</span>
+            <div>
+              <div style="font-weight: 800; font-size: 15px; color: var(--text-primary);">
+                Radar de Assinaturas & Recorrências
+              </div>
+              <div style="font-size: 11.5px; color: var(--text-muted);">
+                Monitoramento de custos contínuos anualizados e detecção de reajustes
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="padding: 4px 12px; border-radius: 8px; background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.25); font-size: 12px;">
+              <span style="color: var(--text-muted);">Total Mensal:</span> <strong style="color: #c084fc;">${fmt.currency(radar.totalMonthly)}</strong>
+            </div>
+            <div style="padding: 4px 12px; border-radius: 8px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); font-size: 12px;">
+              <span style="color: var(--text-muted);">Custo Anualizado:</span> <strong style="color: #fbbf24;">${fmt.currency(radar.totalAnnual)}/ano</strong>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px;">
+          ${radar.subscriptions.map(sub => `
+            <div style="padding: 10px 14px; border-radius: 8px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 18px;">${sub.category_icon || '📱'}</span>
+                <div>
+                  <div style="font-weight: 700; font-size: 13px; color: var(--text-primary);">${sub.name}</div>
+                  <div style="font-size: 11px; color: var(--text-muted);">Dia ${sub.due_day || '—'} • ${fmt.currency(sub.annual_cost)}/ano</div>
+                  ${sub.price_change_alert ? `<div style="font-size: 10px; color: #f87171; font-weight: 600; margin-top: 2px;">⚠️ ${sub.price_change_alert}</div>` : ''}
+                </div>
+              </div>
+              <div style="font-weight: 800; font-size: 13px; color: var(--text-primary);">
+                ${fmt.currency(sub.monthly_amount)}/mês
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    console.warn('Erro ao renderizar radar de assinaturas:', e);
+  }
+}
+

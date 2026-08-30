@@ -571,17 +571,33 @@ async function openImportStatementModal(accounts) {
           result = await window.api.importer.parseCsv(content);
         }
 
-        parsedTransactions = (result?.transactions || []).map((t, idx) => ({
-          ...t,
-          id_temp: idx,
-          selected: true,
-          category_id: (allCategories.find(c => c.name.toLowerCase() === (t.suggestedCategory || '').toLowerCase()) || allCategories[0])?.id || null
-        }));
-
-        if (parsedTransactions.length === 0) {
+        const rawTxs = result?.transactions || [];
+        if (rawTxs.length === 0) {
           toast('Nenhuma transação identificada no arquivo.', 'warning');
           return;
         }
+
+        const targetAccId = parseInt(document.getElementById('import-target-account').value) || (account ? account.id : accounts[0]?.id);
+
+        let reconciledList = [];
+        try {
+          reconciledList = await window.api.accounts.reconcileOfx({
+            accountId: targetAccId,
+            transactions: rawTxs,
+            userId: State.user.id
+          });
+        } catch (recErr) {
+          console.warn('Erro ao rodar fuzzy reconciliation:', recErr);
+        }
+
+        parsedTransactions = (reconciledList && reconciledList.length > 0 ? reconciledList : rawTxs).map((t, idx) => ({
+          ...t,
+          id_temp: idx,
+          selected: true,
+          action: t.suggested_action || (t.match_candidate ? 'match' : 'create'),
+          candidate_id: t.match_candidate?.id || null,
+          category_id: (allCategories.find(c => c.name.toLowerCase() === (t.suggestedCategory || '').toLowerCase()) || allCategories[0])?.id || null
+        }));
 
         renderPreviewTable();
         previewContainer.style.display = 'block';
@@ -595,7 +611,11 @@ async function openImportStatementModal(accounts) {
   };
 
   function renderPreviewTable() {
-    countBadge.textContent = `${parsedTransactions.length} lançamentos encontrados no extrato`;
+    const matchCount = parsedTransactions.filter(t => t.match_candidate).length;
+    countBadge.innerHTML = `
+      <span>${parsedTransactions.length} lançamentos encontrados no extrato</span>
+      ${matchCount > 0 ? `<span style="background: rgba(16,185,129,0.15); color: #34d399; padding: 2px 8px; border-radius: 10px; font-weight: 700; margin-left: 8px;">✨ ${matchCount} correspondências identificadas</span>` : ''}
+    `;
 
     tableWrapper.innerHTML = `
       <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
@@ -603,15 +623,15 @@ async function openImportStatementModal(accounts) {
           <tr style="border-bottom: 1px solid var(--border); text-align: left; color: var(--text-muted);">
             <th style="padding: 6px 8px; width: 30px;">✓</th>
             <th style="padding: 6px 8px;">Data</th>
-            <th style="padding: 6px 8px;">Descrição</th>
+            <th style="padding: 6px 8px;">Extrato Bancário</th>
+            <th style="padding: 6px 8px;">Ação / Conciliação</th>
             <th style="padding: 6px 8px;">Categoria</th>
-            <th style="padding: 6px 8px;">Tipo</th>
             <th style="padding: 6px 8px; text-align: right;">Valor</th>
           </tr>
         </thead>
         <tbody>
           ${parsedTransactions.map(t => `
-            <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); background: ${t.selected ? 'transparent' : 'rgba(0,0,0,0.2)'}; opacity: ${t.selected ? '1' : '0.5'};">
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.04); background: ${t.selected ? (t.action === 'match' ? 'rgba(16,185,129,0.05)' : 'transparent') : 'rgba(0,0,0,0.2)'}; opacity: ${t.selected ? '1' : '0.5'};">
               <td style="padding: 6px 8px;">
                 <input type="checkbox" class="import-chk" data-idx="${t.id_temp}" ${t.selected ? 'checked' : ''}>
               </td>
@@ -620,12 +640,19 @@ async function openImportStatementModal(accounts) {
                 <input type="text" class="import-desc-edit" data-idx="${t.id_temp}" value="${(t.description || '').replace(/"/g, '&quot;')}" style="background: transparent; border: 1px solid transparent; color: var(--text-primary); width: 100%; font-size: 12px;">
               </td>
               <td style="padding: 6px 8px;">
+                ${t.match_candidate ? `
+                  <select class="import-action-select" data-idx="${t.id_temp}" style="padding: 3px 6px; font-size: 11px; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); border-radius: 4px; color: #34d399; font-weight: 600;">
+                    <option value="match" ${t.action === 'match' ? 'selected' : ''}>🟢 Conciliar: "${t.match_candidate.description}" (${fmt.currency(t.match_candidate.amount)})</option>
+                    <option value="create" ${t.action === 'create' ? 'selected' : ''}>🔵 Criar Novo Lançamento</option>
+                  </select>
+                ` : `
+                  <span class="badge badge-blue" style="font-size: 10px; padding: 3px 6px; border-radius: 4px; background: rgba(59,130,246,0.12); color: #60a5fa;">➕ Criar Novo</span>
+                `}
+              </td>
+              <td style="padding: 6px 8px;">
                 <select class="import-cat-select" data-idx="${t.id_temp}" style="padding: 3px 6px; font-size: 11px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; color: var(--text-primary);">
                   ${allCategories.map(c => `<option value="${c.id}" ${c.id === t.category_id ? 'selected' : ''}>${c.icon || ''} ${c.name}</option>`).join('')}
                 </select>
-              </td>
-              <td style="padding: 6px 8px;">
-                <span class="badge ${t.type === 'income' ? 'badge-green' : 'badge-red'}" style="font-size: 10px;">${t.type === 'income' ? 'Receita' : 'Despesa'}</span>
               </td>
               <td style="padding: 6px 8px; text-align: right; font-weight: 700; color: ${t.type === 'income' ? 'var(--accent-light)' : '#f87171'};">
                 ${t.type === 'income' ? '+' : '-'}${fmt.currency(t.amount)}
@@ -642,6 +669,14 @@ async function openImportStatementModal(accounts) {
         parsedTransactions[idx].selected = e.target.checked;
         renderPreviewTable();
         updateConfirmButton();
+      };
+    });
+
+    tableWrapper.querySelectorAll('.import-action-select').forEach(sel => {
+      sel.onchange = (e) => {
+        const idx = parseInt(e.target.dataset.idx);
+        parsedTransactions[idx].action = e.target.value;
+        renderPreviewTable();
       };
     });
 
@@ -664,7 +699,7 @@ async function openImportStatementModal(accounts) {
     const selectedCount = parsedTransactions.filter(t => t.selected).length;
     confirmBtn.disabled = selectedCount === 0;
     confirmBtn.style.opacity = selectedCount === 0 ? '0.5' : '1';
-    confirmBtn.textContent = `Confirmar Importação (${selectedCount} lançamentos)`;
+    confirmBtn.textContent = `Confirmar Conciliação (${selectedCount} lançamentos)`;
   }
 
   toggleAllBtn.onclick = () => {
@@ -686,23 +721,39 @@ async function openImportStatementModal(accounts) {
 
     try {
       confirmBtn.disabled = true;
-      confirmBtn.textContent = 'Importando...';
+      confirmBtn.textContent = 'Conciliando...';
 
-      const res = await window.api.importer.importBatch({
-        userId: State.user.id,
+      const reconciliationsPayload = selectedItems.map(item => ({
+        fitid: item.fitid,
+        date: item.date,
+        amount: item.amount,
+        type: item.type,
+        description: item.description,
+        categoryId: item.category_id,
+        action: item.action || 'create',
+        candidateId: item.action === 'match' ? (item.candidate_id || item.match_candidate?.id) : null
+      }));
+
+      const res = await window.api.accounts.executeReconciliation({
         accountId: targetAccId,
-        transactions: selectedItems
+        reconciliations: reconciliationsPayload,
+        userId: State.user.id
       });
 
       if (res && res.success) {
-        toast(`🎉 ${res.count} lançamentos importados com sucesso!`);
+        toast(res.message || 'Conciliação realizada com sucesso!');
         Modal.close();
         renderAccounts();
+        if (typeof renderDashboard === 'function') renderDashboard();
       } else {
-        toast('Erro ao importar: ' + (res?.error || 'Desconhecido'), 'error');
+        toast('Erro ao conciliar: ' + (res?.error || 'Desconhecido'), 'error');
+        confirmBtn.disabled = false;
+        updateConfirmButton();
       }
     } catch (err) {
-      toast('Erro ao importar extrato: ' + err.message, 'error');
+      toast('Erro ao conciliar extrato: ' + err.message, 'error');
+      confirmBtn.disabled = false;
+      updateConfirmButton();
     }
   };
 }

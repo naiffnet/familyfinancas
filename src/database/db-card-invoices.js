@@ -565,4 +565,118 @@ module.exports = (Base) => class extends Base {
     }
   }
 
+  getAdvanceableInstallments(cardAccountId) {
+    const cardAcc = this.db.prepare('SELECT * FROM accounts WHERE id = ? AND type = \'credit\'').get(cardAccountId);
+    if (!cardAcc) return [];
+
+    const recurring = this.db.prepare(`
+      SELECT ri.*, c.name as category_name, c.color as category_color, c.icon as category_icon
+      FROM recurring_items ri
+      LEFT JOIN categories c ON ri.category_id = c.id
+      WHERE ri.account_id = ? AND ri.repeat_months > 1
+    `).all(cardAccountId);
+
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const curMonth = now.getMonth() + 1;
+
+    return recurring.map(item => {
+      const createdDate = new Date(item.created_at || now);
+      const createdYear = createdDate.getFullYear();
+      const createdMonth = createdDate.getMonth() + 1;
+      const monthsElapsed = Math.max(0, (curYear - createdYear) * 12 + (curMonth - createdMonth));
+      const startInst = item.start_installment || 1;
+      const currentInst = Math.min(item.repeat_months, startInst + monthsElapsed);
+      const remainingCount = Math.max(0, item.repeat_months - currentInst);
+
+      return {
+        id: item.id,
+        name: item.name,
+        amount: item.amount,
+        repeat_months: item.repeat_months,
+        current_installment: currentInst,
+        remaining_installments: remainingCount,
+        category_name: item.category_name || 'Geral',
+        category_color: item.category_color || '#3b82f6',
+        category_icon: item.category_icon || '🏷️',
+        due_day: item.due_day
+      };
+    }).filter(i => i.remaining_installments > 0);
+  }
+
+  advanceInstallments({ cardAccountId, recurringItemId, countToAdvance, discountRateMonthly = 0, currentMonth, currentYear, userId }) {
+    const item = this.db.prepare('SELECT * FROM recurring_items WHERE id = ? AND account_id = ?').get(recurringItemId, cardAccountId);
+    if (!item) return { success: false, error: 'Item parcelado não encontrado' };
+
+    const cardAcc = this.db.prepare('SELECT a.*, u.family_id FROM accounts a JOIN users u ON a.user_id = u.id WHERE a.id = ?').get(cardAccountId);
+    if (!cardAcc) return { success: false, error: 'Cartão de crédito não encontrado' };
+
+    const count = Math.min(parseInt(countToAdvance, 10) || 1, item.repeat_months);
+    if (count <= 0) return { success: false, error: 'Quantidade de parcelas inválida' };
+
+    const rate = Math.max(0, parseFloat(discountRateMonthly) || 0) / 100;
+    const nominalAmountTotal = count * item.amount;
+    let presentValueTotal = 0;
+
+    for (let k = 1; k <= count; k++) {
+      const vp = rate > 0 ? (item.amount / Math.pow(1 + rate, k)) : item.amount;
+      presentValueTotal += vp;
+    }
+
+    const discountTotal = nominalAmountTotal - presentValueTotal;
+    const finalChargeAmount = Math.round(presentValueTotal * 100) / 100;
+
+    const targetM = currentMonth || (new Date().getMonth() + 1);
+    const targetY = currentYear || new Date().getFullYear();
+    const cycle = getCardBillingCycle(cardAcc.closing_day, cardAcc.due_day, targetM, targetY);
+
+    this.db.transaction(() => {
+      // 1. Inserir lançamento de antecipação na fatura atual
+      this.db.prepare(`
+        INSERT INTO transactions (user_id, account_id, category_id, amount, description, date, type, is_paid, is_avulso, notes, discount_amount)
+        VALUES (?, ?, ?, ?, ?, ?, 'expense', 0, 0, ?, ?)
+      `).run(
+        userId || cardAcc.user_id,
+        cardAccountId,
+        item.category_id,
+        finalChargeAmount,
+        `⚡ Antecipação ${count}x "${item.name}"`,
+        cycle.start,
+        `Antecipação de ${count} parcelas no valor nominal de R$ ${nominalAmountTotal.toFixed(2)} com desconto de R$ ${discountTotal.toFixed(2)} (${(rate * 100).toFixed(2)}% a.m.)`,
+        discountTotal
+      );
+
+      // 2. Reduzir as parcelas restantes do item recorrente
+      const newRepeatMonths = Math.max(0, item.repeat_months - count);
+      this.db.prepare(`
+        UPDATE recurring_items
+        SET repeat_months = ?
+        WHERE id = ?
+      `).run(newRepeatMonths, item.id);
+
+      // 3. Recalcular fatura atual
+      this.recalculateCardInvoiceByMonthYear(cardAccountId, targetM, targetY);
+    })();
+
+    this.logAudit({
+      userId: userId || cardAcc.user_id,
+      familyId: cardAcc.family_id,
+      action: 'INSTALLMENT_ADVANCE',
+      entityType: 'card_invoice',
+      entityId: cardAccountId,
+      description: `Antecipou ${count}x parcelas de "${item.name}" no cartão ${cardAcc.name}. Valor nominal: R$ ${nominalAmountTotal.toFixed(2)}, Valor com desconto: R$ ${finalChargeAmount.toFixed(2)} (Economia: R$ ${discountTotal.toFixed(2)})`,
+      newValues: { cardAccountId, recurringItemId, count, nominalAmountTotal, finalChargeAmount, discountTotal }
+    });
+
+    return {
+      success: true,
+      countAdvanced: count,
+      nominalAmountTotal,
+      finalChargeAmount,
+      discountTotal,
+      message: `${count} parcela(s) antecipada(s) com sucesso na fatura atual!`
+    };
+  }
+
 };
+

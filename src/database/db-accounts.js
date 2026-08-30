@@ -374,8 +374,150 @@ module.exports = (Base) => class extends Base {
     return { success: true, count };
   }
 
-  // ── SMART DEDUPLICATION & SYNC ENGINE ─────────────────────────
+  reconcileOfxTransactions({ accountId, transactions, userId }) {
+    if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
+      return [];
+    }
 
-  // ── SMART DEDUPLICATION & SYNC ENGINE ─────────────────────────
+    const acc = this.db.prepare('SELECT a.*, u.family_id FROM accounts a JOIN users u ON a.user_id = u.id WHERE a.id = ?').get(accountId);
+    if (!acc) return [];
+
+    return transactions.map(item => {
+      const itemDate = item.date || new Date().toISOString().split('T')[0];
+      const itemAmount = Math.abs(Number(item.amount) || 0);
+      const itemType = item.type || (Number(item.amount) < 0 ? 'expense' : 'income');
+      const itemDesc = (item.description || item.memo || '').toLowerCase().trim();
+
+      // Janela de +- 3 dias
+      const d = new Date(itemDate);
+      const dMin = new Date(d); dMin.setDate(dMin.getDate() - 3);
+      const dMax = new Date(d); dMax.setDate(dMax.getDate() + 3);
+      const minDateStr = dMin.toISOString().split('T')[0];
+      const maxDateStr = dMax.toISOString().split('T')[0];
+
+      const candidates = this.db.prepare(`
+        SELECT t.*, c.name as category_name, c.color as category_color, c.icon as category_icon
+        FROM transactions t
+        LEFT JOIN categories c ON t.category_id = c.id
+        WHERE t.account_id = ? AND t.type = ? AND t.date >= ? AND t.date <= ?
+      `).all(accountId, itemType, minDateStr, maxDateStr);
+
+      let bestCandidate = null;
+      let highestScore = 0;
+
+      for (const cand of candidates) {
+        let score = 0;
+        const candAmount = Math.abs(cand.amount || 0);
+        
+        // 1. Match de Valor (50 pts)
+        if (Math.abs(candAmount - itemAmount) < 0.01) {
+          score += 50;
+        } else if (Math.abs(candAmount - itemAmount) <= 1.00) {
+          score += 25;
+        }
+
+        // 2. Match de Data (30 pts)
+        if (cand.date === itemDate) {
+          score += 30;
+        } else {
+          const diffDays = Math.abs((new Date(cand.date) - new Date(itemDate)) / (1000 * 60 * 60 * 24));
+          if (diffDays <= 1) score += 20;
+          else if (diffDays <= 2) score += 10;
+        }
+
+        // 3. Match de Descrição (20 pts)
+        const candDesc = (cand.description || '').toLowerCase();
+        const words = itemDesc.split(/\s+/).filter(w => w.length > 2);
+        let matchingWords = 0;
+        for (const w of words) {
+          if (candDesc.includes(w)) matchingWords++;
+        }
+        if (words.length > 0 && matchingWords > 0) {
+          score += Math.min(20, Math.round((matchingWords / words.length) * 20));
+        }
+
+        if (score > highestScore && score >= 50) {
+          highestScore = score;
+          bestCandidate = { ...cand, match_score: score };
+        }
+      }
+
+      return {
+        fitid: item.fitid || item.id || `ofx_${Date.now()}_${Math.random()}`,
+        date: itemDate,
+        amount: itemAmount,
+        type: itemType,
+        description: item.description || item.memo || 'Lançamento Bancário',
+        match_candidate: bestCandidate,
+        suggested_action: bestCandidate ? 'match' : 'create'
+      };
+    });
+  }
+
+  executeReconciliation({ accountId, reconciliations, userId }) {
+    if (!reconciliations || !Array.isArray(reconciliations) || reconciliations.length === 0) {
+      return { success: true, matchedCount: 0, createdCount: 0 };
+    }
+
+    const acc = this.db.prepare('SELECT a.*, u.family_id FROM accounts a JOIN users u ON a.user_id = u.id WHERE a.id = ?').get(accountId);
+    if (!acc) return { success: false, error: 'Conta não encontrada' };
+
+    let matchedCount = 0;
+    let createdCount = 0;
+
+    this.db.transaction(() => {
+      for (const rec of reconciliations) {
+        if (rec.action === 'match' && rec.candidateId) {
+          // Marca o lançamento existente como conciliado
+          this.db.prepare(`
+            UPDATE transactions
+            SET is_paid = 1, payment_date = COALESCE(payment_date, ?), notes = COALESCE(notes, '') || ?
+            WHERE id = ?
+          `).run(rec.date, ` [CONCILIADO OFX: ${rec.fitid || ''}]`, rec.candidateId);
+          matchedCount++;
+        } else if (rec.action === 'create') {
+          // Cria nova transação
+          this.db.prepare(`
+            INSERT INTO transactions (user_id, account_id, category_id, type, amount, description, date, is_paid, is_avulso, payment_date, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?)
+          `).run(
+            userId || acc.user_id,
+            accountId,
+            rec.categoryId || null,
+            rec.type || 'expense',
+            Math.abs(Number(rec.amount) || 0),
+            rec.description || 'Lançamento Conciliado',
+            rec.date,
+            rec.date,
+            `[IMPORTADO VIA CONCILIAÇÃO OFX: ${rec.fitid || ''}]`
+          );
+
+          if (acc.type !== 'credit') {
+            const delta = rec.type === 'income' ? Math.abs(Number(rec.amount)) : -Math.abs(Number(rec.amount));
+            this.db.prepare('UPDATE accounts SET balance = balance + ? WHERE id = ?').run(delta, accountId);
+          }
+          createdCount++;
+        }
+      }
+    })();
+
+    this.logAudit({
+      userId: userId || acc.user_id,
+      familyId: acc.family_id,
+      action: 'BANK_RECONCILIATION',
+      entityType: 'account',
+      entityId: accountId,
+      description: `Conciliação bancária na conta "${acc.name}": ${matchedCount} vinculados, ${createdCount} novos lançamentos criados.`,
+      newValues: { accountId, matchedCount, createdCount }
+    });
+
+    return {
+      success: true,
+      matchedCount,
+      createdCount,
+      message: `Conciliação concluída: ${matchedCount} lançamento(s) vinculados e ${createdCount} criado(s)!`
+    };
+  }
 
 };
+

@@ -33,6 +33,8 @@ contextBridge.exposeInMainWorld('api', {
     update:   (d)      => ipcRenderer.invoke('accounts:update', d),
     delete:   (id)     => ipcRenderer.invoke('accounts:delete', id),
     transfer: (d)      => ipcRenderer.invoke('accounts:transfer', d),
+    reconcileOfx: (d)  => ipcRenderer.invoke('accounts:reconcileOfx', d),
+    executeReconciliation: (d) => ipcRenderer.invoke('accounts:executeReconciliation', d),
   },
   categories: {
     getAll: (userId) => ipcRenderer.invoke('categories:getAll', userId),
@@ -49,6 +51,7 @@ contextBridge.exposeInMainWorld('api', {
     getMonthly:      (d)            => ipcRenderer.invoke('recurring:getMonthly', d),
     postponeInstallment: (d)        => ipcRenderer.invoke('recurring:postponeInstallment', d),
     updatePositions: (userId, positions) => ipcRenderer.invoke('recurring:updatePositions', { userId, positions }),
+    getSubscriptionRadar: (userId) => ipcRenderer.invoke('recurring:getSubscriptionRadar', userId),
   },
   transactions: {
     getAll:      (f)  => ipcRenderer.invoke('transactions:getAll', f),
@@ -61,13 +64,15 @@ contextBridge.exposeInMainWorld('api', {
     refund:      (d)  => ipcRenderer.invoke('transactions:refund', d),
   },
   invoices: {
-    getMonthly:  (d) => ipcRenderer.invoke('invoices:getMonthly', d),
-    pay:         (d) => ipcRenderer.invoke('invoices:pay', d),
-    payPartial:  (d) => ipcRenderer.invoke('cards:payInvoicePartial', d),
-    anticipate:  (d) => ipcRenderer.invoke('cards:anticipateInstallments', d),
-    renegotiate: (d) => ipcRenderer.invoke('invoices:renegotiate', d),
-    reopen:      (d) => ipcRenderer.invoke('invoices:reopen', d),
-    recalculate: (d) => ipcRenderer.invoke('invoices:recalculate', d),
+    getMonthly:      (d) => ipcRenderer.invoke('invoices:getMonthly', d),
+    pay:             (d) => ipcRenderer.invoke('invoices:pay', d),
+    payPartial:      (d) => ipcRenderer.invoke('cards:payInvoicePartial', d),
+    anticipate:      (d) => ipcRenderer.invoke('cards:advanceInstallments', d),
+    getAdvanceable:  (d) => ipcRenderer.invoke('cards:getAdvanceableInstallments', d),
+    advance:         (d) => ipcRenderer.invoke('cards:advanceInstallments', d),
+    renegotiate:     (d) => ipcRenderer.invoke('invoices:renegotiate', d),
+    reopen:          (d) => ipcRenderer.invoke('invoices:reopen', d),
+    recalculate:     (d) => ipcRenderer.invoke('invoices:recalculate', d),
   },
   budgets: {
     getAll: (d) => ipcRenderer.invoke('budgets:getAll', d),
@@ -87,9 +92,10 @@ contextBridge.exposeInMainWorld('api', {
     getCategoryChart:(d)=> ipcRenderer.invoke('dashboard:getCategoryChart', d),
   },
   reports: {
-    getCashflow:      (d) => ipcRenderer.invoke('reports:getCashflow', d),
-    getPatrimony:     (d) => ipcRenderer.invoke('reports:getPatrimony', d),
-    getInterestAudit: (d) => ipcRenderer.invoke('reports:getInterestAudit', d),
+    getCashflow:          (d) => ipcRenderer.invoke('reports:getCashflow', d),
+    getPatrimony:         (d) => ipcRenderer.invoke('reports:getPatrimony', d),
+    getInterestAudit:     (d) => ipcRenderer.invoke('reports:getInterestAudit', d),
+    getPredictiveCashflow:(d) => ipcRenderer.invoke('reports:getPredictiveCashflow', d),
   },
   backup: {
     export: () => ipcRenderer.invoke('backup:export'),
@@ -131,5 +137,22 @@ contextBridge.exposeInMainWorld('api', {
     mergeBatch: (d) => ipcRenderer.invoke('sync:mergeBatch', d),
     dismissDuplicate: (d) => ipcRenderer.invoke('sync:dismissDuplicate', d),
     getHistory: (d) => ipcRenderer.invoke('sync:getHistory', d),
+  },
+  updater: {
+    getInfo: () => ipcRenderer.invoke('updater:getInfo'),
+    check: () => ipcRenderer.invoke('updater:check'),
+    download: () => ipcRenderer.invoke('updater:download'),
+    install: () => ipcRenderer.invoke('updater:install'),
+    rollback: (opts) => ipcRenderer.invoke('updater:rollback', opts || {}),
+    onStatus: (callback) => {
+      const listener = (event, data) => callback(data);
+      ipcRenderer.on('updater:status', listener);
+      return () => ipcRenderer.removeListener('updater:status', listener);
+    },
+    onProgress: (callback) => {
+      const listener = (event, data) => callback(data);
+      ipcRenderer.on('updater:progress', listener);
+      return () => ipcRenderer.removeListener('updater:progress', listener);
+    }
   },
 });

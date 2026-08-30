@@ -1141,6 +1141,9 @@ function renderInvoicesList(container, invoices, accounts) {
 
                 <div class="invoice-card-actions">
                   ${!inv.is_paid ? `
+                    <button class="btn btn-sm advance-invoice-btn" data-id="${inv.id}" data-card-id="${cardAccountId}" style="background: rgba(139, 92, 246, 0.1); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.35); font-weight: 700; border-radius: 8px; padding: 6px 12px;" title="Antecipar parcelas futuras com desconto">
+                      ⚡ Antecipar
+                    </button>
                     <button class="btn btn-sm renegotiate-invoice-btn" data-id="${inv.id}" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35); font-weight: 700; border-radius: 8px; padding: 6px 12px;">
                       🤝 Acordo
                     </button>
@@ -1164,7 +1167,7 @@ function renderInvoicesList(container, invoices, accounts) {
   // Bind invoice card click to toggle highlight on its installments
   container.querySelectorAll('.invoice-card-item').forEach(cardEl => {
     cardEl.onclick = (e) => {
-      if (e.target.closest('.pay-invoice-btn, .renegotiate-invoice-btn, .reopen-invoice-btn, .invoice-highlight-btn')) {
+      if (e.target.closest('.pay-invoice-btn, .renegotiate-invoice-btn, .reopen-invoice-btn, .invoice-highlight-btn, .advance-invoice-btn')) {
         return;
       }
       const cardId = parseInt(cardEl.dataset.cardId);
@@ -1185,6 +1188,18 @@ function renderInvoicesList(container, invoices, accounts) {
       const cardColor = cardEl.dataset.bankColor;
       const cardName = cardEl.dataset.cardName;
       toggleInvoiceHighlight(cardId, cardColor, cardName, invoiceId);
+    };
+  });
+
+  container.querySelectorAll('.advance-invoice-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const invId = parseInt(btn.dataset.id);
+      const cardId = parseInt(btn.dataset.cardId);
+      const inv = invoices.find(i => i.id === invId);
+      if (inv && typeof openAdvanceInstallmentsModal === 'function') {
+        openAdvanceInstallmentsModal(cardId, inv);
+      }
     };
   });
 

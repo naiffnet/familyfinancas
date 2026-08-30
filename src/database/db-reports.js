@@ -817,5 +817,111 @@ module.exports = (Base) => class extends Base {
     };
   }
 
+  getPredictiveCashflowForecast({ userId, days = 30 }) {
+    if (!userId) return { timeline: [], initialBalance: 0, hasNegativeRisk: false };
+    const user = this.db.prepare('SELECT family_id, profile_type FROM users WHERE id = ?').get(userId);
+    if (!user) return { timeline: [], initialBalance: 0, hasNegativeRisk: false };
+
+    // 1. Saldo inicial líquido disponível (contas correntes, carteiras e poupança)
+    const accounts = this.db.prepare(`
+      SELECT a.* FROM accounts a
+      JOIN users u ON a.user_id = u.id
+      WHERE (u.family_id = ? OR a.user_id = ?) AND a.is_active = 1 AND a.type IN ('checking', 'wallet', 'savings')
+    `).all(user.family_id, userId);
+
+    const initialBalance = accounts.reduce((sum, a) => sum + (a.balance || 0), 0);
+    const overdraftAvailable = accounts.reduce((sum, a) => sum + (a.overdraft_limit || 0), 0);
+
+    const totalDays = Math.min(90, Math.max(7, parseInt(days, 10) || 30));
+    const timeline = [];
+    let currentBalance = initialBalance;
+    let hasNegativeRisk = false;
+    let firstNegativeDate = null;
+    let minBalance = initialBalance;
+
+    const startDate = new Date();
+
+    for (let i = 0; i < totalDays; i++) {
+      const d = new Date(startDate);
+      d.setDate(d.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dayOfMonth = d.getDate();
+      const monthNum = d.getMonth() + 1;
+      const yearNum = d.getFullYear();
+
+      // Buscar transações pontuais pendentes/agendadas para esta data
+      const dailyTxs = this.db.prepare(`
+        SELECT t.type, t.amount, t.description
+        FROM transactions t
+        JOIN users u ON t.user_id = u.id
+        WHERE (u.family_id = ? OR t.user_id = ?) AND t.date = ? AND t.is_paid = 0 AND t.is_avulso != 2
+      `).all(user.family_id, userId, dateStr);
+
+      let dailyIncome = 0;
+      let dailyExpense = 0;
+
+      for (const tx of dailyTxs) {
+        if (tx.type === 'income') dailyIncome += tx.amount;
+        else dailyExpense += tx.amount;
+      }
+
+      // Buscar despesas/receitas recorrentes com vencimento neste dia do mês
+      const recurringItems = this.db.prepare(`
+        SELECT ri.type, ri.amount, ri.name, ri.account_id
+        FROM recurring_items ri
+        JOIN users u ON ri.user_id = u.id
+        WHERE (u.family_id = ? OR ri.user_id = ?) AND ri.due_day = ?
+      `).all(user.family_id, userId, dayOfMonth);
+
+      for (const rec of recurringItems) {
+        if (rec.type === 'income') dailyIncome += rec.amount;
+        else dailyExpense += rec.amount;
+      }
+
+      // Buscar faturas de cartão com vencimento neste dia
+      const cardInvoicesDue = this.db.prepare(`
+        SELECT inv.amount, a.name as card_name
+        FROM invoices inv
+        JOIN accounts a ON inv.card_account_id = a.id
+        JOIN users u ON a.user_id = u.id
+        WHERE (u.family_id = ? OR a.user_id = ?) AND inv.due_date = ? AND inv.is_paid = 0
+      `).all(user.family_id, userId, dateStr);
+
+      for (const inv of cardInvoicesDue) {
+        dailyExpense += inv.amount;
+      }
+
+      currentBalance = currentBalance + dailyIncome - dailyExpense;
+      if (currentBalance < minBalance) minBalance = currentBalance;
+
+      if (currentBalance < 0 && !hasNegativeRisk) {
+        hasNegativeRisk = true;
+        firstNegativeDate = dateStr;
+      }
+
+      timeline.push({
+        date: dateStr,
+        dayOfWeek: d.toLocaleDateString('pt-BR', { weekday: 'short' }),
+        dailyIncome: Math.round(dailyIncome * 100) / 100,
+        dailyExpense: Math.round(dailyExpense * 100) / 100,
+        projectedBalance: Math.round(currentBalance * 100) / 100,
+        isNegative: currentBalance < 0,
+        usesOverdraft: currentBalance < 0 && (currentBalance + overdraftAvailable) >= 0
+      });
+    }
+
+    return {
+      timeline,
+      initialBalance: Math.round(initialBalance * 100) / 100,
+      overdraftAvailable,
+      finalProjectedBalance: Math.round(currentBalance * 100) / 100,
+      minProjectedBalance: Math.round(minBalance * 100) / 100,
+      hasNegativeRisk,
+      firstNegativeDate,
+      daysAnalyzed: totalDays
+    };
+  }
+
   // ── FAMILIES & LOGS MANAGEMENT ─────────────────────────────────
 };
+
