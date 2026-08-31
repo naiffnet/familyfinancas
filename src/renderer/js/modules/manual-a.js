@@ -155,21 +155,24 @@ function getManualSidebarHtml() {
         </div>
       </div>
 
-      <!-- CAPÍTULO 7: ORÇAMENTOS & METAS -->
+      <!-- CAPÍTULO 7: ORÇAMENTOS & METAS INTELIGENTES (PILAR 2) -->
       <div class="wiki-tree-group">
         <div class="wiki-tree-header" data-cat="orcamento" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #f43f5e; background: rgba(244,63,94,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-          <span>🎯 7. Orçamentos & Metas</span>
+          <span>🎯 7. Orçamentos & Metas CDI</span>
           <span class="wiki-tree-arrow">▾</span>
         </div>
         <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
           <div class="wiki-tree-item" data-cat="orcamento" data-topic="orc-tetos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
             • 7.1 Tetos de Orçamento
           </div>
+          <div class="wiki-tree-item" data-cat="orcamento" data-topic="orc-503020" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #f43f5e; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+            • 7.2 Regra 50-30-20 (*Equilíbrio*)
+          </div>
           <div class="wiki-tree-item" data-cat="orcamento" data-topic="orc-barras" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 7.2 Barras de Limite Coloridas
+            • 7.3 Barras de Limite Coloridas
           </div>
           <div class="wiki-tree-item" data-cat="orcamento" data-topic="orc-metas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 7.3 Metas de Economia & Aportes
+            • 7.4 Metas com CDI & Simulador PMT
           </div>
         </div>
       </div>
@@ -196,27 +199,42 @@ function getManualSidebarHtml() {
         </div>
       </div>
 
-      <!-- CAPÍTULO 9: RELATÓRIOS, AUDITORIA & PDF -->
+      <!-- CAPÍTULO 9: RELATÓRIOS, GOVERNANÇA & PILARES 1, 2 E 3 -->
       <div class="wiki-tree-group">
         <div class="wiki-tree-header" data-cat="relatorios" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #818cf8; background: rgba(129,140,248,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-          <span>📈 9. Relatórios & Auditoria</span>
+          <span>📈 9. Relatórios & Governança</span>
           <span class="wiki-tree-arrow">▾</span>
         </div>
         <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
           <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-fluxo" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 9.1 Relatório de Fluxo de Caixa
+            • 9.1 Fluxo de Caixa Mensal
           </div>
           <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-graficos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 9.2 Gráficos Interativos
+            • 9.2 Gráficos por Categoria
           </div>
           <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-patrimonio" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 9.3 Evolução Patrimonial Anual
+            • 9.3 Patrimônio & Classes de Ativos
+          </div>
+          <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-projecao" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #8b5cf6; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+            • 9.4 Projeção Preditiva (30 Dias)
+          </div>
+          <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-radar-assinaturas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #ec4899; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+            • 9.5 Radar de Assinaturas & Recorrências
           </div>
           <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-auditoria-juros" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 9.4 Auditoria de Juros & Encargos
+            • 9.6 Auditoria de Juros & Encargos
+          </div>
+          <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-fair-share" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #3b82f6; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+            • 9.7 Divisão Familiar (*Fair Share*)
+          </div>
+          <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-dre" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #10b981; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+            • 9.8 DRE Pessoal Estruturado
+          </div>
+          <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-stress-test" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #f59e0b; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+            • 9.9 Simulador de Estresse (*E se...?*)
           </div>
           <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-impressao-pdf" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 9.5 Impressão & Exportação PDF
+            • 9.10 Impressão & Exportação PDF
           </div>
         </div>
       </div>
@@ -518,14 +536,18 @@ function getManualTopicsPart1Html() {
     <!-- CAPÍTULO 3.5: CARTÕES > ANTECIPAÇÃO DE PARCELAS -->
     <div class="manual-topic-content" id="topic-cartao-antecipacao" style="display: none;">
       <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a855f7; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>⚡ 3.5 Antecipação de Parcelas Futuras com Desconto</span>
+        <span>⚡ 3.5 Antecipação de Parcelas com Desconto a Valor Presente (VP)</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">Aproveite descontos antecipando parcelas de compras longas (ex: compras parceladas no Nubank/Inter):</p>
+        <p style="margin-bottom: 10px;">Aproveite descontos antecipando parcelas de compras longas com o cálculo exato de <strong>Valor Presente ($VP$)</strong>:</p>
+        <div style="background: rgba(168,85,247,0.08); border-left: 4px solid #a855f7; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          $$VP = \frac{VF}{(1 + i)^n}$$
+          Onde $VF$ é o valor nominal da parcela, $i$ é a taxa de desconto mensal e $n$ é a quantidade de meses antecipados.
+        </div>
         <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>Na fatura ou na lista de despesas, selecione as parcelas futuras que deseja adiantar.</li>
-          <li>Informe o desconto em reais (R$) ou percentual concedido pelo banco.</li>
-          <li>O sistema puxa as parcelas para a fatura atual com o valor abatido e libera o limite futuro imediatamente.</li>
+          <li>Na fatura ou na lista de despesas, abra a compra parcelada e selecione as parcelas futuras que deseja adiantar.</li>
+          <li>Informe a taxa de desconto mensal oferecida pelo banco ou o valor total do desconto.</li>
+          <li>O sistema antecipa os vencimentos para a fatura atual com o valor líquido abatido e libera o limite futuro do cartão imediatamente.</li>
         </ol>
       </div>
     </div>

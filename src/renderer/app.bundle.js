@@ -1,7 +1,7 @@
 /* ============================================
  * app.bundle.js — FamilyFinancas Renderer
  * Gerado por: npm run build:renderer
- * 2026-08-30T21:34:52.404Z
+ * 2026-08-31T01:03:36.960Z
  * Modulos: 26
  * ============================================ */
 
@@ -9679,21 +9679,24 @@ function getManualSidebarHtml() {
         </div>
       </div>
 
-      <!-- CAPÍTULO 7: ORÇAMENTOS & METAS -->
+      <!-- CAPÍTULO 7: ORÇAMENTOS & METAS INTELIGENTES (PILAR 2) -->
       <div class="wiki-tree-group">
         <div class="wiki-tree-header" data-cat="orcamento" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #f43f5e; background: rgba(244,63,94,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-          <span>🎯 7. Orçamentos & Metas</span>
+          <span>🎯 7. Orçamentos & Metas CDI</span>
           <span class="wiki-tree-arrow">▾</span>
         </div>
         <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
           <div class="wiki-tree-item" data-cat="orcamento" data-topic="orc-tetos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
             • 7.1 Tetos de Orçamento
           </div>
+          <div class="wiki-tree-item" data-cat="orcamento" data-topic="orc-503020" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #f43f5e; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+            • 7.2 Regra 50-30-20 (*Equilíbrio*)
+          </div>
           <div class="wiki-tree-item" data-cat="orcamento" data-topic="orc-barras" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 7.2 Barras de Limite Coloridas
+            • 7.3 Barras de Limite Coloridas
           </div>
           <div class="wiki-tree-item" data-cat="orcamento" data-topic="orc-metas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 7.3 Metas de Economia & Aportes
+            • 7.4 Metas com CDI & Simulador PMT
           </div>
         </div>
       </div>
@@ -9720,27 +9723,42 @@ function getManualSidebarHtml() {
         </div>
       </div>
 
-      <!-- CAPÍTULO 9: RELATÓRIOS, AUDITORIA & PDF -->
+      <!-- CAPÍTULO 9: RELATÓRIOS, GOVERNANÇA & PILARES 1, 2 E 3 -->
       <div class="wiki-tree-group">
         <div class="wiki-tree-header" data-cat="relatorios" style="padding: 8px 12px; border-radius: 6px; font-weight: 700; font-size: 12.5px; color: #818cf8; background: rgba(129,140,248,0.1); cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-          <span>📈 9. Relatórios & Auditoria</span>
+          <span>📈 9. Relatórios & Governança</span>
           <span class="wiki-tree-arrow">▾</span>
         </div>
         <div class="wiki-tree-subs" style="display: flex; flex-direction: column; gap: 2px; padding-left: 10px; margin-top: 4px;">
           <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-fluxo" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 9.1 Relatório de Fluxo de Caixa
+            • 9.1 Fluxo de Caixa Mensal
           </div>
           <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-graficos" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 9.2 Gráficos Interativos
+            • 9.2 Gráficos por Categoria
           </div>
           <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-patrimonio" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 9.3 Evolução Patrimonial Anual
+            • 9.3 Patrimônio & Classes de Ativos
+          </div>
+          <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-projecao" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #8b5cf6; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+            • 9.4 Projeção Preditiva (30 Dias)
+          </div>
+          <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-radar-assinaturas" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #ec4899; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+            • 9.5 Radar de Assinaturas & Recorrências
           </div>
           <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-auditoria-juros" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 9.4 Auditoria de Juros & Encargos
+            • 9.6 Auditoria de Juros & Encargos
+          </div>
+          <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-fair-share" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #3b82f6; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+            • 9.7 Divisão Familiar (*Fair Share*)
+          </div>
+          <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-dre" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #10b981; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+            • 9.8 DRE Pessoal Estruturado
+          </div>
+          <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-stress-test" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: #f59e0b; font-weight: 700; cursor: pointer; border-left: 2px solid transparent;">
+            • 9.9 Simulador de Estresse (*E se...?*)
           </div>
           <div class="wiki-tree-item" data-cat="relatorios" data-topic="rep-impressao-pdf" style="padding: 6px 10px; border-radius: 6px; font-size: 12px; color: var(--text-muted); cursor: pointer; border-left: 2px solid transparent;">
-            • 9.5 Impressão & Exportação PDF
+            • 9.10 Impressão & Exportação PDF
           </div>
         </div>
       </div>
@@ -10042,14 +10060,18 @@ function getManualTopicsPart1Html() {
     <!-- CAPÍTULO 3.5: CARTÕES > ANTECIPAÇÃO DE PARCELAS -->
     <div class="manual-topic-content" id="topic-cartao-antecipacao" style="display: none;">
       <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #a855f7; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>⚡ 3.5 Antecipação de Parcelas Futuras com Desconto</span>
+        <span>⚡ 3.5 Antecipação de Parcelas com Desconto a Valor Presente (VP)</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">Aproveite descontos antecipando parcelas de compras longas (ex: compras parceladas no Nubank/Inter):</p>
+        <p style="margin-bottom: 10px;">Aproveite descontos antecipando parcelas de compras longas com o cálculo exato de <strong>Valor Presente ($VP$)</strong>:</p>
+        <div style="background: rgba(168,85,247,0.08); border-left: 4px solid #a855f7; padding: 12px 16px; border-radius: 0 8px 8px 0; margin-bottom: 14px;">
+          $$VP = \frac{VF}{(1 + i)^n}$$
+          Onde $VF$ é o valor nominal da parcela, $i$ é a taxa de desconto mensal e $n$ é a quantidade de meses antecipados.
+        </div>
         <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>Na fatura ou na lista de despesas, selecione as parcelas futuras que deseja adiantar.</li>
-          <li>Informe o desconto em reais (R$) ou percentual concedido pelo banco.</li>
-          <li>O sistema puxa as parcelas para a fatura atual com o valor abatido e libera o limite futuro imediatamente.</li>
+          <li>Na fatura ou na lista de despesas, abra a compra parcelada e selecione as parcelas futuras que deseja adiantar.</li>
+          <li>Informe a taxa de desconto mensal oferecida pelo banco ou o valor total do desconto.</li>
+          <li>O sistema antecipa os vencimentos para a fatura atual com o valor líquido abatido e libera o limite futuro do cartão imediatamente.</li>
         </ol>
       </div>
     </div>
@@ -10323,33 +10345,51 @@ function getManualTopicsPart2Html() {
       </div>
     </div>
 
-    <!-- CAPÍTULO 7.2: ORÇAMENTOS > BARRAS COLORIDAS -->
+    <!-- CAPÍTULO 7.2: ORÇAMENTOS > REGRA 50-30-20 -->
+    <div class="manual-topic-content" id="topic-orc-503020" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f43f5e; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>⚖️ 7.2 Regra 50-30-20: Equilíbrio Orçamentário Estruturado</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">A metodologia divide toda a receita líquida auferida no mês em 3 grandes pilares:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>🏠 <strong>50% Necessidades Básicas (Needs):</strong> Moradia, energia, alimentação básica, saúde e educação.</li>
+          <li>🎭 <strong>30% Estilo de Vida e Desejos (Wants):</strong> Lazer, restaurantes, streaming, viagens e compras supérfluas.</li>
+          <li>💰 <strong>20% Poupança e Metas (Savings):</strong> Aportes em reserva de emergência e investimentos.</li>
+        </ul>
+        <div style="background: rgba(244,63,94,0.08); border-left: 4px solid #f43f5e; padding: 12px 16px; border-radius: 0 8px 8px 0;">
+          O sistema agrupa as categorias automaticamente e compara seus gastos reais contra os tetos de 50%, 30% e 20% da receita total do mês.
+        </div>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 7.3: ORÇAMENTOS > BARRAS COLORIDAS -->
     <div class="manual-topic-content" id="topic-orc-barras" style="display: none;">
       <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f43f5e; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>📊 7.2 Acompanhamento Visual das Barras de Limite</span>
+        <span>📊 7.3 Acompanhamento Visual das Barras de Limite</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
         <p style="margin-bottom: 10px;">As barras de progresso mudam de cor dinamicamente para alertar a saúde do orçamento:</p>
         <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
           <li>🟢 <strong>Verde Esmeralda (0% a 70%):</strong> Gastos confortáveis dentro da margem de segurança.</li>
           <li>🟡 <strong>Amarelo Atenção (71% a 90%):</strong> Categoria próxima do limite planejado para o mês.</li>
-          <li>🔴 <strong>Vermelho Perigo (> 90% ou Estourado):</strong> Orçamento esgotado ou ultrapassado, sinalizando que a família deve segurar compras não essenciais.</li>
+          <li>🔴 <strong>Vermelho Perigo (> 90% ou Estourado):</strong> Orçamento esgotado ou ultrapassado.</li>
         </ul>
       </div>
     </div>
 
-    <!-- CAPÍTULO 7.3: ORÇAMENTOS > METAS -->
+    <!-- CAPÍTULO 7.4: ORÇAMENTOS > METAS COM CDI & PMT -->
     <div class="manual-topic-content" id="topic-orc-metas" style="display: none;">
       <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f43f5e; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>🎯 7.3 Criando Metas de Economia & Aportes Financeiros</span>
+        <span>🎯 7.4 Metas Inteligentes com Estimativa de CDI & Simulador PMT</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">Na tela <strong>🎯 Metas</strong>, acompanhe cofrinhos e objetivos de poupança (ex: <em>Reserva de Emergência, Férias em Família, Troca de Carro</em>):</p>
-        <ol style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>Clique em <code>+ Nova Meta</code>, informe o nome do objetivo, valor alvo (R$) e data desejada.</li>
-          <li>Para adicionar dinheiro economizado, clique em <code>+ Fazer Aporte</code> escolhendo a conta bancária de onde o recurso saiu.</li>
-          <li>O sistema atualiza a barra de porcentagem e projeta quantos meses faltam para atingir o objetivo familiar.</li>
-        </ol>
+        <p style="margin-bottom: 10px;">Na aba <strong>🎯 Metas</strong>, planeje objetivos familiares utilizando matemática financeira com juros compostos ($PMT$):</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>📈 <strong>Taxa CDI Estimada:</strong> Informe a rentabilidade esperada da aplicação (ex: <em>100% do CDI, 10.5% ao ano</em>).</li>
+          <li>💡 <strong>Aporte Mensal Sugerido ($PMT$):</strong> O sistema calcula exatamente quanto você precisa poupar mensalmente. O rendimento composto trabalha a seu favor, reduzindo o esforço do bolso.</li>
+          <li>🎯 <strong>Projeção de Conclusão:</strong> Estima com exatidão a data em que o valor alvo será atingido com base nos aportes realizados.</li>
+        </ul>
       </div>
     </div>
 
@@ -10410,59 +10450,130 @@ function getManualTopicsPart2Html() {
     <!-- CAPÍTULO 9.1: RELATÓRIOS > FLUXO DE CAIXA -->
     <div class="manual-topic-content" id="topic-rep-fluxo" style="display: none;">
       <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #818cf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>📈 9.1 Relatório de Fluxo de Caixa</span>
+        <span>📈 9.1 Fluxo de Caixa Mensal</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">Na tela <strong>📈 Relatórios</strong>, visualize a saúde financeira consolidada do grupo familiar:</p>
-        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🟢 <strong>Total de Receitas do Mês:</strong> Entradas salariais e rendimentos.</li>
-          <li>🔴 <strong>Total de Despesas do Mês:</strong> Somatório de gastos fixos, variáveis e faturas.</li>
-          <li>💰 <strong>Saldo Líquido Operacional:</strong> Diferença real entre entradas e saídas.</li>
-          <li>📊 <strong>Taxa de Poupança Familiar (%):</strong> Percentual da renda que a família conseguiu guardar no período.</li>
-        </ul>
+        <p style="margin-bottom: 10px;">Na aba <strong>📊 Fluxo de Caixa</strong>, acompanhe as entradas e saídas do mês, saldo operacional líquido e a taxa de poupança efetiva realizada.</p>
       </div>
     </div>
 
-    <!-- CAPÍTULO 9.2: RELATÓRIOS > GRÁFICOS INTERATIVOS -->
+    <!-- CAPÍTULO 9.2: RELATÓRIOS > GRÁFICOS POR CATEGORIA -->
     <div class="manual-topic-content" id="topic-rep-graficos" style="display: none;">
       <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #818cf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>🍩 9.2 Gráficos Interativos por Categoria (*Pizza, Barras, Radar, Polar*)</span>
+        <span>🍩 9.2 Gráficos Interativos por Categoria</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">Analise para onde seu dinheiro está indo em diferentes perspectivas visuais interativas:</p>
+        <p style="margin-bottom: 10px;">Gráficos em Rosca (Donut) e Barras que mostram a distribuição de gastos por categoria para diagnosticar onde estão as maiores despesas.</p>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 9.3: RELATÓRIOS > PATRIMÔNIO & CLASSES DE ATIVOS -->
+    <div class="manual-topic-content" id="topic-rep-patrimonio" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #818cf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🏛️ 9.3 Alocação Patrimonial & Classes de Ativos</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Aba <strong>🏛️ Alocação Patrimonial</strong>: categorize suas contas e investimentos em classes patrimoniais:</p>
         <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>🍩 <strong>Gráfico em Rosca (Donut):</strong> Mostra a fatia percentual de cada categoria no orçamento da família.</li>
-          <li>📊 <strong>Gráfico de Barras:</strong> Compara a evolução de gastos mês a mês.</li>
-          <li>🕸️ <strong>Gráfico Radar / Polar:</strong> Identifica anomalias e picos de gastos sazonais.</li>
+          <li>🛡️ <strong>Renda Fixa / CDI:</strong> Contas remuneradas, CDBs e Tesouro Direto.</li>
+          <li>💵 <strong>Liquidez Imediata:</strong> Dinheiro em espécie e contas correntes de movimentação.</li>
+          <li>📈 <strong>Renda Variável & FIIs:</strong> Ações e Fundos Imobiliários.</li>
+          <li>🏠 <strong>Imóveis & Ativos Reais:</strong> Veículos e bens duráveis.</li>
         </ul>
       </div>
     </div>
 
-    <!-- CAPÍTULO 9.3: RELATÓRIOS > PATRIMÔNIO -->
-    <div class="manual-topic-content" id="topic-rep-patrimonio" style="display: none;">
-      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #818cf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>🏛️ 9.3 Evolução Patrimonial Anual</span>
+    <!-- CAPÍTULO 9.4: RELATÓRIOS > PROJEÇÃO PREDITIVA -->
+    <div class="manual-topic-content" id="topic-rep-projecao" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #8b5cf6; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🔮 9.4 Projeção Preditiva de Saldo Futuro (30 Dias)</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">Acompanhe o crescimento do <strong>Patrimônio Líquido Familiar</strong> ao longo dos 12 meses do ano:</p>
-        <p style="margin: 0;">O cálculo soma todos os saldos em contas bancárias, poupanças e investimentos, deduzindo dívidas pendentes em cartões de crédito e faturas abertas.</p>
+        <p style="margin-bottom: 10px;">Aba <strong>🔮 Projeção Futura</strong>: simula dia a dia a curva de saldo das suas contas bancárias para os próximos 30 dias com base nos vencimentos agendados, salários previstos e parcelas futuras.</p>
+        <div style="background: rgba(139,92,246,0.08); border-left: 4px solid #8b5cf6; padding: 12px 16px; border-radius: 0 8px 8px 0;">
+          🚨 <strong>Termômetro de Risco:</strong> Alerta antecipadamente se em algum dia o saldo projetado ficará negativo, permitindo transferências preventivas para evitar juros de cheque especial.
+        </div>
       </div>
     </div>
 
-    <!-- CAPÍTULO 9.4: RELATÓRIOS > AUDITORIA DE JUROS -->
+    <!-- CAPÍTULO 9.5: RELATÓRIOS > RADAR DE ASSINATURAS -->
+    <div class="manual-topic-content" id="topic-rep-radar-assinaturas" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #ec4899; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📡 9.5 Radar de Assinaturas & Gastos Recorrentes</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Aba <strong>📡 Radar de Assinaturas</strong>: identifica todos os serviços recorrentes contratados pela família (ex: <em>Netflix, Spotify, Academias, Planos de Celular, Internet</em>):</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>💰 <strong>Custo Anualizado:</strong> Mostra o montante total que cada assinatura consome em 12 meses.</li>
+          <li>📈 <strong>Detector de Reajustes:</strong> Alerta caso um serviço tenha aumentado de preço em relação aos meses anteriores.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 9.6: RELATÓRIOS > AUDITORIA DE JUROS -->
     <div class="manual-topic-content" id="topic-rep-auditoria-juros" style="display: none;">
       <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #818cf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>⚖️ 9.4 Relatório de Auditoria de Juros e Descontos</span>
+        <span>⚖️ 9.6 Relatório de Auditoria de Juros e Encargos</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">Descubra exatamente quanto a família pagou de encargos por atraso de boletos e quanto economizou aproveitando descontos antecipados via PIX.</p>
+        <p style="margin-bottom: 10px;">Aba <strong>⚠️ Auditoria de Juros</strong>: Demonstrativo minucioso de multas e juros pagos por atraso vs descontos obtidos por antecipação de pagamentos.</p>
       </div>
     </div>
 
-    <!-- CAPÍTULO 9.5: RELATÓRIOS > IMPRESSÃO / PDF -->
+    <!-- CAPÍTULO 9.7: RELATÓRIOS > FAIR SHARE -->
+    <div class="manual-topic-content" id="topic-rep-fair-share" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #3b82f6; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🤝 9.7 Divisão Proporcional de Despesas (Fair Share Familiar)</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Aba <strong>🤝 Divisão Familiar</strong>: Divisão justa das contas da casa com base na renda auferida por cada membro no mês:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>⚖️ <strong>Cota Justa Proporcional:</strong> Quem ganha mais arca proporcionalmente com uma fatia maior dos custos essenciais.</li>
+          <li>👥 <strong>Modo Igualitário (50/50):</strong> Alternância instantânea para rateio dividido em partes exatamente iguais.</li>
+          <li>💸 <strong>Matriz de Compensação:</strong> Instruções automáticas de quem deve transferir quanto para quem para liquidar as diferenças do mês.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 9.8: RELATÓRIOS > DRE PESSOAL -->
+    <div class="manual-topic-content" id="topic-rep-dre" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #10b981; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>📑 9.8 DRE Pessoal Estruturado (Demonstrativo do Resultado)</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Aba <strong>📑 DRE Pessoal</strong>: Visão contábil executiva e formal das finanças:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>(+) Receita Operacional Bruta</li>
+          <li>(-) Despesas Fixas Essenciais (Moradia, Alimentação, Saúde)</li>
+          <li>(=) Margem de Contribuição 1 (Resultado Bruto)</li>
+          <li>(-) Despesas Operacionais de Estilo de Vida (Lazer, Extras)</li>
+          <li>(=) Resultado Operacional Antes dos Encargos</li>
+          <li>(+/-) Resultado Financeiro Líquido (Descontos vs Juros)</li>
+          <li>(=) Superávit / Déficit Líquido do Mês e Taxa de Poupança Efetiva.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 9.9: RELATÓRIOS > SIMULADOR DE ESTRESSE -->
+    <div class="manual-topic-content" id="topic-rep-stress-test" style="display: none;">
+      <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #f59e0b; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <span>🧪 9.9 Simulador de Sensibilidade & Cenários de Estresse ("E se...?")</span>
+      </h4>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
+        <p style="margin-bottom: 10px;">Aba <strong>🧪 Simulador de Estresse</strong>: Teste a robustez do seu orçamento familiar sob crises ou choques financeiros:</p>
+        <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
+          <li>📉 <strong>Queda de Renda:</strong> Simula reduções salariais de até -60%.</li>
+          <li>📈 <strong>Inflação e Custos Fixos:</strong> Simula aumentos em contas básicas de até +50%.</li>
+          <li>✂️ <strong>Corte de Despesas Variáveis:</strong> Simula economia com corte imediato de supérfluos de até -70%.</li>
+          <li>⏱️ <strong>Sobrevida da Reserva:</strong> Calcula por quantos meses sua reserva em contas/CDB manterá a família viva sem endividamento em caso de déficit.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPÍTULO 9.10: RELATÓRIOS > IMPRESSÃO / PDF -->
     <div class="manual-topic-content" id="topic-rep-impressao-pdf" style="display: none;">
       <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #818cf8; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>🖨️ 9.5 Impressão & Exportação em PDF (*🖨️ Imprimir / PDF*)</span>
+        <span>🖨️ 9.10 Impressão & Exportação em PDF (*🖨️ Imprimir / PDF*)</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
         <p style="margin-bottom: 10px;">Clique no botão <code>🖨️ Imprimir / PDF</code> no topo da página de relatórios para gerar um arquivo PDF formatado com cabeçalho da família, tabelas detalhadas e gráficos em alta resolução.</p>
