@@ -2871,7 +2871,8 @@ class AppDatabase {
           }
         }
 
-        acc.balance = avulsoIncome + generatedActiveIncome + projectedActiveIncome;
+        acc.monthly_income = avulsoIncome + generatedActiveIncome + projectedActiveIncome;
+        // acc.balance é preservado como o saldo bancário real da conta (vindo do banco de dados)
       }
     }
 

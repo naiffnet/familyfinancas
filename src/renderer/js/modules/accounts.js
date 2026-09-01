@@ -38,10 +38,10 @@ async function renderAccounts() {
         <div class="empty-desc">Adicione sua conta corrente, poupança, cartão benefício ou cartão de crédito</div>
       </div>
     ` : `
-      <!-- 🏦 SEÇÃO 1: CONTAS BANCÁRIAS (Diferença entre Receitas e Despesas do mês) -->
+      <!-- 🏦 SEÇÃO 1: CONTAS BANCÁRIAS (Saldos em Conta, Limites e Disponibilidades) -->
       <div style="margin-bottom: 32px;">
         <h3 style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-          🏦 Contas Bancárias & Carteiras <span style="font-size: 11px; font-weight: 500; text-transform: none; color: var(--text-muted); opacity: 0.85;">(Diferença entre Receitas e Despesas do mês)</span>
+          🏦 Contas Bancárias & Carteiras <span style="font-size: 11px; font-weight: 500; text-transform: none; color: var(--text-muted); opacity: 0.85;">(Saldos reais em conta, limites e fluxo do mês)</span>
         </h3>
         <div class="accounts-grid">
           ${bankAccounts.length === 0 ? `
@@ -57,6 +57,8 @@ async function renderAccounts() {
             const expenses = txs.filter(t => t.account_id === acc.id && t.type === 'expense' && t.is_paid === 1).reduce((sum, t) => sum + t.amount, 0);
             const transfersOut = txs.filter(t => t.account_id === acc.id && t.type === 'transfer' && t.is_paid === 1).reduce((sum, t) => sum + t.amount, 0);
             const monthlyDiff = incomes - expenses - transfersOut;
+            const realBalance = acc.balance !== undefined ? Number(acc.balance) : 0;
+            const totalAvailable = realBalance + (Number(acc.overdraft_limit) || 0);
 
             return `
               <div class="account-card">
@@ -64,13 +66,19 @@ async function renderAccounts() {
                 <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
                   ${bankLogo(acc.bank, 36)}
                   <div>
-                    <div class="account-type-badge">${ACCOUNT_TYPES[acc.type]}</div>
+                    <div class="account-type-badge">${ACCOUNT_TYPES[acc.type] || 'Conta'}</div>
                     <div class="account-name" style="margin:0;font-size:14px;display:flex;align-items:center">${acc.name}${userBadge}${lockIcon}</div>
                   </div>
                 </div>
-                <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Saldo do mês</div>
-                <div class="account-balance" style="color:${monthlyDiff >= 0 ? 'var(--accent-light)' : '#f87171'}">${fmt.currency(monthlyDiff)}</div>
-                ${acc.agency ? `<div style="font-size:11px;color:var(--text-muted);margin-top:6px">Ag. ${acc.agency}${acc.account_number ? ' • CC ' + acc.account_number : ''}</div>` : ''}
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Saldo Atual em Conta</div>
+                <div class="account-balance" style="color:${realBalance >= 0 ? 'var(--accent-light)' : '#f87171'}">${fmt.currency(realBalance)}</div>
+                
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; margin-top:6px; padding:4px 0; border-top:1px dashed var(--border);">
+                  <span style="color:var(--text-muted);">Fluxo do mês:</span>
+                  <strong style="color:${monthlyDiff >= 0 ? 'var(--accent-light)' : '#f87171'}">${monthlyDiff >= 0 ? '+' : ''}${fmt.currency(monthlyDiff)}</strong>
+                </div>
+
+                ${acc.agency ? `<div style="font-size:11px;color:var(--text-muted);margin-top:4px">Ag. ${acc.agency}${acc.account_number ? ' • CC ' + acc.account_number : ''}</div>` : ''}
                 
                 ${(acc.overdraft_limit > 0 || acc.banricompras_limit > 0 || acc.credit_minuto_limit > 0) ? `
                   <div style="margin-top: 10px; margin-bottom: 10px; padding: 10px; border-radius: var(--radius-sm); background: var(--bg-surface); border: 1px solid var(--border);">
@@ -81,6 +89,10 @@ async function renderAccounts() {
                     <div style="font-size: 11px; display: flex; justify-content: space-between; margin-bottom: 3px;">
                       <span style="color: var(--text-muted);">🔴 Cheque Especial:</span>
                       <span style="font-weight: 600; color: var(--text-primary);">${fmt.currency(acc.overdraft_limit)}</span>
+                    </div>
+                    <div style="font-size: 11px; display: flex; justify-content: space-between; margin-bottom: 3px;">
+                      <span style="color: var(--text-muted);">⚡ Disponível Total:</span>
+                      <span style="font-weight: 700; color: ${totalAvailable >= 0 ? '#34d399' : '#f87171'};">${fmt.currency(totalAvailable)}</span>
                     </div>` : ''}
                     ${acc.banricompras_limit > 0 ? `
                     <div style="font-size: 11px; display: flex; justify-content: space-between; margin-bottom: 3px;">

@@ -396,7 +396,8 @@ function renderCreditCardWidget(acc, spent, monthInvoice) {
  */
 function renderDebitAccountWidget(acc) {
   const b = BANKS[acc.bank] || BANKS.outro;
-  const balance = acc.balance || 0;
+  const balance = acc.balance !== undefined ? Number(acc.balance) : 0;
+  const monthlyIncome = acc.monthly_income !== undefined ? Number(acc.monthly_income) : 0;
   const userBadge = acc.user_name ? `<span class="profile-badge" style="background:${acc.user_avatar_color || '#10b981'}22;color:${acc.user_avatar_color || '#10b981'};border:1px solid ${acc.user_avatar_color || '#10b981'}44;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600;margin-top:2px;display:inline-block">${acc.user_name}</span>` : '';
   const isVoucher = acc.type === 'voucher';
   const typeLabel = isVoucher ? (BENEFIT_TYPES[acc.benefit_type] || 'Cartão Benefício') : (ACCOUNT_TYPES[acc.type] || 'Conta');
@@ -417,8 +418,13 @@ function renderDebitAccountWidget(acc) {
         <div class="bank-card-tag" style="background:${b.color}22;color:${b.color}">${b.name}</div>
       </div>
       <div style="margin-top:16px">
-        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${isVoucher ? 'Rendimentos / Recargas do mês' : 'Rendimentos do mês'}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">${isVoucher ? 'Saldo Atual no Cartão' : 'Saldo Atual em Conta'}</div>
         <div style="font-size:28px;font-weight:800;color:${balance >= 0 ? 'var(--accent-light)' : '#f87171'};letter-spacing:-0.02em">${fmt.currency(balance)}</div>
+        ${monthlyIncome > 0 ? `
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+            Entradas no mês: <strong style="color:var(--accent-light);">${fmt.currency(monthlyIncome)}</strong>
+          </div>
+        ` : ''}
         ${isVoucher ? `
           <div style="font-size:11px;color:var(--text-muted);margin-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
             ${acc.card_last_digits ? `<span style="font-weight:700">•••• ${acc.card_last_digits}</span>` : ''}
