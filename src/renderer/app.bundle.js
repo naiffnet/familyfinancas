@@ -1,7 +1,7 @@
 /* ============================================
  * app.bundle.js — FamilyFinancas Renderer
  * Gerado por: npm run build:renderer
- * 2026-09-23T22:05:23.111Z
+ * 2026-09-23T22:30:45.742Z
  * Modulos: 26
  * ============================================ */
 
@@ -11482,12 +11482,15 @@ function getManualTopicsPart2Html() {
     <!-- CAPÍTULO 10.2: SEGURANÇA > LGPD -->
     <div class="manual-topic-content" id="topic-seg-lgpd" style="display: none;">
       <h4 style="margin: 0 0 14px 0; font-size: 16px; color: #14b8a6; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <span>🔒 10.2 Direitos LGPD (*Exportação dos Meus Dados e Exclusão Segura*)</span>
+        <span>🔒 10.2 Direitos LGPD, Criptografia & Privacidade de Dados</span>
       </h4>
       <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.7;">
-        <p style="margin-bottom: 10px;">Em total conformidade com a Lei Geral de Proteção de Dados:</p>
+        <p style="margin-bottom: 10px;">Em total conformidade com a <strong>Lei Geral de Proteção de Dados (LGPD)</strong> e boas práticas de cibersegurança:</p>
         <ul style="padding-left: 20px; line-height: 1.8; margin-bottom: 14px;">
-          <li>📦 <strong>Exportar Meus Dados:</strong> Baixe todo o histórico financeiro da família em arquivo aberto JSON.</li>
+          <li>🔐 <strong>Criptografia em Repouso (AES-256-GCM):</strong> E-mails e telefones de todos os familiares são gravados com criptografia forte no banco de dados SQLite, impossibilitando a leitura dos dados pessoais caso o arquivo físico seja acessado externamente.</li>
+          <li>🚪 <strong>Logout Server-Side Seguro:</strong> Ao sair do sistema, a sessão é destruída e invalidada no servidor imediatamente, protegendo contra reaproveitamento de credenciais.</li>
+          <li>⚡ <strong>Concorrência Otimizada (Multi-Acesso):</strong> Fila de espera inteligente no banco de dados para permitir que diversos familiares usem e salvem transações simultaneamente sem erros.</li>
+          <li>📦 <strong>Exportar Meus Dados:</strong> Baixe todo o histórico financeiro da família em arquivo aberto JSON com um clique.</li>
           <li>🗑️ <strong>Exclusão Definitiva:</strong> Permite ao Administrador expurgar com segurança os registros locais quando desejar.</li>
         </ul>
       </div>
