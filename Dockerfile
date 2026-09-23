@@ -19,13 +19,7 @@ RUN npm ci --omit=dev
 # --- Estágio Final ---
 FROM node:22-slim
 
-# Cria usuário não-root para segurança (previne escalação de privilégio em caso de RCE)
-RUN groupadd --system app && useradd --system --gid app --create-home app
-
 WORKDIR /app
-
-# Cria diretório de dados com permissões corretas
-RUN mkdir -p /data && chown app:app /data
 
 # Copia os node_modules compilados no estágio anterior
 COPY --from=builder /app/node_modules ./node_modules
@@ -35,12 +29,6 @@ COPY package*.json ./
 COPY server.js ./
 COPY src/ ./src/
 COPY scripts/ ./scripts/
-
-# Ajusta permissões do app
-RUN chown -R app:app /app
-
-# Troca para usuário não-root
-USER app
 
 # Configura porta padrão
 EXPOSE 3000
