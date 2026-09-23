@@ -16,11 +16,12 @@
 - [7. Orçamentos por Categoria & Metas Financeiras](#-7-orçamentos-por-categoria--metas-financeiras)
 - [8. Dashboard, Visões & Kanban em 3 Colunas](#-8-dashboard-visões--kanban-em-3-colunas)
 - [9. Conciliação Bancária Inteligente (OFX/CSV) ⭐ Novo](#-9-conciliação-bancária-inteligente-ofxcsv)
-- [10. Relatórios, Auditoria de Juros & Impressão / PDF](#-10-relatórios-auditoria-de-juros--impressão--pdf)
-- [11. Trilha de Auditoria, Segurança & LGPD](#-11-trilha-de-auditoria-segurança--lgpd)
-- [12. Backups, Teste de Integridade & Restauração](#-12-backups-teste-de-integridade--restauração)
-- [13. Acesso pelo Celular & Responsividade Mobile](#-13-acesso-pelo-celular--responsividade-mobile)
-- [14. FAQ — Dúvidas Mais Frequentes do Dia a Dia](#-14-faq--dúvidas-mais-frequentes-do-dia-a-dia)
+- [10. Relatórios Financeiros, Inteligência & Impressão / PDF](#-10-relatórios-financeiros-inteligência--impressão--pdf)
+- [11. Governança Familiar, Fair Share & Relatórios Avançados (Pilar 3)](#-11-governança-familiar-fair-share--relatórios-avançados-pilar-3)
+- [12. Trilha de Auditoria, Segurança Avançada & LGPD ⭐ Atualizado](#-12-trilha-de-auditoria-segurança-avançada--lgpd--atualizado)
+- [13. Backup Local Criptografado, Integridade & Sincronização em Nuvem](#-13-backup-local-criptografado-integridade--sincronização-em-nuvem)
+- [14. Acessibilidade, Design Responsivo & Atalhos de Teclado](#-14-acessibilidade-design-responsivo--atalhos-de-teclado)
+- [15. FAQ — Dúvidas Mais Frequentes do Dia a Dia](#-15-faq--dúvidas-mais-frequentes-do-dia-a-dia)
 
 ---
 
@@ -340,9 +341,11 @@ O menu **Relatórios** centraliza toda a inteligência e diagnósticos financeir
 - Painel de custos contínuos anualizados (streaming, academias, planos de saúde), custo total mensal/anual e detecção de reajustes.
 
 ### 10.6 ⚠️ Auditoria de Juros e Encargos
-- Demonstrativo minucioso de multas e ---
+- Demonstrativo minucioso de multas e encargos por atraso pagos no período, com detalhamento de taxas ao dia (% a.d.), multas moratórias e comparação de economia potencial ao pagar em dia.
 
-## 🏛️ 11. Governança Familiar, Fair Share & Relatórios Avançados (Pilar 3) ⭐ Novo!
+---
+
+## 🏛️ 11. Governança Familiar, Fair Share & Relatórios Avançados (Pilar 3)
 
 O **Pilar 3** eleva o gerenciamento doméstico para um padrão de governança executiva, provendo equilíbrio nas finanças compartilhadas e visão estratégica do patrimônio.
 
@@ -377,31 +380,64 @@ O **Pilar 3** eleva o gerenciamento doméstico para um padrão de governança ex
 
 ---
 
-## 📱 12. Backup Local Criptografado & Sincronização em Nuvem (Multi-Dispositivo)
+## 🛡️ 12. Trilha de Auditoria, Segurança Avançada & LGPD ⭐ Atualizado
 
-### 12.1 Backup Criptografado com Chave AES-256
+O FinançasFamília adota práticas de proteção de nível bancário e conformidade estrita com a **Lei Geral de Proteção de Dados (LGPD)**:
+
+### 12.1 🔐 Criptografia de Dados Pessoais em Repouso (LGPD)
+- **E-mails e Telefones Criptografados:** Informações sensíveis de contato são gravadas no banco de dados SQLite com criptografia forte **AES-256-GCM**.
+- **Chave Derivativa Segura:** Apenas a aplicação autorizada possui a chave para descriptografar os dados em tempo de execução, garantindo que o arquivo físico do banco (`financeiro.db`) não exponha dados pessoais caso seja inspecionado externamente.
+
+### 12.2 📋 Trilha de Auditoria Imutável (Audit Trail)
+- Todas as operações críticas (criação, edição e exclusão de contas, transações e membros) são registradas automaticamente na tabela de auditoria com:
+  - Data e hora exatas da operação.
+  - Membro responsável pela alteração.
+  - Valores anteriores (*snapshot* antes) e valores novos (*snapshot* depois).
+
+### 12.3 🛑 Isolamento Estrito entre Famílias (Fail-Closed)
+- Cada grupo familiar possui isolamento criptográfico e lógico rigoroso. Nenhuma família consegue visualizar ou modificar transações, orçamentos ou contas de outra família.
+- As checagens de permissão operam no modo *Fail-Closed*: caso o recurso não exista ou pertença a outra família, o acesso é negado imediatamente.
+
+### 12.4 🚪 Encerramento de Sessão Seguro (Logout Server-Side)
+- Ao clicar em **Sair**, o aplicativo não apenas limpa o estado visual, mas também **invalida e deleta o token de sessão diretamente no servidor**, impedindo que credenciais antigas possam ser reutilizadas.
+
+### 12.5 🛡️ Proteção Ativa Contra Ataques (Rate Limit & CSP)
+- **Rate Limiting:** Bloqueio automático contra tentativas excessivas de requisições por minuto e proteção contra força bruta no formulário de login.
+- **Content Security Policy (CSP):** Cabeçalhos HTTP avançados aplicados via Helmet impedem a execução de scripts maliciosos injetados (anti-XSS).
+
+### 12.6 ⚡ Concorrência Sem Travamentos (Multi-Acesso Familiar)
+- O motor de banco de dados SQLite opera com fila de espera inteligente (`busy_timeout = 5000`) e sincronização otimizada (`synchronous = NORMAL`), permitindo que diversos membros da família usem o sistema e salvem transações simultaneamente sem erros de concorrência.
+
+---
+
+## 📱 13. Backup Local Criptografado, Integridade & Sincronização em Nuvem
+
+### 13.1 Backup Criptografado com Chave AES-256
 - Exportação de arquivo `.encrypted` seguro. Nenhum dado financeiro fica exposto em texto plano.
 
-### 12.2 Sincronização em Nuvem via End-to-End Encryption
+### 13.2 Teste de Integridade do Banco (SQLite Check)
+- Ferramenta nativa para verificação periódica de integridade física e lógica da base de dados, prevenindo perdas ou corrupção de arquivos.
+
+### 13.3 Sincronização em Nuvem via End-to-End Encryption
 - Permite sincronizar sua base com o app em outros computadores ou nuvem com total privacidade (chave privada conhecida somente por você).
 
 ---
 
-## 🎨 13. Acessibilidade, Design Responsivo & Atalhos de Teclado
+## 🎨 14. Acessibilidade, Design Responsivo & Atalhos de Teclado
 
-### 13.1 Atalhos Rápidos no Teclado
+### 14.1 Atalhos Rápidos no Teclado
 - `N` ➔ Nova Despesa
 - `R` ➔ Nova Receita
 - `T` ➔ Nova Transferência
 - `Esc` ➔ Fechar modal aberto
 - `Ctrl + P` ➔ Imprimir Relatório / Gerar PDF
 
-### 13.2 Layout Mobile, Header Centralizado & Grids Touch-Friendly
+### 14.2 Layout Mobile, Header Centralizado & Grids Touch-Friendly
 - Header em 3 colunas, botões em 42px e gaveta deslizante para navegação ágil.
 
 ---
 
-## ❓ 14. FAQ — Dúvidas Mais Frequentes do Dia a Dia
+## ❓ 15. FAQ — Dúvidas Mais Frequentes do Dia a Dia
 
 - **Como o app trata rendas de familiares em contas diferentes?**
   São reconhecidas como receitas legítimas individuais sem falsos alertas de duplicidade.
@@ -410,7 +446,7 @@ O **Pilar 3** eleva o gerenciamento doméstico para um padrão de governança ex
   O saldo é debitado da conta bancária e todas as compras atreladas são marcadas como pagas atomicamente.
 
 - **Os dados ficam salvos na nuvem?**
-  Não! Todos os dados são armazenados localmente no seu computador com criptografia AES-256 e conformidade com a LGPD.
+  Todos os dados são armazenados localmente e criptografados no banco SQLite com AES-256, com isolamento multi-inquilino e conformidade total com a LGPD.
 
 - **Como funciona o desconto na Antecipação de Parcelas?**
   O sistema usa a fórmula de Valor Presente: cada parcela futura é descontada pela taxa mensal configurada. Quanto mais distante o vencimento, maior o desconto obtido.
@@ -433,7 +469,11 @@ O **Pilar 3** eleva o gerenciamento doméstico para um padrão de governança ex
 - **O que fazer se o Simulador de Estresse indicar menos de 3 meses de sobrevida?**
   O diagnóstico sugerirá aumentar a meta de Reserva de Emergência e simular um corte nas despesas de estilo de vida para recuperar a margem de segurança.
 
+- **Múltiplas pessoas podem salvar ao mesmo tempo no app?**
+  Sim! O SQLite foi calibrado com `busy_timeout` de 5 segundos e modo WAL de alta concorrência. Se dois membros salvarem lançamentos no mesmo segundo, o sistema enfileira as operações de forma transparente sem apresentar erros.
+
 ---
 
-*Manual atualizado em: Agosto/2026 — Versão 1.0 Completa com Pilar 1 (Operacional), Pilar 2 (Orçamentos & Metas CDI) e Pilar 3 (Governança Familiar, Fair Share, DRE Pessoal & Simulador de Estresse)*
+*Manual atualizado em: Setembro/2026 — Versão 1.1 Completa: Pilares 1 (Operacional), 2 (Orçamentos & Metas CDI), 3 (Governança Familiar, Fair Share, DRE Pessoal & Simulador de Estresse) e Hardening de Segurança & LGPD.*
+
 
