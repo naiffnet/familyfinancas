@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('api', {
   },
   accounts: {
     getAll:   (userId) => ipcRenderer.invoke('accounts:getAll', userId),
+    getAnalytics: (d)  => ipcRenderer.invoke('accounts:getAnalytics', d),
+    getTransactions: (d) => ipcRenderer.invoke('accounts:getTransactions', d),
     create:   (d)      => ipcRenderer.invoke('accounts:create', d),
     update:   (d)      => ipcRenderer.invoke('accounts:update', d),
     delete:   (id)     => ipcRenderer.invoke('accounts:delete', id),

@@ -88,6 +88,8 @@ class DbCore {
     } catch (e) {}
     this.db = new Database(this.dbPath);
     this.db.pragma('journal_mode = WAL');
+    this.db.pragma('busy_timeout = 5000');
+    this.db.pragma('synchronous = NORMAL');
     this.db.pragma('foreign_keys = ON');
     this.sessionRepo = new SessionRepository(this.db);
     this.sessionRepo.ensureTable();

@@ -84,6 +84,8 @@ if (!window.api) {
     },
     accounts: {
       getAll:   (userId) => makeRpcCall('accounts:getAll', userId),
+      getAnalytics: (d)  => makeRpcCall('accounts:getAnalytics', d),
+      getTransactions: (d) => makeRpcCall('accounts:getTransactions', d),
       create:   (d)      => makeRpcCall('accounts:create', d),
       update:   (d)      => makeRpcCall('accounts:update', d),
       delete:   (id)     => makeRpcCall('accounts:delete', id),

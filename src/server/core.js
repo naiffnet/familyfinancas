@@ -7,6 +7,15 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const XLSX = require('xlsx');
 
+// Comparação segura contra timing attacks
+function safeCompare(a, b) {
+  if (!a || !b) return false;
+  const bufA = Buffer.from(String(a));
+  const bufB = Buffer.from(String(b));
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
 // Brute force username lock database
 const loginAttempts = new Map();
 
@@ -60,6 +69,7 @@ const PUBLIC_CHANNELS = new Set([
   'auth:resetPasswordWithAnswer',
   'families:checkName',
   'server:getInfo',
+  'auth:logout',
 ]);
 
 const SENSITIVE_CHANNELS = new Set([
@@ -96,9 +106,21 @@ function createOwnershipChecks(db) {
     'settings:get': (session, userId) => userId === session.userId,
     'settings:set': (session, d) => d.userId === session.userId,
     'accounts:getAll': (session, userId) => isSameFamilyUser(db, userId, session),
+    'accounts:getAnalytics': (session, d) => {
+      if (!session) return false;
+      if (session.isSystemAdmin === 1 || session.profileType === 1) return true;
+      const accId = typeof d === 'object' && d !== null ? (d.accountId || d.id) : d;
+      return db.checkAccountFamily(accId, session.familyId);
+    },
+    'accounts:getTransactions': (session, d) => {
+      if (!session) return false;
+      if (session.isSystemAdmin === 1 || session.profileType === 1) return true;
+      const accId = typeof d === 'object' && d !== null ? (d.accountId || d.id) : d;
+      return db.checkAccountFamily(accId, session.familyId);
+    },
     'accounts:create': (session, d) => isSameFamilyUser(db, d ? (d.user_id || d.userId) : null, session),
-    'accounts:update': (session, d) => db.checkAccountFamily(d.id, session.familyId),
-    'accounts:delete': (session, id) => db.checkAccountFamily(id, session.familyId),
+    'accounts:update': (session, d) => (session.isSystemAdmin === 1 || session.profileType === 1) || db.checkAccountFamily(d?.id || d, session.familyId),
+    'accounts:delete': (session, id) => (session.isSystemAdmin === 1 || session.profileType === 1) || db.checkAccountFamily(id, session.familyId),
     'accounts:transfer': (session, d) => db.checkAccountFamily(d.fromAccountId || d.from_account_id, session.familyId) && db.checkAccountFamily(d.toAccountId || d.to_account_id, session.familyId),
     'categories:getAll': (session, userId) => isSameFamilyUser(db, userId, session),
     'categories:create': (session, d) => isSameFamilyUser(db, d ? (d.user_id || d.userId) : null, session),
@@ -183,7 +205,10 @@ function createOwnershipChecks(db) {
     'sync:findDuplicates': (session, d) => session.familyId === d.familyId || isSameFamilyUser(db, d.userId, session.familyId),
     'sync:checkCandidate': (session, d) => session.familyId === d.familyId || isSameFamilyUser(db, d.userId, session.familyId),
     'sync:mergeTransactions': (session, d) => db.checkTransactionFamily(d.primaryTxId, session.familyId) && db.checkTransactionFamily(d.duplicateTxId, session.familyId),
-    'sync:mergeBatch': (session, d) => true,
+    'sync:mergeBatch': (session, d) => {
+      if (!d || !Array.isArray(d.pairs)) return true;
+      return d.pairs.every(p => db.checkTransactionFamily(p.primaryTxId, session.familyId) && db.checkTransactionFamily(p.duplicateTxId, session.familyId));
+    },
     'sync:dismissDuplicate': (session, d) => !d.primaryTxId || db.checkTransactionFamily(d.primaryTxId, session.familyId),
     'sync:getHistory': (session, d) => session.familyId === d.familyId,
     'auth:exportMyData': (session, userId) => userId === session.userId,
@@ -206,8 +231,12 @@ function buildHandlers(db) {
     'settings:set': ({ userId, key, value }) => db.setSetting(userId, key, value),
     'accounts:getAll': (d) => {
       const uid = (typeof d === 'object' && d !== null) ? (d.userId || d.id || 1) : (d || 1);
-      return db.getAccounts(uid);
+      const m = (typeof d === 'object' && d !== null) ? d.month : null;
+      const y = (typeof d === 'object' && d !== null) ? d.year : null;
+      return db.getAccounts(uid, m, y);
     },
+    'accounts:getAnalytics': (d) => db.getAccountAnalytics(d.accountId || d.id, d.periodMode || 'month', d.month, d.year),
+    'accounts:getTransactions': (d) => db.getAccountTransactions(d.accountId || d.id, d.month, d.year),
     'accounts:create': (d) => db.createAccount(d),
     'accounts:update': (d) => db.updateAccount(d),
     'accounts:delete': (id) => db.deleteAccount(typeof id === 'object' ? (id.id || id) : id),
@@ -550,6 +579,7 @@ function buildHandlers(db) {
     'sync:mergeBatch': (d) => db.mergeBatchTransactions(d),
     'sync:dismissDuplicate': (d) => db.dismissDuplicateConflict(d),
     'sync:getHistory': (d) => db.getDeduplicationHistory(d),
+    'auth:logout': () => ({ success: true }),
   };
 }
 
@@ -559,7 +589,20 @@ function createExpressApp(db) {
   const handlers = buildHandlers(db);
 
   app.use(helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        imgSrc: ["'self'", "data:", "blob:"],
+        connectSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+      }
+    },
     crossOriginEmbedderPolicy: false,
   }));
 
@@ -615,6 +658,16 @@ function createExpressApp(db) {
     }
   }));
 
+  // Rate limit geral: 200 req/min por IP
+  const generalLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 200,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Muitas requisições. Tente novamente em 1 minuto.' }
+  });
+  app.use('/api/', generalLimiter);
+
   const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 10,
@@ -638,7 +691,7 @@ function createExpressApp(db) {
       console.error("[Segurança] ADMIN_OPERATION_KEY não está configurada ou é muito curta.");
       return res.status(500).json({ error: 'Erro interno de configuração do servidor.' });
     }
-    if (!adminKey || adminKey !== expectedKey) {
+    if (!adminKey || !safeCompare(adminKey, expectedKey)) {
       return res.status(403).json({ error: 'Acesso negado.' });
     }
     if (!fs.existsSync(db.dbPath)) {
@@ -712,6 +765,17 @@ function createExpressApp(db) {
       }
 
       let sessionToken = null;
+
+      // Logout: invalidar sessão server-side
+      if (channel === 'auth:logout') {
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+        if (token) {
+          db.deleteSession(token);
+        }
+        return res.json({ result: { success: true } });
+      }
+
       if (channel === 'auth:login') {
         const { username } = args[0] || {};
         if (username) {

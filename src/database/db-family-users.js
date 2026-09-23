@@ -16,6 +16,12 @@ module.exports = (Base) => class extends Base {
     if (safeUser.cpf) {
       safeUser.cpf = decryptField(safeUser.cpf);
     }
+    if (safeUser.email) {
+      safeUser.email = decryptField(safeUser.email);
+    }
+    if (safeUser.phone) {
+      safeUser.phone = decryptField(safeUser.phone);
+    }
     this.logEvent('auth:login', `Usuário ${username} fez login.`, user.family_id);
     return { success: true, user: safeUser };
   }
@@ -108,11 +114,13 @@ module.exports = (Base) => class extends Base {
 
     const finalRecoveryAnswer = recovery_answer ? bcrypt.hashSync(recovery_answer.trim().toLowerCase(), 10) : null;
     const encryptedCpf = cpf ? encryptField(cpf) : null;
+    const encryptedEmail = email ? encryptField(email) : null;
+    const encryptedPhone = phone ? encryptField(phone) : null;
 
     const result = this.db.prepare(`
       INSERT INTO users (name, first_name, last_name, email, phone, cpf, birth_date, username, password_hash, avatar_color, family_id, profile_type, recovery_question, recovery_answer, accepted_terms_timestamp, accepted_terms_version) 
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(nameToSave, firstNameToSave, lastNameToSave, email, phone, encryptedCpf, birth_date, finalUsername, hash, color, finalFamilyId, profileType, recovery_question, finalRecoveryAnswer, accepted_terms_timestamp, accepted_terms_version);
+    `).run(nameToSave, firstNameToSave, lastNameToSave, encryptedEmail, encryptedPhone, encryptedCpf, birth_date, finalUsername, hash, color, finalFamilyId, profileType, recovery_question, finalRecoveryAnswer, accepted_terms_timestamp, accepted_terms_version);
     
     const userId = result.lastInsertRowid;
     
@@ -143,12 +151,16 @@ module.exports = (Base) => class extends Base {
       const users = this.db.prepare('SELECT id, name, first_name, last_name, email, phone, cpf, birth_date, username, avatar_color, avatar_image, family_id, profile_type, position, is_system_admin FROM users WHERE family_id = ? ORDER BY position ASC, id ASC').all(familyId);
       return users.map(u => {
         if (u.cpf) u.cpf = decryptField(u.cpf);
+        if (u.email) u.email = decryptField(u.email);
+        if (u.phone) u.phone = decryptField(u.phone);
         return u;
       });
     }
     const users = this.db.prepare('SELECT id, name, first_name, last_name, email, phone, cpf, birth_date, username, avatar_color, avatar_image, family_id, profile_type, position, is_system_admin FROM users ORDER BY family_id ASC, position ASC, id ASC').all();
     return users.map(u => {
       if (u.cpf) u.cpf = decryptField(u.cpf);
+      if (u.email) u.email = decryptField(u.email);
+      if (u.phone) u.phone = decryptField(u.phone);
       return u;
     });
   }
@@ -193,8 +205,8 @@ module.exports = (Base) => class extends Base {
       
       const fName = firstNameToSave !== undefined ? firstNameToSave : (cur ? cur.first_name : null);
       const lName = lastNameToSave !== undefined ? lastNameToSave : (cur ? cur.last_name : null);
-      const mail = email !== undefined ? email : (cur ? cur.email : null);
-      const ph = phone !== undefined ? phone : (cur ? cur.phone : null);
+      const mail = email !== undefined ? (email ? encryptField(email) : null) : (cur ? cur.email : null);
+      const ph = phone !== undefined ? (phone ? encryptField(phone) : null) : (cur ? cur.phone : null);
       
       let cp = null;
       if (cpf !== undefined) {
@@ -372,7 +384,8 @@ module.exports = (Base) => class extends Base {
     id = parseInt(id);
     if (!id || isNaN(id)) return true;
     const t = this.db.prepare('SELECT t.id, u.family_id FROM transactions t LEFT JOIN users u ON t.user_id = u.id WHERE t.id = ?').get(id);
-    return !t || !t.family_id || t.family_id === familyId;
+    if (!t) return false; // Recurso não encontrado: negar acesso (fail-closed)
+    return !t.family_id || t.family_id === familyId;
   }
 
   checkAccountFamily(idPayload, familyId) {
@@ -382,7 +395,8 @@ module.exports = (Base) => class extends Base {
     id = parseInt(id);
     if (!id || isNaN(id)) return true;
     const a = this.db.prepare('SELECT a.id, u.family_id FROM accounts a LEFT JOIN users u ON a.user_id = u.id WHERE a.id = ?').get(id);
-    return !a || !a.family_id || a.family_id === familyId;
+    if (!a) return false; // Recurso não encontrado: negar acesso (fail-closed)
+    return !a.family_id || a.family_id === familyId;
   }
 
   checkCategoryFamily(idPayload, familyId) {
@@ -392,7 +406,8 @@ module.exports = (Base) => class extends Base {
     id = parseInt(id);
     if (!id || isNaN(id)) return true;
     const c = this.db.prepare('SELECT c.id, u.family_id FROM categories c LEFT JOIN users u ON c.user_id = u.id WHERE c.id = ?').get(id);
-    return !c || !c.family_id || c.family_id === familyId;
+    if (!c) return false; // Recurso não encontrado: negar acesso (fail-closed)
+    return !c.family_id || c.family_id === familyId;
   }
 
   checkRecurringFamily(idPayload, familyId) {
@@ -402,7 +417,8 @@ module.exports = (Base) => class extends Base {
     id = parseInt(id);
     if (!id || isNaN(id)) return true;
     const r = this.db.prepare('SELECT ri.id, u.family_id FROM recurring_items ri LEFT JOIN users u ON ri.user_id = u.id WHERE ri.id = ?').get(id);
-    return !r || !r.family_id || r.family_id === familyId;
+    if (!r) return false; // Recurso não encontrado: negar acesso (fail-closed)
+    return !r.family_id || r.family_id === familyId;
   }
 
   checkGoalFamily(idPayload, familyId) {
@@ -412,7 +428,8 @@ module.exports = (Base) => class extends Base {
     id = parseInt(id);
     if (!id || isNaN(id)) return true;
     const g = this.db.prepare('SELECT g.id, u.family_id FROM goals g LEFT JOIN users u ON g.user_id = u.id WHERE g.id = ?').get(id);
-    return !g || !g.family_id || g.family_id === familyId;
+    if (!g) return false; // Recurso não encontrado: negar acesso (fail-closed)
+    return !g.family_id || g.family_id === familyId;
   }
 
   updateUserPermissions(data) {

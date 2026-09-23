@@ -1,11 +1,11 @@
 /* ===
- * accounts.js — L4014–4718 do app.js
+ * accounts.js — Gestão de Contas Bancárias, Cartões, Gráficos Analíticos e Extrato
  */
 
 async function renderAccounts() {
   const page = document.getElementById('page-accounts');
   const [accounts, summary, txs] = await Promise.all([
-    window.api.accounts.getAll(State.user.id),
+    window.api.accounts.getAll({ userId: State.user.id, month: State.currentMonth, year: State.currentYear }),
     window.api.dashboard.getSummary({ userId: State.user.id, month: State.currentMonth, year: State.currentYear }),
     window.api.transactions.getAll({
       userId: State.user.id,
@@ -23,7 +23,7 @@ async function renderAccounts() {
     <div class="page-header" style="align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
       <div>
         <h2 class="page-title">Contas & Cartões</h2>
-        <p class="page-subtitle">Gerencie suas contas bancárias, cartões de benefício e cartões de crédito</p>
+        <p class="page-subtitle">Gerencie suas contas bancárias, previsões de recebimentos, saldos e extratos</p>
       </div>
       <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
         <button class="btn btn-secondary" id="btn-import-statement" style="display:flex;align-items:center;gap:6px"><span>📥</span> Importar Extrato (OFX / CSV)</button>
@@ -38,10 +38,10 @@ async function renderAccounts() {
         <div class="empty-desc">Adicione sua conta corrente, poupança, cartão benefício ou cartão de crédito</div>
       </div>
     ` : `
-      <!-- 🏦 SEÇÃO 1: CONTAS BANCÁRIAS (Saldos em Conta, Limites e Disponibilidades) -->
+      <!-- 🏦 SEÇÃO 1: CONTAS BANCÁRIAS (Previsão de Recebimentos e Saldos) -->
       <div style="margin-bottom: 32px;">
         <h3 style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-          🏦 Contas Bancárias & Carteiras <span style="font-size: 11px; font-weight: 500; text-transform: none; color: var(--text-muted); opacity: 0.85;">(Saldos reais em conta, limites e fluxo do mês)</span>
+          🏦 Contas Bancárias & Carteiras <span style="font-size: 11px; font-weight: 500; text-transform: none; color: var(--text-muted); opacity: 0.85;">(Previsão de recebimentos, saldos reais e extrato)</span>
         </h3>
         <div class="accounts-grid">
           ${bankAccounts.length === 0 ? `
@@ -52,55 +52,71 @@ async function renderAccounts() {
             const userBadge = acc.user_name ? `<span class="profile-badge" style="background:${acc.user_avatar_color || '#10b981'}22;color:${acc.user_avatar_color || '#10b981'};border:1px solid ${acc.user_avatar_color || '#10b981'}44;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600;margin-left:6px;vertical-align:middle;display:inline-block">${acc.user_name}</span>` : '';
             const lockIcon = !canEdit ? `<span title="Apenas Leitura" style="font-size: 11px; margin-left: 6px; cursor: help; opacity: 0.8;">🔒</span>` : '';
             
-            // Calculate dynamic month balance (receitas - despesas - transferencias)
-            const incomes = txs.filter(t => t.account_id === acc.id && t.type === 'income' && t.is_paid === 1).reduce((sum, t) => sum + t.amount, 0);
-            const expenses = txs.filter(t => t.account_id === acc.id && t.type === 'expense' && t.is_paid === 1).reduce((sum, t) => sum + t.amount, 0);
-            const transfersOut = txs.filter(t => t.account_id === acc.id && t.type === 'transfer' && t.is_paid === 1).reduce((sum, t) => sum + t.amount, 0);
-            const monthlyDiff = incomes - expenses - transfersOut;
             const realBalance = acc.balance !== undefined ? Number(acc.balance) : 0;
+            const forecastedIncome = acc.forecasted_income !== undefined ? Number(acc.forecasted_income) : 0;
+            const monthExpenses = acc.month_expenses !== undefined ? Number(acc.month_expenses) : 0;
+            const projectedBalance = acc.projected_balance !== undefined ? Number(acc.projected_balance) : (realBalance + (Number(acc.pending_income) || 0) - (Number(acc.pending_expense) || 0));
             const totalAvailable = realBalance + (Number(acc.overdraft_limit) || 0);
 
             return `
-              <div class="account-card">
+              <div class="account-card account-card-interactive" data-id="${acc.id}" style="cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease;">
                 <div style="position:absolute;top:0;left:0;right:0;height:4px;background:${b.color};border-radius:var(--radius) var(--radius) 0 0"></div>
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-                  ${bankLogo(acc.bank, 36)}
-                  <div>
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+                  ${bankLogo(acc.bank, 38)}
+                  <div style="flex: 1; min-width: 0;">
                     <div class="account-type-badge">${ACCOUNT_TYPES[acc.type] || 'Conta'}</div>
-                    <div class="account-name" style="margin:0;font-size:14px;display:flex;align-items:center">${acc.name}${userBadge}${lockIcon}</div>
+                    <div class="account-name" style="margin:0;font-size:14px;font-weight:700;display:flex;align-items:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${acc.name}">${acc.name}${userBadge}${lockIcon}</div>
                   </div>
                 </div>
-                <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Saldo Atual em Conta</div>
-                <div class="account-balance" style="color:${realBalance >= 0 ? 'var(--accent-light)' : '#f87171'}">${fmt.currency(realBalance)}</div>
                 
-                <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; margin-top:6px; padding:4px 0; border-top:1px dashed var(--border);">
-                  <span style="color:var(--text-muted);">Fluxo do mês:</span>
-                  <strong style="color:${monthlyDiff >= 0 ? 'var(--accent-light)' : '#f87171'}">${monthlyDiff >= 0 ? '+' : ''}${fmt.currency(monthlyDiff)}</strong>
+                <!-- 🎯 DESTAQUE 1 (TOPO): PREVISÃO DE RECEBIMENTOS & SAÍDAS -->
+                <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 10px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                    <div style="font-size: 10px; font-weight: 700; color: var(--accent-light); text-transform: uppercase; letter-spacing: 0.04em;">
+                      💰 Previsão Recebimentos
+                    </div>
+                    <div style="font-size: 10px; color: var(--text-muted);">
+                      Saídas: <strong style="color: #f87171;">${fmt.currency(monthExpenses)}</strong>
+                    </div>
+                  </div>
+                  <div style="font-size: 20px; font-weight: 800; color: var(--accent-light); letter-spacing: -0.02em;">
+                    ${fmt.currency(forecastedIncome)}
+                  </div>
+                  <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px; display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed rgba(16, 185, 129, 0.2); padding-top: 4px;">
+                    <span>Saldo Previsto Fim Mês:</span>
+                    <strong style="color: ${projectedBalance >= 0 ? 'var(--accent-light)' : '#f87171'};">${fmt.currency(projectedBalance)}</strong>
+                  </div>
                 </div>
 
-                ${acc.agency ? `<div style="font-size:11px;color:var(--text-muted);margin-top:4px">Ag. ${acc.agency}${acc.account_number ? ' • CC ' + acc.account_number : ''}</div>` : ''}
-                
-                ${(acc.overdraft_limit > 0 || acc.banricompras_limit > 0 || acc.credit_minuto_limit > 0) ? `
-                  <div style="margin-top: 10px; margin-bottom: 10px; padding: 10px; border-radius: var(--radius-sm); background: var(--bg-surface); border: 1px solid var(--border);">
-                    <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px;">
-                      📋 Limites da Conta
+                <!-- 🎯 DESTAQUE 2 (EMBAIXO): SALDO REAL EM CONTA & DISPONIBILIDADE -->
+                <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 12px;">
+                  <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                    <div>
+                      <div style="font-size: 10px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.02em;">Saldo Real Hoje</div>
+                      <div class="account-balance" style="font-size: 18px; font-weight: 800; color:${realBalance >= 0 ? 'var(--text-primary)' : '#f87171'}; margin-top: 2px;">
+                        ${fmt.currency(realBalance)}
+                      </div>
                     </div>
                     ${acc.overdraft_limit > 0 ? `
-                    <div style="font-size: 11px; display: flex; justify-content: space-between; margin-bottom: 3px;">
-                      <span style="color: var(--text-muted);">🔴 Cheque Especial:</span>
-                      <span style="font-weight: 600; color: var(--text-primary);">${fmt.currency(acc.overdraft_limit)}</span>
-                    </div>
-                    <div style="font-size: 11px; display: flex; justify-content: space-between; margin-bottom: 3px;">
-                      <span style="color: var(--text-muted);">⚡ Disponível Total:</span>
-                      <span style="font-weight: 700; color: ${totalAvailable >= 0 ? '#34d399' : '#f87171'};">${fmt.currency(totalAvailable)}</span>
+                    <div style="text-align: right;">
+                      <div style="font-size: 10px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.02em;">Disponível c/ LIS</div>
+                      <div style="font-size: 14px; font-weight: 700; color:${totalAvailable >= 0 ? '#34d399' : '#f87171'}; margin-top: 2px;">
+                        ${fmt.currency(totalAvailable)}
+                      </div>
                     </div>` : ''}
+                  </div>
+                  ${acc.agency ? `<div style="font-size: 10.5px; color: var(--text-muted); margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border);">Ag. ${acc.agency}${acc.account_number ? ' • CC ' + acc.account_number : ''}</div>` : ''}
+                </div>
+                
+                ${(acc.banricompras_limit > 0 || acc.credit_minuto_limit > 0) ? `
+                  <div style="margin-bottom: 12px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--bg-surface); border: 1px solid var(--border); font-size: 11px;">
                     ${acc.banricompras_limit > 0 ? `
-                    <div style="font-size: 11px; display: flex; justify-content: space-between; margin-bottom: 3px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
                       <span style="color: var(--text-muted);">🛍️ Banricompras:</span>
-                      <span style="font-weight: 600; color: #fbbf24;">${fmt.currency(acc.banricompras_available)} / ${fmt.currency(acc.banricompras_limit)}</span>
+                      <span style="font-weight: 600; color: #fbbf24;">${fmt.currency(acc.banricompras_available)}</span>
                     </div>` : ''}
                     ${acc.credit_minuto_limit > 0 ? `
-                    <div style="font-size: 11px; display: flex; justify-content: space-between;">
+                    <div style="display: flex; justify-content: space-between;">
                       <span style="color: var(--text-muted);">⚡ Crédito Minuto:</span>
                       <span style="font-weight: 600; color: #60a5fa;">${fmt.currency(acc.credit_minuto_limit)}</span>
                     </div>` : ''}
@@ -108,10 +124,13 @@ async function renderAccounts() {
                 ` : ''}
 
                 <div class="account-actions">
+                  <button class="btn btn-primary btn-sm acc-open-hub" data-id="${acc.id}" style="flex: 1; min-width: 0; padding: 6px 4px; font-size: 11.5px;" title="Ver Gestão e Gráficos">
+                    <span>📊</span> Gerenciar & Gráficos
+                  </button>
                   ${canEdit 
-                    ? `<button class="btn btn-secondary btn-sm acc-edit" data-id="${acc.id}">✏️ Editar</button>
-                       <button class="btn btn-danger btn-sm acc-delete" data-id="${acc.id}">🗑</button>`
-                    : `<button class="btn btn-secondary btn-sm" disabled style="opacity:0.5; cursor:not-allowed; width: 100%;">🔒 Apenas Leitura</button>`
+                    ? `<button class="btn btn-secondary btn-sm acc-edit" data-id="${acc.id}" title="Editar Cadastro">✏️</button>
+                       <button class="btn btn-danger btn-sm acc-delete" data-id="${acc.id}" title="Excluir Conta">🗑</button>`
+                    : `<button class="btn btn-secondary btn-sm acc-edit" disabled style="opacity:0.5; cursor:not-allowed;">🔒</button>`
                   }
                 </div>
               </div>`;
@@ -135,19 +154,26 @@ async function renderAccounts() {
             const benefitLabel = BENEFIT_TYPES[acc.benefit_type] || 'Cartão Benefício';
 
             return `
-              <div class="account-card">
+              <div class="account-card account-card-interactive" data-id="${acc.id}">
                 <div style="position:absolute;top:0;left:0;right:0;height:4px;background:${b.color};border-radius:var(--radius) var(--radius) 0 0"></div>
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-                  ${bankLogo(acc.bank, 36)}
-                  <div>
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+                  ${bankLogo(acc.bank, 38)}
+                  <div style="flex: 1; min-width: 0;">
                     <div class="account-type-badge" style="background:${b.color}22;color:${b.color};border:1px solid ${b.color}44">${benefitLabel}</div>
-                    <div class="account-name" style="margin:0;font-size:14px;display:flex;align-items:center">${acc.name}${userBadge}${lockIcon}</div>
+                    <div class="account-name" style="margin:0;font-size:14px;font-weight:700;display:flex;align-items:center">${acc.name}${userBadge}${lockIcon}</div>
                   </div>
                 </div>
-                <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Saldo Atual no Cartão</div>
-                <div class="account-balance" style="color:var(--accent-light)">${fmt.currency(acc.balance || 0)}</div>
+
+                <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 12px;">
+                  <div style="font-size: 10.5px; font-weight: 700; color: var(--accent-light); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 2px;">
+                    Saldo Atual no Cartão
+                  </div>
+                  <div style="font-size: 22px; font-weight: 800; color: var(--accent-light); letter-spacing: -0.02em;">
+                    ${fmt.currency(acc.balance || 0)}
+                  </div>
+                </div>
                 
-                <div style="margin-top: 10px; margin-bottom: 12px; padding: 10px; border-radius: var(--radius-sm); background: var(--bg-surface); border: 1px solid var(--border);">
+                <div style="margin-bottom: 12px; padding: 10px; border-radius: var(--radius-sm); background: var(--bg-surface); border: 1px solid var(--border);">
                   <div style="font-size: 11px; display: flex; justify-content: space-between; margin-bottom: 4px;">
                     <span style="color: var(--text-muted);">🏢 Recarga Mensal:</span>
                     <span style="font-weight: 700; color: var(--text-primary);">${acc.benefit_monthly_credit ? fmt.currency(acc.benefit_monthly_credit) : 'Não informada'}</span>
@@ -164,10 +190,13 @@ async function renderAccounts() {
                 </div>
 
                 <div class="account-actions">
+                  <button class="btn btn-primary btn-sm acc-open-hub" data-id="${acc.id}" style="flex: 1; min-width: 0; padding: 6px 4px; font-size: 11.5px;" title="Ver Extrato e Análise">
+                    <span>📊</span> Extrato & Análise
+                  </button>
                   ${canEdit 
-                    ? `<button class="btn btn-secondary btn-sm acc-edit" data-id="${acc.id}">✏️ Editar</button>
-                       <button class="btn btn-danger btn-sm acc-delete" data-id="${acc.id}">🗑</button>`
-                    : `<button class="btn btn-secondary btn-sm" disabled style="opacity:0.5; cursor:not-allowed; width: 100%;">🔒 Apenas Leitura</button>`
+                    ? `<button class="btn btn-secondary btn-sm acc-edit" data-id="${acc.id}" title="Editar Cadastro">✏️</button>
+                       <button class="btn btn-danger btn-sm acc-delete" data-id="${acc.id}" title="Excluir Cartão">🗑</button>`
+                    : `<button class="btn btn-secondary btn-sm acc-edit" disabled style="opacity:0.5; cursor:not-allowed;">🔒</button>`
                   }
                 </div>
               </div>`;
@@ -178,59 +207,69 @@ async function renderAccounts() {
       <!-- 💳 SEÇÃO 3: LIMITES DE CARTÕES (Fatura do período e limites disponíveis) -->
       <div style="margin-top: 32px; margin-bottom: 24px;">
         <h3 style="font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-          💳 Limites de Cartões de Crédito <span style="font-size: 11px; font-weight: 500; text-transform: none; color: var(--text-muted); opacity: 0.85;">(Fatura do período e limites disponíveis)</span>
+          💳 Cartões de Crédito <span style="font-size: 11px; font-weight: 500; text-transform: none; color: var(--text-muted); opacity: 0.85;">(Fatura do período e limites disponíveis)</span>
         </h3>
         <div class="accounts-grid">
           ${creditAccounts.length === 0 ? `
-            <div class="empty-state" style="grid-column: 1/-1; padding: 24px;">Nenhum cartão de crédito cadastrado.</div>
+            <div class="empty-state" style="grid-column: 1/-1; padding: 24px;">Nenhum cartão de crédito cadastrado. Clique em "+ Nova conta / cartão" para adicionar.</div>
           ` : creditAccounts.map(acc => {
             const b = BANKS[acc.bank] || BANKS.outro;
             const canEdit = State.permissions.can_edit_all === 1 || acc.user_id === State.user.id;
             const userBadge = acc.user_name ? `<span class="profile-badge" style="background:${acc.user_avatar_color || '#10b981'}22;color:${acc.user_avatar_color || '#10b981'};border:1px solid ${acc.user_avatar_color || '#10b981'}44;padding:2px 6px;border-radius:10px;font-size:10px;font-weight:600;margin-left:6px;vertical-align:middle;display:inline-block">${acc.user_name}</span>` : '';
             const lockIcon = !canEdit ? `<span title="Apenas Leitura" style="font-size: 11px; margin-left: 6px; cursor: help; opacity: 0.8;">🔒</span>` : '';
-            
-            const spent = cardSpending[acc.id] || 0;
+            const spent = acc.credit_used !== undefined ? Number(acc.credit_used) : (cardSpending[acc.id] || 0);
+            const monthInvoice = acc.month_invoice !== undefined ? Number(acc.month_invoice) : ((summary.cardMonthlyInvoices && summary.cardMonthlyInvoices[acc.id]) || 0);
             const available = (acc.credit_limit || 0) - spent;
-            const isExceeded = (acc.credit_limit || 0) > 0 && spent > (acc.credit_limit || 0);
+            const isExceeded = available < 0;
 
             return `
-              <div class="account-card" style="${isExceeded ? 'border: 1px solid rgba(239, 68, 68, 0.4);' : ''}">
-                <div style="position:absolute;top:0;left:0;right:0;height:4px;background:${isExceeded ? '#ef4444' : b.color};border-radius:var(--radius) var(--radius) 0 0"></div>
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-                  ${bankLogo(acc.bank, 36)}
-                  <div>
+              <div class="account-card account-card-interactive" data-id="${acc.id}">
+                <div style="position:absolute;top:0;left:0;right:0;height:4px;background:${b.color};border-radius:var(--radius) var(--radius) 0 0"></div>
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+                  ${bankLogo(acc.bank, 38)}
+                  <div style="flex: 1; min-width: 0;">
                     <div class="account-type-badge">${ACCOUNT_TYPES[acc.type]}</div>
-                    <div class="account-name" style="margin:0;font-size:14px;display:flex;align-items:center">
+                    <div class="account-name" style="margin:0;font-size:14px;font-weight:700;display:flex;align-items:center">
                       ${acc.name}${userBadge}${lockIcon}
                     </div>
                   </div>
                 </div>
                 
-                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
-                  <div>
-                    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600;letter-spacing:0.02em;" title="Soma das faturas abertas + todas as parcelas futuras que consom o limite">Comprometido Total</div>
-                    <div style="font-size:16px;font-weight:700;color:#f87171;">${fmt.currency(spent)}</div>
+                <!-- 🎯 DESTAQUE 1: FATURA DO MÊS -->
+                <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 10px;">
+                  <div style="font-size: 10px; font-weight: 700; color: #f87171; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 2px;">
+                    🧾 Fatura ${MONTHS[State.currentMonth - 1] || 'do Mês'}
                   </div>
-                  <div style="text-align: right;">
-                    <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;font-weight:600;letter-spacing:0.02em;">${isExceeded ? 'Excedido / Negativo' : 'Disponível'}</div>
-                    <div style="font-size:16px;font-weight:700;color:${isExceeded ? '#f87171' : 'var(--accent-light)'};">${fmt.currency(available)}</div>
+                  <div style="font-size: 20px; font-weight: 800; color: #f87171; letter-spacing: -0.02em;">
+                    ${fmt.currency(monthInvoice)}
                   </div>
                 </div>
 
-                ${isExceeded ? `
-                <div style="margin-bottom:10px;padding:4px 8px;border-radius:6px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:#f87171;font-size:10px;font-weight:700;display:flex;align-items:center;gap:4px">
-                  <span>⚠️</span> Limite estourado em ${fmt.currency(Math.abs(available))}
-                </div>` : ''}
-
-                <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px;text-transform:uppercase;font-weight:600;letter-spacing:0.02em;">Limite total</div>
-                <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--text-secondary);">${fmt.currency(acc.credit_limit)}</div>
-                
-                <div style="font-size:11px;color:var(--text-muted);margin-top:6px;margin-bottom:12px;">Fecha dia ${acc.closing_day || '—'} • Vence dia ${acc.due_day || '—'}</div>
+                <!-- 🎯 DESTAQUE 2: COMPROMETIDO TOTAL & LIMITE DISPONÍVEL -->
+                <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 12px;">
+                  <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--border);">
+                    <div>
+                      <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Total Comprometido</div>
+                      <div style="font-size: 14px; font-weight: 700; color: #f87171;">${fmt.currency(spent)}</div>
+                    </div>
+                    <div style="text-align: right;">
+                      <div style="font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">${isExceeded ? 'Excedido' : 'Disponível'}</div>
+                      <div style="font-size: 14px; font-weight: 700; color: ${isExceeded ? '#f87171' : 'var(--accent-light)'};">${fmt.currency(available)}</div>
+                    </div>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-muted);">
+                    <span>Limite: <strong style="color: var(--text-secondary);">${fmt.currency(acc.credit_limit)}</strong></span>
+                    <span>Fecha ${acc.closing_day || '—'} • Vence ${acc.due_day || '—'}</span>
+                  </div>
+                </div>
                 <div class="account-actions">
+                  <button class="btn btn-primary btn-sm acc-open-hub" data-id="${acc.id}" style="flex: 1; min-width: 0; padding: 6px 4px; font-size: 11.5px;" title="Ver Lançamentos e Fatura">
+                    <span>📊</span> Fatura & Extrato
+                  </button>
                   ${canEdit 
-                    ? `<button class="btn btn-secondary btn-sm acc-edit" data-id="${acc.id}">✏️ Editar</button>
-                       <button class="btn btn-danger btn-sm acc-delete" data-id="${acc.id}">🗑</button>`
-                    : `<button class="btn btn-secondary btn-sm" disabled style="opacity:0.5; cursor:not-allowed; width: 100%;">🔒 Apenas Leitura</button>`
+                    ? `<button class="btn btn-secondary btn-sm acc-edit" data-id="${acc.id}" title="Editar Cadastro">✏️</button>
+                       <button class="btn btn-danger btn-sm acc-delete" data-id="${acc.id}" title="Excluir Cartão">🗑</button>`
+                    : `<button class="btn btn-secondary btn-sm acc-edit" disabled style="opacity:0.5; cursor:not-allowed;">🔒</button>`
                   }
                 </div>
               </div>`;
@@ -241,15 +280,36 @@ async function renderAccounts() {
     ${accounts.length > 1 ? `<div style="margin-top:16px"><button class="btn btn-secondary" id="btn-transfer">🔄 Transferência entre contas</button></div>` : ''}
   `;
 
+  // Bind Hub modal opening
+  page.querySelectorAll('.acc-open-hub').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const accountId = parseInt(btn.dataset.id);
+      openAccountHubModal(accountId);
+    };
+  });
+
+  // Bind Card click to open Hub modal
+  page.querySelectorAll('.account-card').forEach(card => {
+    card.onclick = (e) => {
+      if (e.target.closest('button')) return;
+      const accountId = parseInt(card.dataset.id);
+      if (accountId) openAccountHubModal(accountId);
+    };
+  });
+
   // Bind edit & delete buttons
   page.querySelectorAll('.acc-edit').forEach(btn => {
-    btn.onclick = () => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
       const acc = accounts.find(a => a.id === parseInt(btn.dataset.id));
       openAccountModal(acc);
     };
   });
+
   page.querySelectorAll('.acc-delete').forEach(btn => {
-    btn.onclick = async () => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
       const id = parseInt(btn.dataset.id);
       const acc = accounts.find(a => a.id === id);
       const confirmDelete = await Modal.confirm(`Excluir conta "${acc?.name}"?`);
@@ -268,6 +328,799 @@ async function renderAccounts() {
   if (btnImportStatement) btnImportStatement.onclick = () => openImportStatementModal(accounts);
   const btnTransfer = document.getElementById('btn-transfer');
   if (btnTransfer) btnTransfer.onclick = () => openTransferModal(accounts);
+}
+
+/**
+ * Hub Interativo da Conta (Gráfico Semanal/Mensal, Extrato e Edição Cadastral)
+ */
+async function openAccountHubModal(accountId, initialTab = 'chart', periodMode = 'month') {
+  try {
+    const [accounts, categories, users, summary] = await Promise.all([
+      window.api.accounts.getAll({ userId: State.user.id, month: State.currentMonth, year: State.currentYear }),
+      window.api.categories.getAll(State.user.id),
+      window.api.auth.getUsers().catch(() => []),
+      window.api.dashboard.getSummary({ userId: State.user.id, month: State.currentMonth, year: State.currentYear }).catch(() => null)
+    ]);
+
+    const acc = (accounts || []).find(a => a.id === accountId);
+    if (!acc) return toast('Conta não encontrada', 'error');
+
+    const userList = Array.isArray(users) ? users : (users?.users || []);
+    const b = BANKS[acc.bank] || BANKS.outro;
+    const isCredit = acc.type === 'credit';
+    const isVoucher = acc.type === 'voucher';
+    const isDebit = !isCredit && !isVoucher;
+    const monthName = MONTHS[State.currentMonth - 1] || 'Mês';
+
+    // Métricas para Contas Bancárias / Carteiras
+    const realBalance = Number(acc.balance) || 0;
+    const forecastedIncome = Number(acc.forecasted_income) || 0;
+    const monthExpenses = Number(acc.month_expenses) || 0;
+    const projectedBalance = acc.projected_balance !== undefined ? Number(acc.projected_balance) : (realBalance + (Number(acc.pending_income) || 0) - (Number(acc.pending_expense) || 0));
+    const totalAvailable = realBalance + (Number(acc.overdraft_limit) || 0);
+
+    // Métricas para Cartão de Crédito
+    const cardSpending = acc.credit_used !== undefined ? Number(acc.credit_used) : ((summary?.cardSpending && summary.cardSpending[acc.id]) != null ? summary.cardSpending[acc.id] : 0);
+    const monthInvoice = acc.month_invoice !== undefined ? Number(acc.month_invoice) : ((summary?.cardMonthlyInvoices && summary.cardMonthlyInvoices[acc.id]) != null ? summary.cardMonthlyInvoices[acc.id] : 0);
+    const availableCredit = (acc.credit_limit || 0) - cardSpending;
+    const isCreditExceeded = availableCredit < 0;
+
+    // Métricas para Cartão Benefício
+    const benefitBalance = Number(acc.balance) || 0;
+    const benefitMonthly = Number(acc.benefit_monthly_credit) || 0;
+
+    // Carrega analytics e transações com tratamento de erro seguro
+    let analytics = { labels: [], incomes: [], expenses: [], netFlow: [], totalIncome: 0, totalExpense: 0 };
+    let txs = [];
+
+    try {
+      const [anRes, txRes] = await Promise.all([
+        window.api.accounts.getAnalytics({ accountId, periodMode, month: State.currentMonth, year: State.currentYear }),
+        window.api.accounts.getTransactions({ accountId, month: State.currentMonth, year: State.currentYear })
+      ]);
+      if (anRes && Array.isArray(anRes.labels)) analytics = anRes;
+      if (Array.isArray(txRes)) txs = txRes;
+    } catch (apiErr) {
+      console.warn('[Hub Conta] Aviso ao carregar analytics/extrato:', apiErr);
+    }
+
+    const modalHtml = `
+    <div style="min-width: 680px; max-width: 860px; width: 100%;">
+      <!-- 🏦 CABEÇALHO DA CONTA COM KPIS RÁPIDOS ESPECÍFICOS -->
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          ${bankLogo(acc.bank, 46)}
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <h3 style="margin: 0; font-size: 18px; font-weight: 800; color: var(--text-primary);">${acc.name}</h3>
+              <span class="account-type-badge">${ACCOUNT_TYPES[acc.type] || 'Conta'}</span>
+            </div>
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;">
+              ${acc.user_name ? `👤 Titular: <strong>${acc.user_name}</strong> • ` : ''}
+              ${isCredit 
+                ? `💳 Fecha dia <strong>${acc.closing_day || '—'}</strong> • Vence dia <strong>${acc.due_day || '—'}</strong>`
+                : isVoucher
+                  ? `🎟️ Recarga todo dia <strong>${acc.benefit_credit_day || 1}</strong>${acc.card_last_digits ? ` • Final ${acc.card_last_digits}` : ''}`
+                  : (acc.agency ? `Ag. ${acc.agency} • CC ${acc.account_number || ''}` : b.name)
+              }
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          ${isCredit ? `
+            <!-- BADGES CARTÃO DE CRÉDITO -->
+            <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); padding: 6px 12px; border-radius: var(--radius-sm); text-align: right;">
+              <div style="font-size: 10px; font-weight: 700; color: #f87171; text-transform: uppercase;">Fatura ${monthName}</div>
+              <div style="font-size: 15px; font-weight: 800; color: #f87171;">${fmt.currency(monthInvoice)}</div>
+            </div>
+            <div style="background: var(--bg-surface); border: 1px solid var(--border); padding: 6px 12px; border-radius: var(--radius-sm); text-align: right;">
+              <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Comprometido Total</div>
+              <div style="font-size: 15px; font-weight: 800; color: #f87171;">${fmt.currency(cardSpending)}</div>
+            </div>
+            <div style="background: var(--bg-surface); border: 1px solid var(--border); padding: 6px 12px; border-radius: var(--radius-sm); text-align: right;">
+              <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">${isCreditExceeded ? 'Limite Excedido' : 'Limite Disponível'}</div>
+              <div style="font-size: 15px; font-weight: 800; color: ${isCreditExceeded ? '#f87171' : 'var(--accent-light)'};">${fmt.currency(availableCredit)}</div>
+            </div>
+            <div style="background: var(--bg-surface); border: 1px solid var(--border); padding: 6px 12px; border-radius: var(--radius-sm); text-align: right;">
+              <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Limite Total</div>
+              <div style="font-size: 15px; font-weight: 800; color: var(--text-primary);">${fmt.currency(acc.credit_limit || 0)}</div>
+            </div>
+          ` : isVoucher ? `
+            <!-- BADGES CARTÃO BENEFÍCIO -->
+            <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); padding: 6px 12px; border-radius: var(--radius-sm); text-align: right;">
+              <div style="font-size: 10px; font-weight: 700; color: var(--accent-light); text-transform: uppercase;">Saldo Atual</div>
+              <div style="font-size: 15px; font-weight: 800; color: var(--accent-light);">${fmt.currency(benefitBalance)}</div>
+            </div>
+            <div style="background: var(--bg-surface); border: 1px solid var(--border); padding: 6px 12px; border-radius: var(--radius-sm); text-align: right;">
+              <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Recarga Mensal</div>
+              <div style="font-size: 15px; font-weight: 800; color: var(--text-primary);">${fmt.currency(benefitMonthly)}</div>
+            </div>
+            <div style="background: var(--bg-surface); border: 1px solid var(--border); padding: 6px 12px; border-radius: var(--radius-sm); text-align: right;">
+              <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Gastos no Mês</div>
+              <div style="font-size: 15px; font-weight: 800; color: #f87171;">${fmt.currency(analytics.totalExpense)}</div>
+            </div>
+          ` : `
+            <!-- BADGES CONTA CORRENTE / CARTEIRA / POUPANÇA -->
+            <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); padding: 6px 12px; border-radius: var(--radius-sm); text-align: right;">
+              <div style="font-size: 10px; font-weight: 700; color: var(--accent-light); text-transform: uppercase;">Previsão Entradas</div>
+              <div style="font-size: 15px; font-weight: 800; color: var(--accent-light);">${fmt.currency(forecastedIncome)}</div>
+            </div>
+            <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); padding: 6px 12px; border-radius: var(--radius-sm); text-align: right;">
+              <div style="font-size: 10px; font-weight: 700; color: #f87171; text-transform: uppercase;">Saídas do Mês</div>
+              <div style="font-size: 15px; font-weight: 800; color: #f87171;">${fmt.currency(monthExpenses)}</div>
+            </div>
+            <div style="background: var(--bg-surface); border: 1px solid var(--border); padding: 6px 12px; border-radius: var(--radius-sm); text-align: right;">
+              <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Saldo Previsto Fim Mês</div>
+              <div style="font-size: 15px; font-weight: 800; color: ${projectedBalance >= 0 ? 'var(--accent-light)' : '#f87171'};">${fmt.currency(projectedBalance)}</div>
+            </div>
+            <div style="background: var(--bg-surface); border: 1px solid var(--border); padding: 6px 12px; border-radius: var(--radius-sm); text-align: right;">
+              <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Saldo Real Hoje</div>
+              <div style="font-size: 15px; font-weight: 800; color: ${realBalance >= 0 ? 'var(--text-primary)' : '#f87171'};">${fmt.currency(realBalance)}</div>
+            </div>
+            ${acc.overdraft_limit > 0 ? `
+            <div style="background: var(--bg-surface); border: 1px solid var(--border); padding: 6px 12px; border-radius: var(--radius-sm); text-align: right;">
+              <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Disponível c/ LIS</div>
+              <div style="font-size: 15px; font-weight: 800; color: ${totalAvailable >= 0 ? '#34d399' : '#f87171'};">${fmt.currency(totalAvailable)}</div>
+            </div>` : ''}
+          `}
+        </div>
+      </div>
+
+      <!-- 📑 NAVEGAÇÃO POR ABAS -->
+      <div class="tab-nav" style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+        <button class="btn btn-sm ${initialTab === 'chart' ? 'btn-primary' : 'btn-secondary'}" id="hub-tab-chart" style="display: flex; align-items: center; gap: 6px; font-weight: 700;">
+          <span>📊</span> ${isCredit ? 'Evolução da Fatura' : isVoucher ? 'Consumo do Benefício' : 'Gráficos & Evolução'}
+        </button>
+        <button class="btn btn-sm ${initialTab === 'txs' ? 'btn-primary' : 'btn-secondary'}" id="hub-tab-txs" style="display: flex; align-items: center; gap: 6px; font-weight: 700;">
+          <span>📝</span> ${isCredit ? 'Compras na Fatura' : 'Lançamentos & Extrato'} (${txs.length})
+        </button>
+        <button class="btn btn-sm ${initialTab === 'edit' ? 'btn-primary' : 'btn-secondary'}" id="hub-tab-edit" style="display: flex; align-items: center; gap: 6px; font-weight: 700;">
+          <span>⚙️</span> ${isCredit ? 'Configuração do Cartão' : isVoucher ? 'Configuração do Benefício' : 'Cadastro da Conta'}
+        </button>
+      </div>
+
+      <!-- 📊 ABA 1: GRÁFICO & EVOLUÇÃO -->
+      <div id="hub-content-chart" style="${initialTab === 'chart' ? '' : 'display: none;'}">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+          <div style="font-size: 12.5px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+            <span>📈</span> ${isCredit ? `Gastos na Fatura (${monthName}/${State.currentYear})` : isVoucher ? `Consumo do Benefício (${monthName}/${State.currentYear})` : 'Fluxo de Entradas vs Despesas'}
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <button class="btn btn-sm ${periodMode === 'month' ? 'btn-primary' : 'btn-secondary'}" id="hub-toggle-month" style="font-size: 11px; padding: 4px 10px;">
+              📅 Semanas do Mês (${monthName}/${State.currentYear})
+            </button>
+            <button class="btn btn-sm ${periodMode === 'year' ? 'btn-primary' : 'btn-secondary'}" id="hub-toggle-year" style="font-size: 11px; padding: 4px 10px;">
+              📆 Ano Completo (${State.currentYear})
+            </button>
+          </div>
+        </div>
+
+        <div style="background: var(--bg-surface); padding: 14px; border-radius: var(--radius); border: 1px solid var(--border); margin-bottom: 14px;">
+          <div style="position: relative; height: 220px; width: 100%;">
+            <canvas id="hub-chart-canvas"></canvas>
+          </div>
+        </div>
+
+        <!-- TABELA RESUMO DAS SEÇÕES -->
+        <div style="overflow-x: auto;">
+          ${(isCredit || isVoucher) ? `
+            <table class="data-table" style="font-size: 11.5px; width: 100%;">
+              <thead>
+                <tr>
+                  <th>Período</th>
+                  <th style="text-align: right; color: #f87171;">${isCredit ? 'Gastos na Fatura (−)' : 'Consumo Realizado (−)'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${analytics.labels.map((lbl, idx) => {
+                  const exp = analytics.expenses[idx] || 0;
+                  return `
+                    <tr>
+                      <td><strong>${lbl}</strong></td>
+                      <td style="text-align: right; color: #f87171; font-weight: 700;">${fmt.currency(exp)}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+              <tfoot>
+                <tr style="font-weight: 800; background: var(--bg-surface);">
+                  <td>Total do Período</td>
+                  <td style="text-align: right; color: #f87171;">${fmt.currency(analytics.totalExpense)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          ` : `
+            <table class="data-table" style="font-size: 11.5px; width: 100%;">
+              <thead>
+                <tr>
+                  <th>Período</th>
+                  <th style="text-align: right; color: var(--accent-light);">Entradas (+)</th>
+                  <th style="text-align: right; color: #f87171;">Despesas (−)</th>
+                  <th style="text-align: right;">Resultado Líquido</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${analytics.labels.map((lbl, idx) => {
+                  const inc = analytics.incomes[idx] || 0;
+                  const exp = analytics.expenses[idx] || 0;
+                  const net = analytics.netFlow[idx] || 0;
+                  return `
+                    <tr>
+                      <td><strong>${lbl}</strong></td>
+                      <td style="text-align: right; color: var(--accent-light); font-weight: 600;">${fmt.currency(inc)}</td>
+                      <td style="text-align: right; color: #f87171; font-weight: 600;">${fmt.currency(exp)}</td>
+                      <td style="text-align: right; font-weight: 700; color: ${net >= 0 ? 'var(--accent-light)' : '#f87171'};">
+                        ${net >= 0 ? '+' : ''}${fmt.currency(net)}
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+              <tfoot>
+                <tr style="font-weight: 800; background: var(--bg-surface);">
+                  <td>Total Geral</td>
+                  <td style="text-align: right; color: var(--accent-light);">${fmt.currency(analytics.totalIncome)}</td>
+                  <td style="text-align: right; color: #f87171;">${fmt.currency(analytics.totalExpense)}</td>
+                  <td style="text-align: right; color: ${(analytics.totalIncome - analytics.totalExpense) >= 0 ? 'var(--accent-light)' : '#f87171'};">
+                    ${(analytics.totalIncome - analytics.totalExpense) >= 0 ? '+' : ''}${fmt.currency(analytics.totalIncome - analytics.totalExpense)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          `}
+        </div>
+      </div>
+
+      <!-- 📝 ABA 2: LANÇAMENTOS & EXTRATO -->
+      <div id="hub-content-txs" style="${initialTab === 'txs' ? '' : 'display: none;'}">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 10px; flex-wrap: wrap;">
+          <div style="font-size: 12.5px; font-weight: 700; color: var(--text-primary);">
+            ${isCredit ? `Compras na Fatura (${monthName}/${State.currentYear})` : isVoucher ? `Extrato do Cartão Benefício (${monthName}/${State.currentYear})` : `Extrato de Lançamentos (${monthName}/${State.currentYear})`}
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-primary btn-sm" id="btn-hub-new-tx" style="display: flex; align-items: center; gap: 6px; font-size: 12px;">
+              <span>+</span> ${isCredit ? 'Nova Compra no Cartão' : isVoucher ? 'Novo Gasto com Benefício' : 'Novo Lançamento nesta Conta'}
+            </button>
+          </div>
+        </div>
+
+        ${txs.length === 0 ? `
+          <div class="empty-state" style="padding: 30px 20px;">
+            <div class="empty-icon" style="font-size: 28px;">📭</div>
+            <div class="empty-title" style="font-size: 14px;">Nenhum lançamento encontrado para este período</div>
+            <div class="empty-desc" style="font-size: 12px;">Clique no botão acima para adicionar um novo registro.</div>
+          </div>
+        ` : `
+          <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm);">
+            <table class="data-table" style="font-size: 12px; width: 100%; margin: 0;">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Descrição</th>
+                  <th>Categoria</th>
+                  <th style="text-align: right;">Valor</th>
+                  <th style="text-align: center;">Status</th>
+                  <th style="text-align: center;">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${txs.map(t => {
+                  const isInc = t.type === 'income';
+                  const isPaid = t.is_paid === 1;
+                  return `
+                    <tr>
+                      <td style="white-space: nowrap; color: var(--text-muted); font-size: 11px;">${fmt.date(t.date)}</td>
+                      <td style="font-weight: 600;">
+                        ${t.description}
+                        ${t.user_name ? `<span style="font-size: 10px; color: var(--text-muted); display: block; font-weight: normal;">👤 ${t.user_name}</span>` : ''}
+                      </td>
+                      <td>
+                        <span style="font-size: 11px; padding: 2px 6px; border-radius: 4px; background: ${t.category_color ? t.category_color + '22' : 'var(--bg-surface)'}; color: ${t.category_color || 'var(--text-secondary)'}; font-weight: 600;">
+                          ${t.category_icon || '🏷️'} ${t.category_name || 'Sem Categoria'}
+                        </span>
+                      </td>
+                      <td style="text-align: right; font-weight: 700; color: ${isInc ? 'var(--accent-light)' : '#f87171'}; white-space: nowrap;">
+                        ${isInc ? '+' : '−'} ${fmt.currency(t.amount)}
+                      </td>
+                      <td style="text-align: center;">
+                        <span style="font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 10px; background: ${isPaid ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)'}; color: ${isPaid ? 'var(--accent-light)' : '#f59e0b'};">
+                          ${isPaid ? '✓ Pago' : '⏳ Pendente'}
+                        </span>
+                      </td>
+                      <td style="text-align: center; white-space: nowrap;">
+                        <button class="btn btn-secondary btn-sm hub-tx-edit" data-id="${t.id}" style="padding: 2px 6px; font-size: 11px; margin-right: 4px;" title="Editar Lançamento">✏️</button>
+                        <button class="btn btn-danger btn-sm hub-tx-del" data-id="${t.id}" style="padding: 2px 6px; font-size: 11px;" title="Excluir Lançamento">🗑</button>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        `}
+      </div>
+
+      <!-- ⚙️ ABA 3: CADASTRO DA CONTA / CARTÃO -->
+      <div id="hub-content-edit" style="${initialTab === 'edit' ? '' : 'display: none;'}">
+        <form id="form-hub-edit-account" onsubmit="return false;">
+          <div class="form-group">
+            <label>Nome de Identificação</label>
+            <input type="text" id="hub-acc-name" value="${acc.name || ''}" required placeholder="Ex: Banrisul Will, Mercado Livre, Vale Alimentação...">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Tipo de Conta / Cartão</label>
+              <select id="hub-acc-type">
+                ${Object.entries(ACCOUNT_TYPES).map(([v,l]) => `<option value="${v}" ${acc.type === v ? 'selected' : ''}>${l}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Banco / Operadora</label>
+              <select id="hub-acc-bank">
+                ${Object.entries(BANKS).map(([v,bk]) => `<option value="${v}" ${acc.bank === v ? 'selected' : ''}>${bk.emoji} ${bk.name}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Titular / Perfil</label>
+              <select id="hub-acc-user-id">
+                ${userList.map(u => `<option value="${u.id}" ${acc.user_id === u.id ? 'selected' : ''}>${u.name} (@${u.username})</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Classe Patrimonial</label>
+              <select id="hub-acc-asset-class">
+                <option value="checking" ${(acc.asset_class || 'checking') === 'checking' ? 'selected' : ''}>🏦 Conta Corrente / Caixa</option>
+                <option value="cash" ${acc.asset_class === 'cash' ? 'selected' : ''}>💵 Dinheiro Físico</option>
+                <option value="cdb_di" ${acc.asset_class === 'cdb_di' ? 'selected' : ''}>🛡️ Renda Fixa / CDI / Poupança</option>
+                <option value="stocks_fii" ${acc.asset_class === 'stocks_fii' ? 'selected' : ''}>📈 Renda Variável / Ações / FIIs</option>
+                <option value="crypto" ${acc.asset_class === 'crypto' ? 'selected' : ''}>🪙 Criptoativos</option>
+                <option value="real_estate" ${acc.asset_class === 'real_estate' ? 'selected' : ''}>🏠 Bens / Imóveis / Patrimônio</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 💳 CAMPOS ESPECÍFICOS: CARTÃO DE CRÉDITO -->
+          <div id="hub-credit-fields" style="${isCredit ? '' : 'display:none;'}">
+            <div class="form-row form-row-3">
+              <div class="form-group">
+                <label>Limite Total de Crédito (R$)</label>
+                <input type="number" id="hub-acc-credit-limit" step="0.01" min="0" value="${acc.credit_limit || ''}" placeholder="0,00">
+              </div>
+              <div class="form-group">
+                <label>Dia do Fechamento</label>
+                <input type="number" id="hub-acc-closing-day" min="1" max="31" value="${acc.closing_day || ''}" placeholder="15">
+              </div>
+              <div class="form-group">
+                <label>Dia do Vencimento</label>
+                <input type="number" id="hub-acc-due-day" min="1" max="31" value="${acc.due_day || ''}" placeholder="22">
+              </div>
+            </div>
+          </div>
+
+          <!-- 🎟️ CAMPOS ESPECÍFICOS: CARTÃO BENEFÍCIO / VOUCHER -->
+          <div id="hub-benefit-fields" style="${isVoucher ? '' : 'display:none;'}">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Modalidade do Benefício</label>
+                <select id="hub-acc-benefit-type">
+                  ${Object.entries(BENEFIT_TYPES).map(([v,l]) => `<option value="${v}" ${(acc.benefit_type || 'va') === v ? 'selected' : ''}>${l}</option>`).join('')}
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Saldo Atual no Cartão (R$)</label>
+                <input type="number" id="hub-acc-benefit-balance" step="0.01" value="${acc.balance || 0}" placeholder="0,00">
+              </div>
+            </div>
+            <div class="form-row form-row-3">
+              <div class="form-group">
+                <label>Recarga Mensal (R$)</label>
+                <input type="number" id="hub-acc-benefit-credit" step="0.01" value="${acc.benefit_monthly_credit || ''}" placeholder="Ex: 800,00">
+              </div>
+              <div class="form-group">
+                <label>Dia da Recarga</label>
+                <input type="number" id="hub-acc-benefit-day" min="1" max="31" value="${acc.benefit_credit_day || 1}">
+              </div>
+              <div class="form-group">
+                <label>Final do Cartão</label>
+                <input type="text" id="hub-acc-card-last-digits" maxlength="4" value="${acc.card_last_digits || ''}" placeholder="Ex: 1234">
+              </div>
+            </div>
+          </div>
+
+          <!-- 🏦 CAMPOS ESPECÍFICOS: CONTA BANCÁRIA / CARTEIRA -->
+          <div id="hub-debit-fields" style="${isDebit ? '' : 'display:none;'}">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Saldo Atual em Conta (R$)</label>
+                <input type="number" id="hub-acc-balance" step="0.01" value="${acc.balance || 0}">
+              </div>
+              <div class="form-group">
+                <label>Agência</label>
+                <input type="text" id="hub-acc-agency" value="${acc.agency || ''}" placeholder="0001">
+              </div>
+              <div class="form-group">
+                <label>Número da Conta</label>
+                <input type="text" id="hub-acc-number" value="${acc.account_number || ''}" placeholder="00000-0">
+              </div>
+            </div>
+
+            <div style="background: var(--bg-surface); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-top: 10px; margin-bottom: 16px;">
+              <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px;">
+                📋 Limites e Créditos Vinculados à Conta
+              </div>
+              <div class="form-row form-row-3">
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label style="font-size: 11.5px;">🔴 Cheque Especial (R$)</label>
+                  <input type="number" id="hub-acc-overdraft" step="0.01" min="0" value="${acc.overdraft_limit || ''}" placeholder="0,00">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label style="font-size: 11.5px;">🛍️ Banricompras (R$)</label>
+                  <input type="number" id="hub-acc-banricompras" step="0.01" min="0" value="${acc.banricompras_limit || ''}" placeholder="0,00">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label style="font-size: 11.5px;">⚡ Crédito Minuto (R$)</label>
+                  <input type="number" id="hub-acc-credit-minuto" step="0.01" min="0" value="${acc.credit_minuto_limit || ''}" placeholder="0,00">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px;">
+            <button class="btn btn-primary" id="btn-hub-save-account" style="font-weight: 700;">💾 Salvar Alterações</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  const modalTitle = isCredit 
+    ? `💳 Gestão do Cartão • ${acc.name}` 
+    : isVoucher 
+      ? `🎟️ Gestão do Benefício • ${acc.name}` 
+      : `🏦 Gestão da Conta • ${acc.name}`;
+
+  Modal.open(modalTitle, modalHtml, true);
+
+  // Inicializa gráfico se estiver na aba de gráfico
+  if (initialTab === 'chart') {
+    setTimeout(() => {
+      renderHubChart(analytics, acc.type);
+    }, 50);
+  }
+
+  // Alternância de Abas
+  const tabChart = document.getElementById('hub-tab-chart');
+  const tabTxs = document.getElementById('hub-tab-txs');
+  const tabEdit = document.getElementById('hub-tab-edit');
+
+  const contentChart = document.getElementById('hub-content-chart');
+  const contentTxs = document.getElementById('hub-content-txs');
+  const contentEdit = document.getElementById('hub-content-edit');
+
+  function selectTab(tabName) {
+    tabChart.className = `btn btn-sm ${tabName === 'chart' ? 'btn-primary' : 'btn-secondary'}`;
+    tabTxs.className = `btn btn-sm ${tabName === 'txs' ? 'btn-primary' : 'btn-secondary'}`;
+    tabEdit.className = `btn btn-sm ${tabName === 'edit' ? 'btn-primary' : 'btn-secondary'}`;
+
+    contentChart.style.display = tabName === 'chart' ? '' : 'none';
+    contentTxs.style.display = tabName === 'txs' ? '' : 'none';
+    contentEdit.style.display = tabName === 'edit' ? '' : 'none';
+
+    if (tabName === 'chart') {
+      setTimeout(() => renderHubChart(analytics, acc.type), 50);
+    }
+  }
+
+  tabChart.onclick = () => selectTab('chart');
+  tabTxs.onclick = () => selectTab('txs');
+  tabEdit.onclick = () => selectTab('edit');
+
+  // Alternância de Período do Gráfico (Semanas vs Meses)
+  const toggleMonth = document.getElementById('hub-toggle-month');
+  const toggleYear = document.getElementById('hub-toggle-year');
+
+  if (toggleMonth) {
+    toggleMonth.onclick = () => {
+      openAccountHubModal(accountId, 'chart', 'month');
+    };
+  }
+  if (toggleYear) {
+    toggleYear.onclick = () => {
+      openAccountHubModal(accountId, 'chart', 'year');
+    };
+  }
+
+  // Dinamismo na troca de tipo de conta na aba de edição
+  const selectType = document.getElementById('hub-acc-type');
+  if (selectType) {
+    selectType.onchange = (e) => {
+      const val = e.target.value;
+      const fCredit = document.getElementById('hub-credit-fields');
+      const fBenefit = document.getElementById('hub-benefit-fields');
+      const fDebit = document.getElementById('hub-debit-fields');
+      if (fCredit) fCredit.style.display = val === 'credit' ? '' : 'none';
+      if (fBenefit) fBenefit.style.display = val === 'voucher' ? '' : 'none';
+      if (fDebit) fDebit.style.display = (val !== 'credit' && val !== 'voucher') ? '' : 'none';
+    };
+  }
+
+  // Botão de Novo Lançamento na Conta / Cartão
+  const btnNewTx = document.getElementById('btn-hub-new-tx');
+  if (btnNewTx) {
+    btnNewTx.onclick = () => {
+      Modal.close();
+      if (typeof openAvulsoModal === 'function') {
+        const defaultType = isCredit ? 'expense' : 'expense';
+        openAvulsoModal(accounts, categories, null, defaultType, { accountId: acc.id });
+      }
+    };
+  }
+
+  // Ações nas transações do Extrato (Editar / Excluir)
+  document.querySelectorAll('.hub-tx-edit').forEach(btn => {
+    btn.onclick = () => {
+      const txId = parseInt(btn.dataset.id);
+      const targetTx = txs.find(t => t.id === txId);
+      if (targetTx && typeof openAvulsoModal === 'function') {
+        Modal.close();
+        openAvulsoModal(accounts, categories, targetTx, targetTx.type);
+      }
+    };
+  });
+
+  document.querySelectorAll('.hub-tx-del').forEach(btn => {
+    btn.onclick = async () => {
+      const txId = parseInt(btn.dataset.id);
+      const targetTx = txs.find(t => t.id === txId);
+      const ok = await Modal.confirm(`Excluir o lançamento "${targetTx?.description}"?`);
+      if (ok) {
+        await window.api.transactions.delete(txId);
+        toast('Lançamento excluído com sucesso');
+        renderAccounts();
+        openAccountHubModal(accountId, 'txs', periodMode);
+      }
+    };
+  });
+
+  // Salvar Alterações da Conta / Cartão
+  const btnSaveAcc = document.getElementById('btn-hub-save-account');
+  if (btnSaveAcc) {
+    btnSaveAcc.onclick = async () => {
+      const name = document.getElementById('hub-acc-name').value.trim();
+      if (!name) return toast('Nome é obrigatório', 'error');
+
+      const selectedType = document.getElementById('hub-acc-type').value;
+      const isCreditType = selectedType === 'credit';
+      const isVoucherType = selectedType === 'voucher';
+
+      let balance = 0;
+      if (isVoucherType) {
+        balance = parseFloat(document.getElementById('hub-acc-benefit-balance')?.value) || 0;
+      } else if (!isCreditType) {
+        balance = parseFloat(document.getElementById('hub-acc-balance')?.value) || 0;
+      }
+
+      const payload = {
+        id: acc.id,
+        name,
+        type: selectedType,
+        bank: document.getElementById('hub-acc-bank').value,
+        user_id: parseInt(document.getElementById('hub-acc-user-id').value) || State.user.id,
+        asset_class: document.getElementById('hub-acc-asset-class').value,
+        balance,
+        // credit fields
+        credit_limit: isCreditType ? (parseFloat(document.getElementById('hub-acc-credit-limit')?.value) || 0) : null,
+        closing_day: isCreditType ? (parseInt(document.getElementById('hub-acc-closing-day')?.value) || null) : null,
+        due_day: isCreditType ? (parseInt(document.getElementById('hub-acc-due-day')?.value) || null) : null,
+        // voucher fields
+        benefit_type: isVoucherType ? document.getElementById('hub-acc-benefit-type')?.value : null,
+        benefit_monthly_credit: isVoucherType ? (parseFloat(document.getElementById('hub-acc-benefit-credit')?.value) || 0) : null,
+        benefit_credit_day: isVoucherType ? (parseInt(document.getElementById('hub-acc-benefit-day')?.value) || 1) : null,
+        card_last_digits: isVoucherType ? (document.getElementById('hub-acc-card-last-digits')?.value.trim() || null) : null,
+        // debit fields
+        agency: !isCreditType && !isVoucherType ? (document.getElementById('hub-acc-agency')?.value.trim() || null) : null,
+        account_number: !isCreditType && !isVoucherType ? (document.getElementById('hub-acc-number')?.value.trim() || null) : null,
+        overdraft_limit: !isCreditType && !isVoucherType ? (parseFloat(document.getElementById('hub-acc-overdraft')?.value) || 0) : 0,
+        banricompras_limit: !isCreditType && !isVoucherType ? (parseFloat(document.getElementById('hub-acc-banricompras')?.value) || 0) : 0,
+        credit_minuto_limit: !isCreditType && !isVoucherType ? (parseFloat(document.getElementById('hub-acc-credit-minuto')?.value) || 0) : 0
+      };
+
+      try {
+        await window.api.accounts.update(payload);
+        toast('Conta atualizada com sucesso!');
+        renderAccounts();
+        openAccountHubModal(accountId, 'edit', periodMode);
+      } catch (err) {
+        toast('Erro ao atualizar conta: ' + (err.message || err), 'error');
+      }
+    };
+  }
+  } catch (err) {
+    console.error('[openAccountHubModal] Erro ao abrir modal:', err);
+    toast('Erro ao abrir gestão da conta: ' + (err.message || err), 'error');
+  }
+}
+window.openAccountHubModal = openAccountHubModal;
+
+/**
+ * Renderiza o Gráfico Chart.js no Hub da Conta / Cartão
+ */
+function renderHubChart(analytics, accountType = 'checking') {
+  const canvas = document.getElementById('hub-chart-canvas');
+  if (!canvas || typeof Chart === 'undefined' || !analytics || !Array.isArray(analytics.labels)) return;
+
+  if (window._currentHubChart) {
+    window._currentHubChart.destroy();
+    window._currentHubChart = null;
+  }
+
+  const ctx = canvas.getContext('2d');
+  const isCredit = accountType === 'credit';
+  const isVoucher = accountType === 'voucher';
+
+  if (isCredit || isVoucher) {
+    // Apenas despesas/fatura para cartões de crédito e vouchers
+    const expGrad = ctx.createLinearGradient(0, 0, 0, 200);
+    expGrad.addColorStop(0, 'rgba(248, 113, 113, 0.4)');
+    expGrad.addColorStop(1, 'rgba(248, 113, 113, 0.0)');
+
+    window._currentHubChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: analytics.labels,
+        datasets: [
+          {
+            label: isCredit ? 'Gastos na Fatura (R$)' : 'Consumo Realizado (R$)',
+            data: analytics.expenses,
+            borderColor: '#f87171',
+            backgroundColor: expGrad,
+            borderWidth: 2.5,
+            tension: 0.3,
+            fill: true,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            pointBackgroundColor: '#f87171'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: { color: '#94a3b8', font: { size: 11, weight: '600' }, boxWidth: 12 }
+          },
+          tooltip: {
+            callbacks: {
+              label: function(ctx) {
+                return ` ${ctx.dataset.label}: ${fmt.currency(ctx.parsed.y)}`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: 'rgba(255,255,255,0.05)' },
+            ticks: { color: '#94a3b8', font: { size: 10.5 } }
+          },
+          y: {
+            grid: { color: 'rgba(255,255,255,0.05)' },
+            ticks: {
+              color: '#94a3b8',
+              font: { size: 10.5 },
+              callback: function(value) {
+                return 'R$ ' + value.toLocaleString('pt-BR');
+              }
+            }
+          }
+        }
+      }
+    });
+    return;
+  }
+
+  // Gradientes para contas correntes/carteiras
+  const incGrad = ctx.createLinearGradient(0, 0, 0, 200);
+  incGrad.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
+  incGrad.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+
+  const expGrad = ctx.createLinearGradient(0, 0, 0, 200);
+  expGrad.addColorStop(0, 'rgba(248, 113, 113, 0.35)');
+  expGrad.addColorStop(1, 'rgba(248, 113, 113, 0.0)');
+
+  window._currentHubChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: analytics.labels,
+      datasets: [
+        {
+          label: 'Receitas / Entradas (R$)',
+          data: analytics.incomes,
+          borderColor: '#10b981',
+          backgroundColor: incGrad,
+          borderWidth: 2.5,
+          tension: 0.3,
+          fill: true,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#10b981'
+        },
+        {
+          label: 'Despesas / Saídas (R$)',
+          data: analytics.expenses,
+          borderColor: '#f87171',
+          backgroundColor: expGrad,
+          borderWidth: 2.5,
+          tension: 0.3,
+          fill: true,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#f87171'
+        },
+        {
+          label: 'Resultado Líquido (R$)',
+          data: analytics.netFlow,
+          borderColor: '#60a5fa',
+          borderWidth: 2,
+          borderDash: [5, 5],
+          tension: 0.3,
+          fill: false,
+          pointRadius: 3,
+          pointBackgroundColor: '#60a5fa'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: {
+            color: '#94a3b8',
+            font: { size: 11, weight: '600' },
+            boxWidth: 12
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              return ` ${ctx.dataset.label}: ${fmt.currency(ctx.parsed.y)}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: { color: '#94a3b8', font: { size: 10.5 } }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.05)' },
+          ticks: {
+            color: '#94a3b8',
+            font: { size: 10.5 },
+            callback: function(value) {
+              return 'R$ ' + value.toLocaleString('pt-BR');
+            }
+          }
+        }
+      }
+    }
+  });
 }
 
 async function openAccountModal(acc) {

@@ -4,16 +4,25 @@
  */
 const { parseOfxStatement } = require('./importers/ofxParser');
 const { parseCsvStatement } = require('./importers/csvParser');
+const { getCardBillingCycle } = require('./db-core');
 
 module.exports = (Base) => class extends Base {
-  getAccounts(userId) {
+  getAccounts(userId, month = null, year = null) {
+    let m = month;
+    let y = year;
     if (typeof userId === 'object' && userId !== null) {
+      m = userId.month || m;
+      y = userId.year || y;
       userId = userId.userId || userId.id;
     }
     userId = userId || 1;
     const user = this.db.prepare('SELECT family_id, profile_type FROM users WHERE id = ?').get(userId);
     const familyId = user ? user.family_id : null;
     const profileType = user ? user.profile_type : 2;
+
+    const now = new Date();
+    const curM = m ? String(m).padStart(2, '0') : String(now.getMonth() + 1).padStart(2, '0');
+    const curY = y ? String(y) : String(now.getFullYear());
 
     let accounts = [];
     if (profileType === 1) {
@@ -60,20 +69,33 @@ module.exports = (Base) => class extends Base {
       const available_balance = (acc.balance || 0) + (acc.overdraft_limit || 0);
 
       let credit_used = 0;
+      let month_invoice = 0;
       if (acc.type === 'credit') {
         try {
-          // 1. Transações de despesas pendentes no cartão de crédito
+          // Ciclo de faturamento do cartão no mês selecionado
+          const cycle = getCardBillingCycle(acc.closing_day, acc.due_day, parseInt(curM), parseInt(curY));
+          if (cycle) {
+            month_invoice = this.db.prepare(`
+              SELECT COALESCE(SUM(amount), 0) as total
+              FROM transactions
+              WHERE account_id = ? AND type = 'expense' AND date >= ? AND date <= ?
+            `).get(acc.id, cycle.start, cycle.end).total;
+          } else {
+            month_invoice = this.db.prepare(`
+              SELECT COALESCE(SUM(amount), 0) as total
+              FROM transactions
+              WHERE account_id = ? AND type = 'expense' AND strftime('%m', date) = ? AND strftime('%Y', date) = ?
+            `).get(acc.id, curM, curY).total;
+          }
+
+          // 1. Transações de despesas pendentes/não pagas no cartão de crédito
           const pendingTxTotal = this.db.prepare(`
             SELECT COALESCE(SUM(amount), 0) as total
             FROM transactions
-            WHERE account_id = ? AND type = 'expense' AND is_paid = 0 AND is_avulso != 2
+            WHERE account_id = ? AND type = 'expense' AND (is_paid = 0 OR is_paid IS NULL) AND is_avulso != 2
           `).get(acc.id).total;
 
-          // 2. Itens de despesas recorrentes/planejamento ativos vinculados ao cartão que ainda não viraram transação no mês
-          const now = new Date();
-          const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
-          const currentYear = String(now.getFullYear());
-
+          // 2. Itens recorrentes ativos que ainda não geraram lançamento no mês
           const pendingRecurringTotal = this.db.prepare(`
             SELECT COALESCE(SUM(ri.amount), 0) as total
             FROM recurring_items ri
@@ -83,11 +105,87 @@ module.exports = (Base) => class extends Base {
               WHERE t.recurring_item_id = ri.id
               AND strftime('%m', t.date) = ? AND strftime('%Y', t.date) = ?
             )
-          `).get(acc.id, currentMonth, currentYear).total;
+          `).get(acc.id, curM, curY).total;
 
           credit_used = pendingTxTotal + pendingRecurringTotal;
         } catch (err) {
           credit_used = 0;
+          month_invoice = 0;
+        }
+      }
+
+      // Previsão de recebimentos e saídas do mês para contas bancárias/carteiras/vouchers
+      let forecasted_income = 0;
+      let pending_income = 0;
+      let month_expenses = 0;
+      let pending_expense = 0;
+      let projected_balance = (acc.balance !== undefined ? Number(acc.balance) : 0);
+
+      if (acc.type !== 'credit') {
+        try {
+          const realBalance = Number(acc.balance) || 0;
+
+          // 1. Receitas do mês
+          const txIncomes = this.db.prepare(`
+            SELECT COALESCE(SUM(amount), 0) as total
+            FROM transactions
+            WHERE account_id = ? AND type = 'income' AND strftime('%m', date) = ? AND strftime('%Y', date) = ?
+          `).get(acc.id, curM, curY).total;
+
+          const pendingTxIncome = this.db.prepare(`
+            SELECT COALESCE(SUM(amount), 0) as total
+            FROM transactions
+            WHERE account_id = ? AND type = 'income' AND (is_paid = 0 OR is_paid IS NULL)
+            AND strftime('%m', date) = ? AND strftime('%Y', date) = ?
+          `).get(acc.id, curM, curY).total;
+
+          const pendingRecIncome = this.db.prepare(`
+            SELECT COALESCE(SUM(ri.amount), 0) as total
+            FROM recurring_items ri
+            WHERE ri.account_id = ? AND ri.type = 'income' AND ri.is_active = 1
+            AND NOT EXISTS (
+              SELECT 1 FROM transactions t
+              WHERE t.recurring_item_id = ri.id AND strftime('%m', t.date) = ? AND strftime('%Y', t.date) = ?
+            )
+          `).get(acc.id, curM, curY).total;
+
+          forecasted_income = txIncomes + pendingRecIncome;
+          pending_income = pendingTxIncome + pendingRecIncome;
+
+          // 2. Despesas do mês
+          const txExpenses = this.db.prepare(`
+            SELECT COALESCE(SUM(amount), 0) as total
+            FROM transactions
+            WHERE account_id = ? AND type = 'expense' AND strftime('%m', date) = ? AND strftime('%Y', date) = ?
+          `).get(acc.id, curM, curY).total;
+
+          const pendingTxExpense = this.db.prepare(`
+            SELECT COALESCE(SUM(amount), 0) as total
+            FROM transactions
+            WHERE account_id = ? AND type = 'expense' AND (is_paid = 0 OR is_paid IS NULL)
+            AND strftime('%m', date) = ? AND strftime('%Y', date) = ?
+          `).get(acc.id, curM, curY).total;
+
+          const pendingRecExpense = this.db.prepare(`
+            SELECT COALESCE(SUM(ri.amount), 0) as total
+            FROM recurring_items ri
+            WHERE ri.account_id = ? AND ri.type = 'expense' AND ri.is_active = 1
+            AND NOT EXISTS (
+              SELECT 1 FROM transactions t
+              WHERE t.recurring_item_id = ri.id AND strftime('%m', t.date) = ? AND strftime('%Y', t.date) = ?
+            )
+          `).get(acc.id, curM, curY).total;
+
+          month_expenses = txExpenses + pendingRecExpense;
+          pending_expense = pendingTxExpense + pendingRecExpense;
+
+          projected_balance = realBalance + pending_income - pending_expense;
+        } catch (e) {
+          forecasted_income = 0;
+          pending_income = 0;
+          month_expenses = 0;
+          pending_expense = 0;
+          projected_balance = Number(acc.balance) || 0;
         }
       }
 
@@ -97,11 +195,155 @@ module.exports = (Base) => class extends Base {
         ...acc,
         credit_used,
         available_limit,
+        month_invoice,
         banricompras_used,
         banricompras_available,
-        available_balance
+        available_balance,
+        forecasted_income,
+        pending_income,
+        month_expenses,
+        pending_expense,
+        projected_balance
       };
     });
+  }
+
+  getAccountAnalytics(accountId, periodMode = 'month', month = null, year = null) {
+    const now = new Date();
+    const curMonth = month ? String(month).padStart(2, '0') : String(now.getMonth() + 1).padStart(2, '0');
+    const curYear = year ? String(year) : String(now.getFullYear());
+
+    const acc = this.db.prepare('SELECT id, type, closing_day, due_day FROM accounts WHERE id = ?').get(accountId);
+    const isCredit = acc && acc.type === 'credit';
+
+    if (periodMode === 'year') {
+      const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+      const incomes = [];
+      const expenses = [];
+      const netFlow = [];
+
+      for (let m = 1; m <= 12; m++) {
+        const mStr = String(m).padStart(2, '0');
+
+        if (isCredit) {
+          const cycle = getCardBillingCycle(acc.closing_day, acc.due_day, m, parseInt(curYear));
+          const exp = this.db.prepare(`
+            SELECT COALESCE(SUM(amount), 0) as total
+            FROM transactions
+            WHERE account_id = ? AND type = 'expense'
+            AND date >= ? AND date <= ?
+          `).get(accountId, cycle.start, cycle.end).total;
+
+          incomes.push(0);
+          expenses.push(exp);
+          netFlow.push(exp);
+        } else {
+          const inc = this.db.prepare(`
+            SELECT COALESCE(SUM(amount), 0) as total
+            FROM transactions
+            WHERE account_id = ? AND type = 'income'
+            AND strftime('%m', date) = ? AND strftime('%Y', date) = ?
+          `).get(accountId, mStr, curYear).total;
+
+          const exp = this.db.prepare(`
+            SELECT COALESCE(SUM(amount), 0) as total
+            FROM transactions
+            WHERE account_id = ? AND type = 'expense'
+            AND strftime('%m', date) = ? AND strftime('%Y', date) = ?
+          `).get(accountId, mStr, curYear).total;
+
+          incomes.push(inc);
+          expenses.push(exp);
+          netFlow.push(inc - exp);
+        }
+      }
+
+      return {
+        periodMode: 'year',
+        year: curYear,
+        labels: months,
+        incomes,
+        expenses,
+        netFlow,
+        totalIncome: incomes.reduce((a, b) => a + b, 0),
+        totalExpense: expenses.reduce((a, b) => a + b, 0)
+      };
+    } else {
+      // periodMode === 'month' (por semanas)
+      const weeks = [
+        { label: 'Sem 1 (1-7)', startDay: 1, endDay: 7 },
+        { label: 'Sem 2 (8-14)', startDay: 8, endDay: 14 },
+        { label: 'Sem 3 (15-21)', startDay: 15, endDay: 21 },
+        { label: 'Sem 4 (22-28)', startDay: 22, endDay: 28 },
+        { label: 'Sem 5 (29+)', startDay: 29, endDay: 31 }
+      ];
+
+      const labels = [];
+      const incomes = [];
+      const expenses = [];
+      const netFlow = [];
+
+      for (const w of weeks) {
+        labels.push(w.label);
+
+        const startStr = `${curYear}-${curMonth}-${String(w.startDay).padStart(2, '0')}`;
+        const endStr = `${curYear}-${curMonth}-${String(w.endDay).padStart(2, '0')}`;
+
+        const inc = isCredit ? 0 : this.db.prepare(`
+          SELECT COALESCE(SUM(amount), 0) as total
+          FROM transactions
+          WHERE account_id = ? AND type = 'income'
+          AND date >= ? AND date <= ?
+        `).get(accountId, startStr, endStr).total;
+
+        const exp = this.db.prepare(`
+          SELECT COALESCE(SUM(amount), 0) as total
+          FROM transactions
+          WHERE account_id = ? AND type = 'expense'
+          AND date >= ? AND date <= ?
+        `).get(accountId, startStr, endStr).total;
+
+        incomes.push(inc);
+        expenses.push(exp);
+        netFlow.push(isCredit ? exp : (inc - exp));
+      }
+
+      return {
+        periodMode: 'month',
+        month: curMonth,
+        year: curYear,
+        labels,
+        incomes,
+        expenses,
+        netFlow,
+        totalIncome: incomes.reduce((a, b) => a + b, 0),
+        totalExpense: expenses.reduce((a, b) => a + b, 0)
+      };
+    }
+  }
+
+  getAccountTransactions(accountId, month = null, year = null) {
+    let query = `
+      SELECT t.*, c.name as category_name, c.icon as category_icon, c.color as category_color,
+             u.name as user_name, u.avatar_color as user_avatar_color
+      FROM transactions t
+      LEFT JOIN categories c ON t.category_id = c.id
+      LEFT JOIN users u ON t.user_id = u.id
+      WHERE t.account_id = ?
+    `;
+    const params = [accountId];
+
+    if (month && year) {
+      query += ` AND strftime('%m', t.date) = ? AND strftime('%Y', t.date) = ?`;
+      params.push(String(month).padStart(2, '0'), String(year));
+    } else if (year) {
+      query += ` AND strftime('%Y', t.date) = ?`;
+      params.push(String(year));
+    }
+
+    query += ` ORDER BY t.date DESC, t.id DESC LIMIT 100`;
+
+    return this.db.prepare(query).all(...params);
   }
 
   createAccount(data) {

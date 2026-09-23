@@ -89,22 +89,26 @@ module.exports = (Base) => class extends Base {
           AND date >= ? AND date <= ?
         `).get(acc.id, cycle.start, cycle.end).v;
 
-        // 1. Soma de todas as faturas abertas / não pagas do cartão
-        const openInvoicesSum = this.db.prepare(`
-          SELECT COALESCE(SUM(amount), 0) as v 
-          FROM invoices 
-          WHERE card_account_id = ? AND is_paid = 0 AND is_renegotiated = 0 AND amount > 0
-        `).get(acc.id).v;
+        // 1. Transações de despesas pendentes/não pagas no cartão de crédito
+        const pendingTxTotal = this.db.prepare(`
+          SELECT COALESCE(SUM(amount), 0) as total
+          FROM transactions
+          WHERE account_id = ? AND type = 'expense' AND (is_paid = 0 OR is_paid IS NULL) AND is_avulso != 2
+        `).get(acc.id).total;
 
-        // 2. Despesas avulsas ou pendentes ainda não associadas a faturas abertas
-        const unInvoicedTxs = this.db.prepare(`
-          SELECT COALESCE(SUM(amount), 0) as v 
-          FROM transactions 
-          WHERE account_id = ? AND type = 'expense' AND (is_paid = 0 OR is_paid IS NULL) AND is_avulso != 2 
-          AND (invoice_id IS NULL OR invoice_id NOT IN (SELECT id FROM invoices WHERE card_account_id = ? AND is_paid = 0))
-        `).get(acc.id, acc.id).v;
+        // 2. Itens recorrentes ativos vinculados ao cartão que ainda não geraram lançamento no mês
+        const pendingRecurringTotal = this.db.prepare(`
+          SELECT COALESCE(SUM(ri.amount), 0) as total
+          FROM recurring_items ri
+          WHERE ri.account_id = ? AND ri.type = 'expense' AND ri.is_active = 1
+          AND NOT EXISTS (
+            SELECT 1 FROM transactions t
+            WHERE t.recurring_item_id = ri.id
+            AND strftime('%m', t.date) = ? AND strftime('%Y', t.date) = ?
+          )
+        `).get(acc.id, m, y).total;
 
-        const totalCommitted = openInvoicesSum + unInvoicedTxs;
+        const totalCommitted = pendingTxTotal + pendingRecurringTotal;
 
         cardMonthlyInvoices[acc.id] = cycleSpent;
         cardSpending[acc.id] = totalCommitted;

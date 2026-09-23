@@ -47,6 +47,7 @@ const fmt = {
     return isNaN(parsed.getTime()) ? d : parsed.toLocaleDateString('pt-BR');
   },
   monthYear: (m, y) => new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
+  monthName: (m) => (typeof MONTHS !== 'undefined' && MONTHS[(parseInt(m, 10) || 1) - 1]) ? MONTHS[(parseInt(m, 10) || 1) - 1] : new Date(2026, (parseInt(m, 10) || 1) - 1, 1).toLocaleDateString('pt-BR', { month: 'long' }),
   time: (d) => {
     if (!d) return '';
     const isoString = d.includes(' ') ? d.replace(' ', 'T') : d;
@@ -54,6 +55,17 @@ const fmt = {
     return isNaN(dateObj.getTime()) ? d : dateObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   }
 };
+
+// ── Segurança: sanitização contra XSS ──────
+/** Escapa caracteres HTML perigosos para inserção segura via innerHTML/template literals */
+function escapeHtml(text) {
+  if (text === null || text === undefined) return '';
+  const str = String(text);
+  const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  return str.replace(/[&<>"']/g, c => map[c]);
+}
+/** Alias curto para uso em template literals: ${H(userInput)} */
+const H = escapeHtml;
 
 /**
  * Retorna os feriados nacionais bancários no Brasil (Anbima/Febraban) para o ano especificado
